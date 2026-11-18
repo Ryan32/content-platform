@@ -6,6 +6,23 @@ This document captures work completed in the originating Portal conversation. Ve
 
 ### Admin usability, invitations and automation — 2026-11-18
 
+- **Deployed to dev (2026-11-18 ~13:50 CST), commit `6392131`.**
+  - Images:
+    - web `aecp-dev-cms:dev-platform-admin-ux`: index `sha256:1d1b74b1…`, amd64 `sha256:772d1741…`
+    - operations `dev-platform-ops-admin-ux`: index `sha256:738eb5a2…`, amd64 `sha256:f29b8275…`
+    - Both verified identical to the local builds.
+  - RDS snapshot `aecp-dev-postgres-pre-admin-ux-20261118` was taken first. Migration `20261118_190233_admin_usability` applied, and the rerun was a no-op.
+  - Smoke test passed. Web service `aecp-dev-library-web:4` is healthy.
+  - New always-on worker `aecp-dev-library-worker:2`:
+    - Roles `aecp-dev-library-worker-execution` and `-task` (S3 `content/*` and `processing/*`, Transcribe, the two approved Bedrock inference profiles).
+    - Private subnets, no public IP.
+    - Paid processing on under the daily limit. The Vimeo token is not stored yet, so Vimeo jobs and Vimeo thumbnails wait.
+    - Verified it started: TLS, current schema, no DDL privilege, reconcile loop running.
+  - Fixed two deploy-script defects found here:
+    - `worker-service.ps1` passed unquoted `Key=…,Value=…` tags, which PowerShell splits.
+    - `worker.js` passed a database target without `:5432`, so the processing CLI's target check correctly refused to start.
+  - The ALB now also admits the owner's new IP. A DNS limitation remains: the owner's current network resolver has no `library-dev.advisorsexcel.com` record, though public DNS returns the CNAME to the ALB. Checks pinned to the ALB address: health 200, home 200, admin login 200, sign-in redirects to Auth0, anonymous thumbnail 404, anonymous cover upload 403.
+  - Not yet verified live: signed-in upload → extraction → AI tagging → Review, cover upload to S3, PDF thumbnails, Transcribe.
 - **Account menu (Portal pattern).**
   - The signed-in person sits at the bottom of the navy menu on both the reader site and the admin. Clicking it opens a card with name and email, then:
     - Reader site: **Admin** for editors and administrators, and **Manage people** for administrators.

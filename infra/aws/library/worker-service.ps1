@@ -49,7 +49,7 @@ try {
                         @{ name = 'aecp-dev-library-worker-task'; policy = 'DevLibraryProcessing'; doc = $task; description = 'AE Library dev worker: S3 processing, Transcribe, approved Bedrock models' })) {
         $found = & aws iam list-roles @iam --query "Roles[?RoleName=='$($role.name)'].RoleName" --output text
         if (-not $found) { Invoke-Aws iam create-role @iam --role-name $role.name --description $role.description --assume-role-policy-document "file://$tmp\trust.json" `
-            --tags Key=Project,Value=AEContentPlatform Key=Environment,Value=dev 'Key=Owner,Value=AE Content Platform' --query Role.Arn --output text }
+            --tags 'Key=Project,Value=AEContentPlatform' 'Key=Environment,Value=dev' 'Key=Owner,Value=AE Content Platform' --query Role.Arn --output text }
         [IO.File]::WriteAllText("$tmp\$($role.policy).json", ($role.doc | ConvertTo-Json -Depth 8))
         Invoke-Aws iam put-role-policy @iam --role-name $role.name --policy-name $role.policy --policy-document "file://$tmp\$($role.policy).json" | Out-Null
     }

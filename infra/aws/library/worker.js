@@ -30,7 +30,7 @@ async function main() {
   url.password = process.env.DB_PASSWORD
   const env = { ...process.env, DATABASE_URI: url.toString(), DATABASE_CA_FILE: file, NODE_EXTRA_CA_CERTS: file, PROCESSING_ENVIRONMENT: 'development' }
   delete env.DB_PASSWORD
-  const target = `${process.env.PGHOST}/${DATABASE}`
+  const target = `${url.hostname}:${url.port}${url.pathname}` // Must equal the CLI's expected host:port/database.
   const worker = spawn(process.execPath, ['node_modules/payload/bin.js', 'run', 'src/processing/cli.ts', 'loop', target], { stdio: 'inherit', env })
   for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => worker.kill(signal))
   worker.once('error', () => { process.exitCode = 1 })

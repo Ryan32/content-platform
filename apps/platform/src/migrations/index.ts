@@ -3,6 +3,7 @@ import * as migration_20261118_041309_import_adapter from './20261118_041309_imp
 import * as migration_20261118_091607_processing_review from './20261118_091607_processing_review';
 import * as migration_20261118_092849_review_receipt from './20261118_092849_review_receipt';
 import * as migration_20261118_190233_admin_usability from './20261118_190233_admin_usability';
+import * as migration_20261118_234658_review_windows_and_sections from './20261118_234658_review_windows_and_sections';
 
 export const migrations = [
   {
@@ -28,6 +29,11 @@ export const migrations = [
   {
     up: migration_20261118_190233_admin_usability.up,
     down: migration_20261118_190233_admin_usability.down,
-    name: '20261118_190233_admin_usability'
+    name: '20261118_190233_admin_usability',
+  },
+  {
+    up: migration_20261118_234658_review_windows_and_sections.up,
+    down: migration_20261118_234658_review_windows_and_sections.down,
+    name: '20261118_234658_review_windows_and_sections'
   },
 ];

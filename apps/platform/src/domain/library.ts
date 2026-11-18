@@ -5,9 +5,14 @@ export interface Material {
   id: string; title: string; description: string; format: string; version: string;
   body: string; updatedAt: string; evidence: Evidence[]
   vimeoId?: string; previewAssetId?: number; downloadAssetIds?: number[]; thumbnailVersion?: string
+  kind?: string; section?: string; topics?: string[]
+  /** Originals the reader may view inline (PDF, image, audio, video, sheets). Download permission is required until view-only derivatives exist (ADR-026). */
+  inlineAssets?: { id: number; mimeType: string }[]
 }
+/** Narrows a listing to part of the Library menu. Values are the stored keys from domain/navigation. */
+export interface BrowseFilters { section?: string; topic?: string; page?: string; kind?: string }
 export interface LibraryRepository {
-  search(query: string, format: string | undefined, page: number, action: 'view' | 'retrieve'): Promise<{ items: Material[]; hasNextPage: boolean }>
+  search(query: string, format: string | undefined, page: number, action: 'view' | 'retrieve', filters?: BrowseFilters): Promise<{ items: Material[]; hasNextPage: boolean }>
   get(id: string, action: 'view' | 'retrieve'): Promise<Material | null>
 }
 

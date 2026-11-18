@@ -54,7 +54,7 @@ function profile(id: number, member: ReturnType<typeof membership>, actions: Act
   return { id, active, grants: actions.map(action => ({ action, ...member })) }
 }
 
-function content(id: number, label: string, accessProfile: number, lifecycle: { state?: string; expiresAt?: string; availableAt?: string } = {}) {
+function content(id: number, label: string, accessProfile: number, lifecycle: { state?: string; expiresAt?: string; availableAt?: string; reviewDueAt?: string; section?: string; topics?: string[]; pages?: string[]; kind?: string } = {}) {
   return { id, title: `Synthetic acceptance ${label}`, accessProfile, state: 'published', format: 'article',
     description: `Synthetic description ${id}`, body: `Synthetic private excerpt ${id}`, updatedAt: now,
     evidenceVersion: 'v1', sourceHash: `synthetic-source-${id}`,
@@ -73,7 +73,7 @@ function matches(doc: Record<string, unknown>, where: Where): boolean {
     return Object.entries(rules).every(([operator, operand]) => {
       switch (operator) {
         case 'equals': return value === operand
-        case 'in': return Array.isArray(operand) && operand.includes(value)
+        case 'in': return Array.isArray(operand) && (Array.isArray(value) ? value.some(v => operand.includes(v)) : operand.includes(value))
         case 'exists': return (value != null) === operand
         case 'contains': return typeof value === 'string' && typeof operand === 'string' && value.toLowerCase().includes(operand.toLowerCase())
         case 'less_than_equal': return typeof value === 'string' && typeof operand === 'string' && value <= operand
@@ -96,13 +96,14 @@ function fixture({ assetReads = false } = {}) {
     profile(37, membership('firm:b', 'wealth'), ['view', 'retrieve']),
   ]
   const documents = [
-    content(101, 'annuity retrieval', 31), content(102, 'annuity view', 32),
+    content(101, 'annuity retrieval', 31, { section: 'products', topics: ['products:commission-schedules'], pages: ['products:commission-schedules'], reviewDueAt: '2027-11-18T12:00:00.000Z' }),
+    content(102, 'annuity view', 32, { section: 'operations', kind: 'howto' }),
     content(103, 'wealth download', 33), content(104, 'crossed membership', 34),
     content(105, 'inactive profile', 35), content(106, 'missing view', 36), content(107, 'wealth retrieval', 37),
     content(108, 'expired at current time', 31, { expiresAt: now }),
     content(109, 'archived', 31, { state: 'archived' }), content(110, 'intake', 31, { state: 'intake' }),
     content(111, 'future release', 31, { availableAt: '2026-11-19T12:00:00.000Z' }),
-    content(112, 'expired PDF', 33, { expiresAt: now }), content(113, 'archived PDF', 33, { state: 'archived' }),
+    content(112, 'expired PDF', 33, { expiresAt: now }), content(114, 'review lapsed', 31, { section: 'products', reviewDueAt: now }), content(113, 'archived PDF', 33, { state: 'archived' }),
     ...Array.from({ length: 21 }, (_, index) => content(200 + index, `denied pagination ${index}`, 34)),
   ]
   const assets = [101, 102, 103, 112, 113].map(id => ({
@@ -217,7 +218,7 @@ describe('synthetic two-firm, two-business-line permission acceptance', () => {
     fixture()
     const repository = (await authenticatedLibrary(session(annuity.id)))!
     const mcp = (await authenticatedLibrary(bearer(annuity.id), 'mcp'))!
-    for (const id of [104, 105, 106, 108, 109, 110, 111]) {
+    for (const id of [104, 105, 106, 108, 109, 110, 111, 114]) {
       expect(await repository.get(String(id), 'view')).toBeNull()
       expect(await mcp.get(String(id), 'retrieve')).toBeNull()
     }
@@ -227,6 +228,19 @@ describe('synthetic two-firm, two-business-line permission acceptance', () => {
     expect(await authenticatedLibrary(bearer(99), 'mcp')).toBeNull()
     const adminRepository = (await authenticatedLibrary(bearer(administrator.id), 'mcp'))!
     expect(await adminRepository.get('101', 'retrieve')).toBeNull()
+  })
+
+  it('REQ-NAV-03: section, topic, page and how-to listings stay inside the reader\'s authorization', async () => {
+    fixture()
+    const repository = (await authenticatedLibrary(session(annuity.id)))!
+    const ids = async (filters: Parameters<typeof repository.search>[4]) => (await repository.search('', undefined, 1, 'view', filters)).items.map(i => Number(i.id))
+    expect(await ids({ section: 'products' })).toEqual([101])
+    expect(await ids({ topic: 'products:commission-schedules' })).toEqual([101])
+    expect(await ids({ page: 'products:commission-schedules' })).toEqual([101])
+    expect(await ids({ kind: 'howto' })).toEqual([102])
+    expect(await ids({ section: 'operations' })).toEqual([102])
+    const other = (await authenticatedLibrary(session(wealth.id)))!
+    expect((await other.search('', undefined, 1, 'view', { section: 'products' })).items).toEqual([])
   })
 
   it('rechecks current grants and memberships before returning previously issued citations', async () => {

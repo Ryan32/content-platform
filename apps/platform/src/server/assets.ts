@@ -3,6 +3,7 @@ import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import config from '../payload.config'
 import { profileIds, publishedWhere } from '../collections/access'
 import { principalFromUser } from '../domain/access'
+import { isInlineType } from '../domain/viewers'
 
 export async function assetResponse(request: Request, assetId: string, download: boolean) {
   const denied = () => new Response('Not found', { status: 404, headers: { 'Cache-Control': 'private, no-store' } })
@@ -22,13 +23,13 @@ export async function assetResponse(request: Request, assetId: string, download:
   const doc = (await payload.find({ collection: 'content', req, overrideAccess: true, depth: 0, limit: 1,
     where: { and: [publishedWhere(ids), { id: { equals: contentId } }] } })).docs[0]
   if (!doc || doc.sourceHash !== asset.version || !/^content\/[A-Za-z0-9/_-]+(?:\.[A-Za-z0-9]+)?$/.test(asset.objectKey)) return denied()
-  if (!download && asset.mimeType !== 'application/pdf') return denied()
+  if (!download && !isInlineType(asset.mimeType)) return denied()
   const range = request.headers.get('range')
   if (range && !/^bytes=\d+-\d*$/.test(range)) return new Response('Invalid range', { status: 416 })
   try {
     const object = await new S3Client({}).send(new GetObjectCommand({ Bucket: process.env.CONTENT_BUCKET, Key: asset.objectKey, ...(range ? { Range: range } : {}) }))
     if (!object.Body) return denied()
-    const headers = new Headers({ 'Content-Type': download ? 'application/octet-stream' : 'application/pdf',
+    const headers = new Headers({ 'Content-Type': download ? 'application/octet-stream' : asset.mimeType.toLowerCase(),
       'Content-Disposition': `${download ? 'attachment' : 'inline'}; filename="resource-${asset.id}${asset.mimeType === 'application/pdf' ? '.pdf' : ''}"`,
       'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'Accept-Ranges': 'bytes',
       'Content-Security-Policy': "sandbox; default-src 'none'; frame-ancestors 'self'" })

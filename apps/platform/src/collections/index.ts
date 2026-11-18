@@ -3,6 +3,8 @@ import { createHash, randomUUID } from 'node:crypto'
 import { admin, deny, editor, readContent } from './access'
 import { allowsBrowserSession, readSession } from '../auth/browser'
 import { isAdminUser, isStaffUser } from './visibility'
+import { CONTENT_KINDS, PAGE_OPTIONS, SECTION_OPTIONS, TOPIC_OPTIONS } from '../domain/navigation'
+import { REVIEW_WINDOWS, applyReviewSchedule } from '../domain/review'
 
 export const vimeoSourceHash = (id: unknown) => id ? createHash('sha256').update(`vimeo:${id}`).digest('hex') : undefined
 const locked = { create: admin, read: admin, update: admin, delete: deny }
@@ -143,6 +145,15 @@ export const Content: CollectionConfig = {
     { name: 'format', type: 'select', required: true, label: 'Format',
       options: [option('article', 'Article'), option('pdf', 'PDF'), option('video', 'Video'), option('audio', 'Audio'), option('slides', 'Slides'), option('document', 'Document')] },
     { name: 'description', type: 'textarea', label: 'Summary', admin: { description: 'Two or three sentences readers see in search results. AI tagging proposes one you can edit in Review.' } },
+    { name: 'kind', type: 'select', required: true, defaultValue: 'resource', label: 'Type', options: CONTENT_KINDS.map(k => ({ ...k })),
+      admin: { description: 'How-to articles are instructional pages written here. They appear in their section like any other item, with a How-to badge and filter.' } },
+    { type: 'collapsible', label: 'Where it appears', admin: { description: 'Where readers find this item in the Library menu. Tags help people find content; they never grant access.' }, fields: [
+      { name: 'section', type: 'select', label: 'Section', options: SECTION_OPTIONS, index: true },
+      { name: 'topics', type: 'select', hasMany: true, label: 'Topics', options: TOPIC_OPTIONS,
+        admin: { description: 'Pick topics from the item\'s section. An item can sit in more than one topic.' } },
+      { name: 'pages', type: 'select', hasMany: true, label: 'Pages you know', options: PAGE_OPTIONS,
+        admin: { description: 'Familiar pages from the old resource site (for example Commission Schedules) that should list this item.' } },
+    ] },
     { name: 'vimeoId', type: 'text', label: 'Vimeo video ID', validate: (value: unknown) => !value || /^\d+$/.test(String(value)) || 'Use the number at the end of the Vimeo link, e.g. 123456789.',
       admin: { condition: data => ['video', 'audio'].includes(data?.format), description: 'The number from the Vimeo link. Captions are used when available; otherwise the audio is transcribed.' } },
     { name: 'processing', type: 'ui', label: 'Processing', admin: { components: { Field: '/components/ContentProcessing' } } },
@@ -165,6 +176,16 @@ export const Content: CollectionConfig = {
       admin: { position: 'sidebar', description: 'Who can see this item once published. Required to publish.' } },
     { name: 'availableAt', type: 'date', label: 'Available from', access: { create: admin, update: admin }, admin: { position: 'sidebar', description: 'Optional embargo.' } },
     { name: 'expiresAt', type: 'date', label: 'Expires', access: { create: admin, update: admin }, admin: { position: 'sidebar', description: 'Optional. Hidden from readers and AI after this date.' } },
+    { type: 'collapsible', label: 'Review schedule', admin: { position: 'sidebar' }, fields: [
+      { name: 'reviewWindow', type: 'select', label: 'Review every', defaultValue: 'annual', required: true, options: REVIEW_WINDOWS.map(w => ({ value: w.id, label: w.label })),
+        admin: { description: 'When the review date passes, the item is hidden from readers, search and AI until someone renews it.' } },
+      { name: 'reviewOn', type: 'date', label: 'Review on', admin: { condition: data => data?.reviewWindow === 'fixedDate', description: 'The date this item must be reviewed by.' } },
+      { name: 'owner', type: 'relationship', relationTo: 'users', label: 'Owner', admin: { description: 'Who renews this item. Owners and administrators can renew.' } },
+      { name: 'reviewDueAt', type: 'date', label: 'Next review due', index: true, access: { create: () => false, update: () => false },
+        admin: { readOnly: true, description: 'Set automatically from the schedule and the last review.' } },
+      { name: 'lastReviewedAt', type: 'date', label: 'Last reviewed', access: { create: () => false, update: () => false },
+        admin: { readOnly: true, description: 'Publishing and renewing count as a review.' } },
+    ] },
     { type: 'collapsible', label: 'Source and citations (technical)', admin: { initCollapsed: true, condition: (_data, _sibling, { user }) => isStaffUser(user) }, fields: [
       { name: 'sourceKey', type: 'text', unique: true, index: true, label: 'Source record', access: { create: admin, update: admin, read: editor },
         admin: { readOnly: true, description: 'Where this item came from, e.g. wordpress:dbr:post:1 or manual:42.' } },
@@ -195,6 +216,7 @@ export const Content: CollectionConfig = {
       data.evidenceVersion = 'unprocessed'
       data.passages = []
       if (data.state === 'published') data.state = 'draft'
+      applyReviewSchedule(data, undefined, { renewal: false })
       return data
     }
     const textChanged = originalDoc && ['title', 'description', 'body', 'vimeoId', 'format', 'sourceKey', 'sourceHash'].some(key => key in data && data[key] !== originalDoc[key])
@@ -209,6 +231,7 @@ export const Content: CollectionConfig = {
       }
     }
     if (data.state === 'published' && !(data.accessProfile ?? originalDoc?.accessProfile)) throw new Error('Publication requires an access profile')
+    applyReviewSchedule(data, originalDoc, { renewal: Boolean(context?.reviewRenewal) })
     return data
   }] },
 }

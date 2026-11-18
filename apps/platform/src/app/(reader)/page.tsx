@@ -4,6 +4,7 @@ import { readerLibrary } from '../../server/library'
 import { FORMATS, FormatChip, formatDate, formatPlural } from '../../components/Format'
 import { Thumbnail } from '../../components/Thumbnail'
 import Icon from '../../components/Icon'
+import { ResourceGrid } from '../../components/ResourceGrid'
 export const dynamic = 'force-dynamic'
 
 export default async function Home({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -62,17 +63,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
         {result.items.length === 0 ? <div className="empty inline">
           <h2>{query || format ? 'Nothing matches yet' : 'No resources yet'}</h2>
           <p>{query || format ? 'Try different words, or clear the filters.' : 'Resources appear here once they are published for you.'}</p>
-        </div> : view === 'grid' ? <div className="card-grid">
-          {result.items.map(item => <Link key={item.id} className="resource-card" href={`/resources/${item.id}`}>
-            <Thumbnail id={item.id} version={item.thumbnailVersion} format={item.format} title={item.title} rounded={0} />
-            <div className="resource-card-body">
-              <FormatChip format={item.format} />
-              <h3>{item.title}</h3>
-              {item.description && <p>{item.description}</p>}
-              <span className="subtle small-text">Updated {formatDate(item.updatedAt)}</span>
-            </div>
-          </Link>)}
-        </div> : <table className="list">
+        </div> : view === 'grid' ? <ResourceGrid items={result.items} />
+        : <table className="list">
           <thead><tr><th scope="col" className="thumb-col"><span className="sr-only">Preview</span></th><th scope="col">Resource</th><th scope="col">Format</th><th scope="col">Updated</th></tr></thead>
           <tbody>{result.items.map(item => <tr key={item.id}>
             <td className="thumb-col"><Thumbnail id={item.id} version={item.thumbnailVersion} format={item.format} title={item.title} rounded={6} compact /></td>

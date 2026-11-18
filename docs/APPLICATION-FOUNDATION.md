@@ -38,6 +38,11 @@ These IDs are implementation traceability anchors, not a claim that the full bus
 | REQ-SEARCH-01: lexical/vector retrieval | Permission-filtered keyword query | Keyword foundation only; full-text ranking/embeddings pending |
 | REQ-ASSET-01: protected previews/downloads | Private asset metadata collection | Delivery deliberately unavailable until implemented |
 | REQ-AWS-01: deployable app and versioned schema | Linux/amd64 runtime and operations images, versioned migrations, `infra/aws/library` tasks | Migrated and smoke-tested on dev RDS (`aecp_library`); serving via HTTPS ALB in dev |
+| REQ-NAV-01/02: section menu and Ctrl K search | `src/domain/navigation.ts`, `suggest.ts`, `/library-api/suggest`, `tests/navigation.test.ts` | Implemented; live results use the authorized ranked search |
+| REQ-NAV-03: section, topic, familiar-page and how-to listings | `section`/`topics`/`pages`/`kind` fields, `/sections/[id]`, `permission-matrix.test.ts` | Implemented; filters never widen authorization. Content still needs filing (migration wave) |
+| REQ-GOV-01/02: review windows hide lapsed items until renewed | `src/domain/review.ts`, `publishedWhere`, `/admin/due-for-review`, renew route, `tests/manage-review.test.ts` | Implemented; renewal is owner/admin only. Email reminders (30/14/3 days) pending |
+| REQ-VIEW-01: inline viewers | `src/domain/viewers.ts`, `components/viewers`, `/files/[id]` | PDF.js, image, audio, video, Vimeo with cited page/time. Inline originals still need download permission (ADR-026); Office/sheets need Gotenberg previews |
+| REQ-HOWTO-01: how-to articles | `src/domain/markdown.ts`, `components/Article.tsx`, `tests/viewers.test.ts` | Safe Markdown subset with anchors, copy link, On this page, More in section. Screenshot upload from the editor pending |
 
 ## Run and configure
 

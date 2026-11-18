@@ -22,8 +22,8 @@ export async function GET(request: Request) {
   let items: SuggestItem[] = []
   try {
     const found = await repository.search(query, undefined, 1, 'view')
-    items = found.items.slice(0, 12).map(item => ({ kind: kindForFormat(item.format), id: item.id, title: item.title,
-      meta: formatLabel(item.format), href: `/resources/${encodeURIComponent(item.id)}` }))
+    items = found.items.slice(0, 12).map(item => ({ kind: kindForFormat(item.format, item.kind), id: item.id, title: item.title,
+      meta: item.kind === 'howto' ? 'How-to article' : formatLabel(item.format), href: `/resources/${encodeURIComponent(item.id)}` }))
   } catch { return json({ error: 'Search is temporarily unavailable.' }, 503) }
   return json({ results: [...items, ...matchPages(query)] })
 }

@@ -22,6 +22,8 @@ export function publishedWhere(ids: (string | number)[], now = new Date()): Wher
     { accessProfile: { in: ids } }, { state: { equals: 'published' } },
     { or: [{ availableAt: { exists: false } }, { availableAt: { less_than_equal: now.toISOString() } }] },
     { or: [{ expiresAt: { exists: false } }, { expiresAt: { greater_than: now.toISOString() } }] },
+    // Past its review date: hidden from readers, search and AI until renewed (docs/design, review windows).
+    { or: [{ reviewDueAt: { exists: false } }, { reviewDueAt: { greater_than: now.toISOString() } }] },
   ] }
 }
 

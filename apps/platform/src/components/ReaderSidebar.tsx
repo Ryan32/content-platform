@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { SECTIONS, isReadingPath, searchHref, sectionFromPath, sectionHref} from '../domain/navigation'
+import { SECTIONS, isReadingPath, pageHref, sectionFromPath, sectionHref, topicHref } from '../domain/navigation'
 import Icon from './Icon'
 
 /**
@@ -28,9 +28,9 @@ export default function ReaderSidebar({ children }: { children: React.ReactNode 
           <Link className={`side-link${on ? ' active' : ''}`} href={sectionHref(section.id)} aria-current={on ? 'page' : undefined} title={section.label}>
             <Icon name={section.icon} /><span className="side-text">{section.label}</span></Link>
           {on && !collapsed && <div className="side-sub">
-            {section.topics.slice(0, 5).map(t => <Link key={t} href={searchHref(t)}>{t}</Link>)}
+            {section.topics.slice(0, 5).map(t => <Link key={t} href={topicHref(section.id, t)}>{t}</Link>)}
             <p className="side-sublabel">Pages you know</p>
-            {section.familiar.map(f => <Link key={f} href={searchHref(f)}>{f}</Link>)}
+            {section.familiar.map(f => <Link key={f} href={pageHref(section.id, f)}>{f}</Link>)}
           </div>}
         </div>
       })}

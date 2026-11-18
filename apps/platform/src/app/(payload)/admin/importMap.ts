@@ -11,6 +11,7 @@ import { default as default_d3392df45e45e44979b0b22325863226 } from '../../../co
 import { default as default_f77dc98158034f0df43ee589ca5a1d10 } from '../../../components/AutomationStatus'
 import { default as default_726120f9bd502ed758a233d6ae282eeb } from '../../../components/ReviewView'
 import { default as default_320afdf58b23f17a3457e49bdf0654d3 } from '../../../components/BulkAddView'
+import { default as default_f2cf7c2b1de14ac57ce550500b3c1b17 } from '../../../components/DueForReview'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 
 /** @type import('payload').ImportMap */
@@ -28,5 +29,6 @@ export const importMap = {
   "/components/AutomationStatus#default": default_f77dc98158034f0df43ee589ca5a1d10,
   "/components/ReviewView#default": default_726120f9bd502ed758a233d6ae282eeb,
   "/components/BulkAddView#default": default_320afdf58b23f17a3457e49bdf0654d3,
+  "/components/DueForReview#default": default_f2cf7c2b1de14ac57ce550500b3c1b17,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1
 }

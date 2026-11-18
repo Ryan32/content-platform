@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SECTIONS, isReadingPath, searchHref, sectionFromPath } from '../src/domain/navigation'
+import { SECTIONS, TOPIC_OPTIONS, isReadingPath, pageHref, searchHref, sectionFromPath, slugify, tagValue, topicHref } from '../src/domain/navigation'
 import { groupSuggestions, highlight, kindForFormat, matchPages, toggleFilter, type SuggestItem } from '../src/domain/suggest'
 
 describe('REQ-NAV-01: reader navigation follows the design handoff', () => {
@@ -13,6 +13,13 @@ describe('REQ-NAV-01: reader navigation follows the design handoff', () => {
     expect(sectionFromPath('/')).toBeNull()
     expect(isReadingPath('/resources/12')).toBe(true)
     expect(isReadingPath('/sections/events')).toBe(false)
+  })
+  it('gives topics and familiar pages stable keys and links', () => {
+    expect(slugify('Tax, RMDs & IRAs')).toBe('tax-rmds-iras')
+    expect(tagValue('planning', 'Tax, RMDs & IRAs')).toBe('planning:tax-rmds-iras')
+    expect(topicHref('planning', 'Tax, RMDs & IRAs')).toBe('/sections/planning?topic=tax-rmds-iras')
+    expect(pageHref('products', 'Annuity Rate Watch')).toBe('/sections/products?page=annuity-rate-watch')
+    expect(new Set(TOPIC_OPTIONS.map(o => o.value)).size).toBe(TOPIC_OPTIONS.length)
   })
   it('turns topic names into clean search links', () => {
     expect(searchHref('Tax, RMDs & IRAs')).toBe('/?q=Tax+RMDs+IRAs')
@@ -37,7 +44,7 @@ describe('REQ-NAV-02: Ctrl K search groups live results and filters by type', ()
     expect(toggleFilter([], 'video')).toEqual(['video'])
     expect(toggleFilter(['video'], 'video')).toEqual([])
     expect(toggleFilter(['video'], 'all')).toEqual([])
-    expect(toggleFilter(['document', 'video', 'slides'], 'page')).toEqual([])
+    expect(toggleFilter(['document', 'video', 'slides', 'howto'], 'page')).toEqual([])
   })
   it('maps formats, matches pages and highlights the typed word', () => {
     expect(kindForFormat('audio')).toBe('video')

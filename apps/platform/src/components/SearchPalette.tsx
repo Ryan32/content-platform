@@ -4,7 +4,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { FILTERS, groupSuggestions, highlight, toggleFilter, type SuggestItem, type SuggestKind } from '../domain/suggest'
 import Icon, { type IconName } from './Icon'
 
-const KIND_ICON: Record<SuggestKind, IconName> = { document: 'file', video: 'video', slides: 'slides', page: 'page' }
+const KIND_ICON: Record<SuggestKind, IconName> = { document: 'file', video: 'video', slides: 'slides', howto: 'howto', page: 'page' }
 
 /**
  * Top-bar search plus the Ctrl K window. Typing shows live, authorized results grouped by kind, with one row of

@@ -1,18 +1,19 @@
-import { SECTIONS, searchHref, sectionHref } from './navigation'
+import { SECTIONS, pageHref, sectionHref, topicHref } from './navigation'
 
 /** Ctrl K search: live results grouped by kind, with quick type filters. Pure so it can be tested without a browser. */
-export type SuggestKind = 'document' | 'video' | 'slides' | 'page'
+export type SuggestKind = 'document' | 'video' | 'slides' | 'howto' | 'page'
 export type SuggestItem = { kind: SuggestKind; id: string; title: string; meta: string; href: string }
 export type SuggestFilter = 'all' | SuggestKind
 export const FILTERS: { id: SuggestFilter; label: string }[] = [
   { id: 'all', label: 'All' }, { id: 'document', label: 'Documents' }, { id: 'video', label: 'Videos' },
-  { id: 'slides', label: 'Slides' }, { id: 'page', label: 'Pages' },
+  { id: 'slides', label: 'Slides' }, { id: 'howto', label: 'How-to' }, { id: 'page', label: 'Pages' },
 ]
-const GROUP_LABEL: Record<SuggestKind, string> = { document: 'Documents', video: 'Videos', slides: 'Slides', page: 'Pages' }
-const ORDER: SuggestKind[] = ['document', 'video', 'slides', 'page']
+const GROUP_LABEL: Record<SuggestKind, string> = { document: 'Documents', video: 'Videos', slides: 'Slides', howto: 'How-to articles', page: 'Pages' }
+const ORDER: SuggestKind[] = ['document', 'video', 'slides', 'howto', 'page']
 
 /** Maps a library format to the palette's kind. */
-export function kindForFormat(format: string): SuggestKind {
+export function kindForFormat(format: string, kind?: string): SuggestKind {
+  if (kind === 'howto') return 'howto'
   if (format === 'video' || format === 'audio') return 'video'
   if (format === 'slides') return 'slides'
   return 'document'
@@ -27,8 +28,8 @@ export function matchPages(query: string, limit = 6): SuggestItem[] {
   const entries: SuggestItem[] = []
   for (const s of SECTIONS) {
     entries.push({ kind: 'page', id: `section:${s.id}`, title: s.label, meta: 'Section', href: sectionHref(s.id) })
-    for (const t of s.topics) entries.push({ kind: 'page', id: `topic:${s.id}:${t}`, title: t, meta: `Topic · ${s.label}`, href: searchHref(t) })
-    for (const f of s.familiar) entries.push({ kind: 'page', id: `page:${s.id}:${f}`, title: f, meta: `Page you know · ${s.label}`, href: searchHref(f) })
+    for (const t of s.topics) entries.push({ kind: 'page', id: `topic:${s.id}:${t}`, title: t, meta: `Topic · ${s.label}`, href: topicHref(s.id, t) })
+    for (const f of s.familiar) entries.push({ kind: 'page', id: `page:${s.id}:${f}`, title: f, meta: `Page you know · ${s.label}`, href: pageHref(s.id, f) })
   }
   const seen = new Set<string>()
   return entries.filter(e => {

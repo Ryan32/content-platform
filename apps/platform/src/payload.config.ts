@@ -18,6 +18,7 @@ export default buildConfig({
         automation: { Component: '/components/AutomationStatus', path: '/automation', exact: true, meta: { title: 'Automation status' } },
         review: { Component: '/components/ReviewView', path: '/review', meta: { title: 'Review AI suggestions' } },
         bulkAdd: { Component: '/components/BulkAddView', path: '/bulk-add', exact: true, meta: { title: 'Add many files' } },
+        dueForReview: { Component: '/components/DueForReview', path: '/due-for-review', exact: true, meta: { title: 'Due for review' } },
       } } },
   // Order sets the admin menu: Library first, then review and automation, then people and access.
   collections: [Content, Taxonomy, Assets, Suggestions, Jobs, Users, Audiences, AccessProfiles, ImportArtifacts, SourceSnapshots, SourceRelations, ImportReviews, ImportRuns],

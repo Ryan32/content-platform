@@ -158,6 +158,85 @@ export interface Content {
    */
   description?: string | null;
   /**
+   * How-to articles are instructional pages written here. They appear in their section like any other item, with a How-to badge and filter.
+   */
+  kind: 'resource' | 'howto';
+  section?: ('products' | 'operations' | 'marketing' | 'planning' | 'coaching' | 'events') | null;
+  /**
+   * Pick topics from the item's section. An item can sit in more than one topic.
+   */
+  topics?:
+    | (
+        | 'products:carriers-a-z'
+        | 'products:commission-schedules'
+        | 'products:rates-performance'
+        | 'products:aewm-strategies'
+        | 'products:product-changes'
+        | 'products:carrier-snapshots'
+        | 'operations:forms'
+        | 'operations:sample-applications'
+        | 'operations:new-business-nigo'
+        | 'operations:transfers'
+        | 'operations:schwab-fidelity'
+        | 'operations:compliance'
+        | 'marketing:seminar-kits'
+        | 'marketing:recorded-seminars'
+        | 'marketing:campaigns-print-on-demand'
+        | 'marketing:scripts-appointments'
+        | 'marketing:client-events-invites'
+        | 'marketing:digital-social'
+        | 'planning:retirement-income'
+        | 'planning:tax-rmds-iras'
+        | 'planning:social-security'
+        | 'planning:estate-legacy'
+        | 'planning:long-term-care'
+        | 'planning:high-net-worth'
+        | 'coaching:practice-management'
+        | 'coaching:hiring-hr-hub'
+        | 'coaching:onboard-your-staff'
+        | 'coaching:team-training'
+        | 'coaching:leadership'
+        | 'coaching:coaching-programs'
+        | 'events:upcoming-events'
+        | 'events:the-journey'
+        | 'events:world-series-of-success'
+        | 'events:aexchange'
+        | 'events:forums-summits'
+        | 'events:webinar-replays'
+      )[]
+    | null;
+  /**
+   * Familiar pages from the old resource site (for example Commission Schedules) that should list this item.
+   */
+  pages?:
+    | (
+        | 'products:commission-schedules'
+        | 'products:annuity-carrier-information'
+        | 'products:annuity-rate-watch'
+        | 'products:aewm-strategy-menu'
+        | 'operations:suitability-quick-reference-matrix'
+        | 'operations:transfer-company-list'
+        | 'operations:aewm-forms'
+        | 'operations:sample-applications'
+        | 'marketing:recorded-seminars'
+        | 'marketing:turnkey-seminars-webinars'
+        | 'marketing:real-wins'
+        | 'marketing:print-on-demand'
+        | 'planning:advanced-markets'
+        | 'planning:ask-the-experts'
+        | 'planning:high-net-worth'
+        | 'planning:whitepapers'
+        | 'coaching:hr-hub'
+        | 'coaching:advisor-talent-solutions'
+        | 'coaching:onboard-your-staff'
+        | 'coaching:stretch-leadership'
+        | 'events:the-journey'
+        | 'events:world-series-of-success'
+        | 'events:ops-connect'
+        | 'events:live-events-calendar'
+      )[]
+    | null;
+  /**
    * The number from the Vimeo link. Captions are used when available; otherwise the audio is transcribed.
    */
   vimeoId?: string | null;
@@ -189,6 +268,26 @@ export interface Content {
    * Optional. Hidden from readers and AI after this date.
    */
   expiresAt?: string | null;
+  /**
+   * When the review date passes, the item is hidden from readers, search and AI until someone renews it.
+   */
+  reviewWindow: 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'biennial' | 'fixedDate';
+  /**
+   * The date this item must be reviewed by.
+   */
+  reviewOn?: string | null;
+  /**
+   * Who renews this item. Owners and administrators can renew.
+   */
+  owner?: (number | null) | User;
+  /**
+   * Set automatically from the schedule and the last review.
+   */
+  reviewDueAt?: string | null;
+  /**
+   * Publishing and renewing count as a review.
+   */
+  lastReviewedAt?: string | null;
   /**
    * Where this item came from, e.g. wordpress:dbr:post:1 or manual:42.
    */
@@ -273,51 +372,6 @@ export interface AccessProfile {
   createdAt: string;
 }
 /**
- * Original files attached to library items, stored privately and never changed once uploaded. Upload files from a library item's Processing panel; this list is for reference.
- *
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "assets".
- */
-export interface Asset {
-  id: number;
-  content: number | Content;
-  mimeType: string;
-  objectKey: string;
-  sha256: string;
-  version: string;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * Summaries and tags proposed by AI tagging. Nothing here changes content until an editor accepts it. Open Review (/review) to read the evidence, edit, and accept or reject each one.
- *
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "suggestions".
- */
-export interface Suggestion {
-  id: number;
-  content: number | Content;
-  decision?: ('pending' | 'accepted' | 'rejected') | null;
-  model: string;
-  reviewNote?: string | null;
-  reviewedBy?: (number | null) | User;
-  reviewedAt?: string | null;
-  jobKey?: string | null;
-  sourceVersion: string;
-  proposal:
-    | {
-        [k: string]: unknown;
-      }
-    | unknown[]
-    | string
-    | number
-    | boolean
-    | null;
-  reviewAttempt?: string | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
  * Everyone who can sign in to AE Library. Add a person with their work email and role; their account links automatically the first time they sign in with that email. Roles control what they can do here; memberships control which library content they can see.
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -371,6 +425,51 @@ export interface User {
   updatedAt: string;
   createdAt: string;
   collection: 'users';
+}
+/**
+ * Original files attached to library items, stored privately and never changed once uploaded. Upload files from a library item's Processing panel; this list is for reference.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "assets".
+ */
+export interface Asset {
+  id: number;
+  content: number | Content;
+  mimeType: string;
+  objectKey: string;
+  sha256: string;
+  version: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Summaries and tags proposed by AI tagging. Nothing here changes content until an editor accepts it. Open Review (/review) to read the evidence, edit, and accept or reject each one.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "suggestions".
+ */
+export interface Suggestion {
+  id: number;
+  content: number | Content;
+  decision?: ('pending' | 'accepted' | 'rejected') | null;
+  model: string;
+  reviewNote?: string | null;
+  reviewedBy?: (number | null) | User;
+  reviewedAt?: string | null;
+  jobKey?: string | null;
+  sourceVersion: string;
+  proposal:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  reviewAttempt?: string | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * The automatic work queue: text extraction, captions, transcription, and AI tagging. Jobs are created when files are uploaded or a Vimeo ID is set, and run in the background. Failures and retries are managed on the Automation status page.
@@ -714,6 +813,10 @@ export interface ContentSelect<T extends boolean = true> {
   title?: T;
   format?: T;
   description?: T;
+  kind?: T;
+  section?: T;
+  topics?: T;
+  pages?: T;
   vimeoId?: T;
   thumbnailVersion?: T;
   thumbnailKey?: T;
@@ -725,6 +828,11 @@ export interface ContentSelect<T extends boolean = true> {
   accessProfile?: T;
   availableAt?: T;
   expiresAt?: T;
+  reviewWindow?: T;
+  reviewOn?: T;
+  owner?: T;
+  reviewDueAt?: T;
+  lastReviewedAt?: T;
   sourceKey?: T;
   sourceHash?: T;
   evidenceVersion?: T;

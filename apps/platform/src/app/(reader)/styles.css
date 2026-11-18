@@ -255,3 +255,51 @@ kbd { font: inherit; font-size: 11px; padding: 1px 6px; border: 1px solid var(--
   body:has(.sidebar.collapsed) .workspace-main { margin-left: 0 }
   .palette-backdrop { padding: 12px }
 }
+
+/* Navigation v2, phase 1: listings, viewers, how-to articles */
+.eyebrow { margin: 0 0 2px; font-size: 12px; font-weight: 600; color: var(--muted) }
+.eyebrow a { color: var(--primary) }
+.topic-row { margin: 0 0 16px }
+.pill-link[aria-current="page"] { background: var(--primary); border-color: var(--primary); color: var(--on-primary) }
+.chip-howto { background: #e6f4d7; color: #3f6212 }
+.chip-line { display: flex; gap: 6px }
+.detail-title { flex: 1; min-width: 0 }
+.detail-head .chip { vertical-align: 1px }
+.more-in ul { list-style: none; margin: 0; padding: 0 }
+.more-in li { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--border) }
+.more-in li:last-child { border-bottom: 0 }
+.sticky-side { position: sticky; top: 72px; align-self: start }
+
+.viewer { background: var(--surface-2) }
+.viewer-bar { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--border); background: var(--surface); font-size: 13px }
+.viewer-bar .btn-ghost.small { padding: 4px 8px }
+.viewer-page input { width: 52px; margin: 0 4px; padding: 3px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font: inherit }
+.viewer-spacer { flex: 1 }
+.viewer-zoom { min-width: 44px; text-align: center; color: var(--muted) }
+.viewer-pages { position: relative; height: 75vh; overflow: auto; padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 16px }
+.pdf-page { background: #fff; box-shadow: 0 1px 3px rgba(16,24,40,.18); max-width: 100% }
+.pdf-page canvas { display: block; max-width: 100% }
+.viewer-loading, .viewer-fallback { padding: 24px; color: var(--muted); display: flex; gap: 8px; align-items: center }
+.image-viewer { display: flex; justify-content: center; max-height: 75vh; overflow: auto }
+.image-zoom { position: relative; border: 0; padding: 0; background: none; cursor: zoom-in }
+.image-viewer img { display: block; max-width: 100%; height: auto }
+.image-viewer.zoomed .image-zoom { cursor: zoom-out }
+.image-viewer.zoomed img { max-width: none }
+.image-zoom-hint { position: absolute; right: 10px; bottom: 10px; display: inline-flex; gap: 4px; align-items: center; padding: 3px 8px; border-radius: 999px; background: rgba(17,24,39,.7); color: #fff; font-size: 12px }
+.audio-viewer { padding: 20px } .audio-viewer audio { width: 100% }
+.video-viewer video { display: block; width: 100%; max-height: 75vh; background: #000 }
+
+.wiki { color: var(--text-2); line-height: 1.7; font-size: 15px; max-width: 760px }
+.wiki-heading { position: relative; color: var(--text); scroll-margin-top: 80px; margin: 28px 0 8px }
+h2.wiki-heading { font-size: 20px } h3.wiki-heading { font-size: 16px }
+.copy-anchor { margin-left: 8px; padding: 2px 4px; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; opacity: 0; vertical-align: middle }
+.wiki-heading:hover .copy-anchor, .copy-anchor:focus-visible { opacity: 1 }
+.copy-anchor:hover { color: var(--primary); background: var(--primary-soft) }
+.wiki code { padding: 1px 5px; border-radius: 5px; background: var(--surface-2); border: 1px solid var(--border); font-size: 13px }
+.wiki-shot { margin: 16px 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--surface-2) }
+.wiki-shot img { display: block; max-width: 100%; height: auto; margin: 0 auto }
+.wiki-shot figcaption { padding: 8px 12px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--border) }
+.toc ol { list-style: none; margin: 0; padding: 0 }
+.toc li { padding: 4px 0 } .toc .toc-sub { padding-left: 14px; font-size: 13px }
+.toc a { color: var(--text-2) } .toc a:hover { color: var(--primary) }
+@media (max-width: 800px) { .sticky-side { position: static } .viewer-pages { height: 60vh } }

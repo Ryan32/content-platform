@@ -4,6 +4,17 @@ This document captures work completed in the originating Portal conversation. Ve
 
 ## Active priority — core platform and general MCP
 
+### Library app pieces (no content yet) — 2026-11-18
+
+- **Implemented, not deployed.** Migration `20261118_234658_review_windows_and_sections` (additive; backfills already-published items to a 12-month window from their last update). Rehearsed on local TLS PostgreSQL 16: applies cleanly, rerun is a no-op.
+- **Sections and topics on content:** new fields Type (Resource / How-to article), Section, Topics and Pages you know. `/sections/[id]` lists authorized items, with `?topic=` and `?page=` views and type tabs; the sidebar and Ctrl K link to them. How-to is a filter and badge, not a section.
+- **Review windows:** each item has Review every (monthly, 3, 6, 12, 24 months, or a set date), Owner, Next review due and Last reviewed. Publishing counts as a review. When the due date passes, `publishedWhere` hides the item from the reader, search, suggestions, files and MCP; editors still see it. **Due for review** (`/admin/due-for-review`) lists hidden and due-in-30-days items with Renew (owner or administrator only; set-date items need a new future date).
+- **Viewers:** PDF.js viewer (page nav, zoom, opens at a cited page), image zoom, audio and video players, Vimeo opening at a cited time. `/files/[id]` now serves PDF, PNG/JPEG/GIF/WebP, common audio and MP4/WebM inline; SVG and HTML never inline. Inline originals still require download permission (ADR-026).
+- **How-to articles:** safe Markdown subset (headings with anchors, lists, links, `/files/` screenshots), Copy link for the page and each heading, On this page, More in section.
+- Validation: typecheck, 119 tests (20 files; new REQ-NAV-03, REQ-GOV-01/02, REQ-VIEW-01, REQ-HOWTO-01), production build (6 indexed migrations). Local browser check with seeded synthetic data: section/topic listings, how-to article, Due for review, renew → item reappears, PDF opens at page 2.
+- Not built: email reminders before due dates, Office/spreadsheet previews (Gotenberg), screenshot upload in the article editor, Home redesign with AXL, carrier pages.
+- **Deploy (AWS laptop):** pull, build web and operations images, take an RDS snapshot, run the migrate task, then deploy web and worker, as for `657e4d0`.
+
 ### Navigation v2, phase 0 — 2026-11-18
 
 - **Implemented, not deployed.** Reader sidebar with Home and six sections (active section expands to its topics and familiar pages; collapses to a rail on resource pages), and one search centered in the top bar on every page.

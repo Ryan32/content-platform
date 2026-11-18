@@ -25,6 +25,12 @@ const PATHS: Record<string, string> = {
   video: 'M3 5h18v14H3zM10 9l5 3-5 3z',
   slides: 'M3 4h18v12H3zM12 16v4M8 20h8',
   page: 'M4 6h16M4 12h16M4 18h10',
+  howto: 'M4 4h11a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3zM18 7h2v13M8 9h6M8 13h6',
+  link: 'M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7',
+  check: 'M20 6L9 17l-5-5',
+  clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2',
+  zoomIn: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-4.3-4.3M11 8v6M8 11h6',
+  zoomOut: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-4.3-4.3M8 11h6',
 }
 export type IconName = keyof typeof PATHS
 export default function Icon({ name, size = 16 }: { name: IconName; size?: number }) {

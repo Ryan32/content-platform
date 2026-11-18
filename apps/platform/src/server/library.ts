@@ -1,11 +1,12 @@
-import { createLocalReq, getPayload } from 'payload'
+import { createLocalReq, getPayload, type Where } from 'payload'
 import config from '../payload.config'
 import { profileIds, publishedWhere } from '../collections/access'
-import type { LibraryRepository, Material } from '../domain/library'
+import type { BrowseFilters, LibraryRepository, Material } from '../domain/library'
 import { principalFromUser } from '../domain/access'
 import { hasSessionCookie, readSession } from '../auth/browser'
 import { verifyBearer } from '../auth/verify'
 import { rankedContentIds } from './search'
+import { isInlineType } from '../domain/viewers'
 
 export type LibraryAccess = { repository: LibraryRepository | null; signedIn: boolean }
 export type ReaderProfile = { name: string; email: string; isStaff: boolean; isAdmin: boolean }
@@ -56,11 +57,18 @@ export async function authenticatedLibrary(headers: Headers, mode: 'browser' | '
   const map = (doc: any): Material => ({ id: String(doc.id), title: doc.title,
     description: doc.description ?? '', format: doc.format, version: doc.evidenceVersion,
     body: doc.body ?? '', updatedAt: doc.updatedAt, ...(doc.thumbnailVersion ? { thumbnailVersion: doc.thumbnailVersion } : {}),
+    kind: doc.kind ?? 'resource', ...(doc.section ? { section: doc.section } : {}), topics: doc.topics ?? [],
     evidence: (doc.passages ?? []).filter((p: any) => p.version === doc.evidenceVersion)
       .map((p: any) => ({ id: p.citationId, version: p.version, text: p.text, locator: p.locator })),
   })
+  const browse = (filters?: BrowseFilters): Where[] => [
+    ...(filters?.section ? [{ section: { equals: filters.section } }] : []),
+    ...(filters?.topic ? [{ topics: { in: [filters.topic] } }] : []),
+    ...(filters?.page ? [{ pages: { in: [filters.page] } }] : []),
+    ...(filters?.kind ? [{ kind: { equals: filters.kind } }] : []),
+  ]
   return {
-    async search(query, format, page, action) {
+    async search(query, format, page, action, filters) {
       const ids = await profileIds(req, action)
       if (!ids.length) return { items: [], hasNextPage: false }
       const pool = (payload.db as { pool?: Parameters<typeof rankedContentIds>[0] } | undefined)?.pool
@@ -69,7 +77,7 @@ export async function authenticatedLibrary(headers: Headers, mode: 'browser' | '
         // Relevance order from PostgreSQL; the authorization filter below is unchanged, so ranking never widens access.
         if (!ranked.length) return { items: [], hasNextPage: false }
         const allowed = await payload.find({ collection: 'content', req, user, overrideAccess: false, depth: 0, pagination: false,
-          where: { and: [publishedWhere(ids), { id: { in: ranked } }, ...(format ? [{ format: { equals: format } }] : [])] } })
+          where: { and: [publishedWhere(ids), { id: { in: ranked } }, ...(format ? [{ format: { equals: format } }] : []), ...browse(filters)] } })
         const order = new Map(ranked.map((id, index) => [id, index]))
         const sorted = allowed.docs.sort((a, b) => order.get(a.id)! - order.get(b.id)!)
         return { items: sorted.slice((page - 1) * 20, page * 20).map(map), hasNextPage: sorted.length > page * 20 }
@@ -77,7 +85,7 @@ export async function authenticatedLibrary(headers: Headers, mode: 'browser' | '
       const result = await payload.find({ collection: 'content', req, user, overrideAccess: false, depth: 0,
         limit: 20, page, sort: '-updatedAt', where: { and: [publishedWhere(ids),
           ...(query ? [{ or: [{ title: { contains: query } }, { description: { contains: query } }, { body: { contains: query } }] }] : []),
-          ...(format ? [{ format: { equals: format } }] : []),
+          ...(format ? [{ format: { equals: format } }] : []), ...browse(filters),
         ] } })
       return { items: result.docs.map(map), hasNextPage: result.hasNextPage }
     },
@@ -102,6 +110,7 @@ export async function authenticatedLibrary(headers: Headers, mode: 'browser' | '
           item.downloadAssetIds = downloadable.includes(policyId!) ? assets.docs.map(a => a.id) : []
           // Until a separate derivative exists, embedded PDF is the original.
           if (downloadable.includes(policyId!)) item.previewAssetId = assets.docs.find(a => a.mimeType === 'application/pdf')?.id
+          if (downloadable.includes(policyId!)) item.inlineAssets = assets.docs.filter(a => isInlineType(a.mimeType)).map(a => ({ id: a.id, mimeType: a.mimeType }))
         }
       }
       return item

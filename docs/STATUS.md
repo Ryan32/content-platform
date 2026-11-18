@@ -4,6 +4,36 @@ This document captures work completed in the originating Portal conversation. Ve
 
 ## Active priority — core platform and general MCP
 
+### Owner actions pending — 2026-11-18
+
+1. **Internal DNS:** the `advisorsexcel.com` AD zone (primary `gagedc01`) lacks `library-dev`. Add `library-dev` CNAME → `aecp-dev-library-alb-173180842.us-east-1.elb.amazonaws.com` (TTL 300). Public DNS already has it.
+2. **Vimeo token → Secrets Manager** (on the laptop holding `.env.local`). Run this with a current `ae-dev-mfa` session; it never displays the token or puts it on a command line:
+
+   ```powershell
+   $secure = Read-Host 'Paste Vimeo token (hidden)' -AsSecureString
+   $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+   $file = Join-Path $env:TEMP ("vimeo-" + [guid]::NewGuid().ToString('N') + ".json")
+   try {
+       $token = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr).Trim()
+       $me = Invoke-RestMethod -Uri 'https://api.vimeo.com/me?fields=name' -Headers @{ Authorization = "Bearer $token"; Accept = 'application/vnd.vimeo.*+json;version=3.4' }
+       "Token OK for Vimeo account: $($me.name)"
+       @{ SecretId = 'aecp-dev-library-vimeo-token'; SecretString = $token } | ConvertTo-Json -Compress | Set-Content -LiteralPath $file -Encoding ascii
+       aws secretsmanager put-secret-value --profile ae-dev-mfa --region us-east-1 --cli-input-json "file://$file" --query 'VersionStages' --output text
+   } finally {
+       Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue
+       [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+       Remove-Variable token, secure -ErrorAction SilentlyContinue
+   }
+   ```
+
+   Then redeploy the worker on the current image so it receives the token. No image push is needed; the script prints `Vimeo token stored: True`:
+
+   ```powershell
+   .\infra\aws\library\worker-service.ps1 -ImageDigest sha256:3df8a57f477a46d58e641e5ffdefbeb77a54b1537023d68c06e109e62772d6e4
+   ```
+3. **Live signed-in check** once DNS resolves: new item → upload a text PDF → extraction → AI tagging → Review → accept → cover image → audience → publish → reader grid.
+4. **Content decisions:** starter Tags & topics (AI tagging chooses only from these), audiences and access profiles, and the first editors and admins to invite.
+
 ### Admin usability, invitations and automation — 2026-11-18
 
 - **Admin polish — deployed to dev 2026-11-18 ~14:25 CST (commit `657e4d0`).** Images `dev-platform-admin-polish` (amd64 `sha256:b9cc25b5…`) and `dev-platform-ops-admin-polish` (amd64 `sha256:3df8a57f…`), verified identical to local builds. No schema change; migrate was a no-op and the smoke test passed. Web `aecp-dev-library-web:5` is healthy; worker `aecp-dev-library-worker:3` started and reconciled. Pinned-ALB checks: health, home, and admin login 200.

@@ -4,6 +4,10 @@ This document captures work completed in the originating Portal conversation. Ve
 
 ## Active priority — core platform and general MCP
 
+### Design handoff — 2026-11-18
+
+- **Proposed, not implemented.** Navigation v2, carrier pages, saved views for familiar WordPress pages, how-to articles as a content type, Manage (review windows and expiry), and asset viewers. Brief, seed data, tokens and AXL assets are in [`docs/design/`](design/README.md), reconciled against `85c9fe1`. Visual source: the "AE Library — design" canvas. Open decisions A–G are listed in the brief.
+
 ### Owner actions pending — 2026-11-18
 
 1. **Internal DNS:** the `advisorsexcel.com` AD zone (primary `gagedc01`) lacks `library-dev`. Add `library-dev` CNAME → `aecp-dev-library-alb-173180842.us-east-1.elb.amazonaws.com` (TTL 300). Public DNS already has it.

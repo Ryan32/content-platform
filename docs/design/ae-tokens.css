@@ -1,0 +1,108 @@
+/* AE Library design tokens — generated from the AE Portal design system (tokens.json, 2026-11-18).
+   Dark comes from the AE Portal design system (screenshots of the dark app). Light matches the palette already shipped in apps/platform.
+   Usage: data-theme="dark" | "light" on <html>; the app's Auto/Light/Dark switch (payload-theme cookie) sets it. Components read only these variables. */
+
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-page: #151c23;
+  --surface-card: #1b2129;
+  --surface-raised: #21272f;
+  --surface-inset: #1f252d;
+  --surface-hover: #292f37;
+  --surface-row: #222834;
+  --border-subtle: #262c34;
+  --border-strong: #343a42;
+  --text-primary: #ffffff;
+  --text-secondary: #a3a9b1;
+  --text-muted: #868c94;
+  --text-on-accent: #151c23;
+  --primary: #7f9eff;          /* fills: buttons, selected chips, send */
+  --primary-text: #7f9eff;     /* links and primary-coloured text */
+  --primary-soft: #252e40;
+  --highlight-card: #7798f2;
+  --axl-blue: #328dff;
+  --status-progress: #48adc0;
+  --status-progress-soft: #154654;
+  --status-done: #68b9b0;
+  --status-done-soft: #184844;
+
+  /* Section colours (AE Library navigation v2) — borders, icons, chip text only; never large fills */
+  --section-products: #7f9eff;   --section-products-soft: #252e40;
+  --section-operations: #68b9b0; --section-operations-soft: #184844;
+  --section-marketing: #d28fb1;  --section-marketing-soft: #3d2033;
+  --section-planning: #7bc4d5;   --section-planning-soft: #1c4556;
+  --section-coaching: #d6b884;   --section-coaching-soft: #3a3122;
+  --section-events: #7d83fe;     --section-events-soft: #33367a;
+
+  /* Brand (marks and the AXL illustration only; UI chrome stays flat) */
+  --brand-cyan: #3ad5fb;
+  --brand-blue: #3896f8;
+  --brand-indigo: #3759ed;
+  --brand-navy: #171f29;
+
+  --shadow-focus: 0 0 0 2px #7f9eff;
+}
+
+[data-theme="light"] {
+  /* Light now follows the palette apps/platform already ships (built from real AE Portal light-mode screens,
+     commit 6392131), which supersedes the design system's drafted light values. */
+  color-scheme: light;
+  --surface-page: #f6f7f9;
+  --surface-card: #ffffff;
+  --surface-raised: #f9fafb;
+  --surface-inset: #f9fafb;
+  --surface-hover: #eef1f5;
+  --surface-row: #eef1fe;
+  --border-subtle: #e5e7eb;
+  --border-strong: #d6dae1;
+  --text-primary: #111827;
+  --text-secondary: #374151;
+  --text-muted: #6b7280;
+  --text-on-accent: #ffffff;
+  --primary: #3d5af1;
+  --primary-text: #3d5af1;
+  --primary-soft: #eef1fe;
+  --highlight-card: #3d5af1;
+  --axl-blue: #1f6fe0;
+  --status-progress: #1d6f84;
+  --status-progress-soft: #ddf1f7;
+  --status-done: #1b6f66;
+  --status-done-soft: #dff3f0;
+
+  --section-products: #3d5af1;   --section-products-soft: #eef1fe;
+  --section-operations: #1b6f66; --section-operations-soft: #dff3f0;
+  --section-marketing: #b0457a;  --section-marketing-soft: #fbe6f0;
+  --section-planning: #1d6f84;   --section-planning-soft: #ddf1f7;
+  --section-coaching: #8a6a2e;   --section-coaching-soft: #f7efdf;
+  --section-events: #5a5fe0;     --section-events-soft: #e8e9ff;
+
+  --shadow-focus: 0 0 0 2px #3d5af1;
+}
+
+:root {
+  /* Type: Inter assumed by the design system (Portal may use Geist — confirm before build) */
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --text-stat-xl: 700 28px/32px var(--font-sans);
+  --text-page-title: 600 22px/28px var(--font-sans);
+  --text-stat: 700 18px/24px var(--font-sans);
+  --text-headline: 600 16px/22px var(--font-sans);
+  --text-card-title: 600 14px/20px var(--font-sans);
+  --text-body: 400 13px/20px var(--font-sans);
+  --text-body-strong: 600 13px/20px var(--font-sans);
+  --text-caption: 400 12px/16px var(--font-sans);
+  --text-label: 500 11px/14px var(--font-sans);   /* uppercase eyebrow labels */
+  --text-reading: 400 15px/26px var(--font-sans);  /* Library addition: how-to articles */
+
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px;
+
+  --radius-sm: 4px; --radius-md: 8px; --radius-lg: 12px; --radius-full: 9999px;
+}
+
+/* AXL hero float (Home only) */
+@keyframes axl-float { 0%, 100% { transform: translateY(0) rotate(-1.5deg); } 50% { transform: translateY(-12px) rotate(1.5deg); } }
+@keyframes axl-shadow { 0%, 100% { transform: scaleX(1); opacity: .9; } 50% { transform: scaleX(.72); opacity: .45; } }
+.axl-float { animation: axl-float 4.2s ease-in-out infinite; transform-origin: 50% 80%; }
+.axl-shadow { animation: axl-shadow 4.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .axl-float, .axl-shadow { animation: none; } }

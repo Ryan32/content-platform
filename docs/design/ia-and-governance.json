@@ -1,0 +1,462 @@
+{
+  "schema": "ae-library-ia/1",
+  "status": "proposed — validate with tree test before treating as final",
+  "evidence": "WordPress scan 2026-11-17: lifetime views on 3,827 downloadable resources (1.26M views); menus and categories from inventory.sqlite",
+  "sections": [
+    {
+      "id": "products",
+      "label": "Products & Carriers",
+      "blurb": "Commission schedules, rates, carrier snapshots and AEWM strategies, organized by carrier.",
+      "topics": [
+        "Carriers A–Z",
+        "Commission Schedules",
+        "Rates & Performance",
+        "AEWM Strategies",
+        "Product Changes",
+        "Carrier Snapshots"
+      ],
+      "color": "#7f9eff",
+      "softColor": "#252e40",
+      "familiarPages": [
+        "Commission Schedules",
+        "Annuity Carrier Information",
+        "Annuity Rate Watch",
+        "AE Indexed Performance Report",
+        "AEWM Strategy Menu",
+        "Carrier & Product Changes"
+      ],
+      "wordpressCategoryRules": [
+        "Product Information",
+        "Commission Schedules",
+        "Snapshot",
+        "Fact Sheet",
+        "Holdings Summary",
+        "Performance",
+        "Wealth Strategies",
+        "Diversified Core",
+        "Disciplined Edge",
+        "Strategic Index",
+        "AE Private Exchange",
+        "Indexed Universal Life (IUL)",
+        "Annuities",
+        "Tax-Managed & Alternative Solutions",
+        "All Investments",
+        "Smart Veta",
+        "Volatility Management",
+        "Risk-Efficient Income",
+        "<any Carrier child term>"
+      ]
+    },
+    {
+      "id": "operations",
+      "label": "Forms & Operations",
+      "blurb": "Forms, sample applications, new business, transfers, custodians and compliance.",
+      "topics": [
+        "Forms",
+        "Sample Applications",
+        "New Business & NIGO",
+        "Transfers",
+        "Schwab & Fidelity",
+        "Compliance"
+      ],
+      "color": "#68b9b0",
+      "softColor": "#184844",
+      "familiarPages": [
+        "Suitability Quick Reference Matrix",
+        "Transfer Company List",
+        "AEWM Forms",
+        "Sample Applications",
+        "Annuity New Business",
+        "Inforce Business",
+        "Life Pending Business",
+        "Compliance"
+      ],
+      "wordpressCategoryRules": [
+        "Operations",
+        "Form",
+        "Carrier Guidelines",
+        "Annuity New Business",
+        "Inforce Business",
+        "Compliance",
+        "Licensing",
+        "Sample",
+        "Orion",
+        "TD Ameritrade/Schwab",
+        "Fidelity",
+        "Custodians",
+        "Trade Portal",
+        "FireLight",
+        "iPipeline",
+        "RegEd",
+        "Technology",
+        "Best Practices/Instructions",
+        "Medicare Advantage/PDP Certifications",
+        "Security",
+        "Regulatory Updates",
+        "Suitability",
+        "App Assist",
+        "Docusign",
+        "Policy"
+      ]
+    },
+    {
+      "id": "marketing",
+      "label": "Marketing & Seminars",
+      "blurb": "Seminar kits, campaigns, print on demand, scripts and client-ready pieces.",
+      "topics": [
+        "Seminar Kits",
+        "Recorded Seminars",
+        "Campaigns & Print on Demand",
+        "Scripts & Appointments",
+        "Client Events & Invites",
+        "Digital & Social"
+      ],
+      "color": "#d28fb1",
+      "softColor": "#3d2033",
+      "familiarPages": [
+        "Recorded Seminars",
+        "Turnkey Seminars & Webinars",
+        "Real Wins",
+        "Print on Demand",
+        "AE Marketing Hub",
+        "Weekly Headlines & Highlights"
+      ],
+      "wordpressCategoryRules": [
+        "Seminars",
+        "Seminar Success",
+        "Seminar/Webinar Tools",
+        "Seminar Tools",
+        "Seminar Support",
+        "Seminar Marketing",
+        "Seminar",
+        "Webinars",
+        "Lead Generation",
+        "Digital Marketing",
+        "Marketing",
+        "Appointments (Scheduling)",
+        "Referrals",
+        "Advertising",
+        "AE Marketing Hub",
+        "Real Wins",
+        "Real Wins: ROI",
+        "Second Half Playbook",
+        "Express Lane",
+        "List Building",
+        "Website",
+        "Branding",
+        "Public Relations",
+        "Client Events",
+        "Invites",
+        "Print on Demand",
+        "Email",
+        "Point of Sale",
+        "Creative Services",
+        "Greeting Cards",
+        "Weekly Headlines & Highlights",
+        "AE Media",
+        "Newsletter",
+        "Flyer",
+        "Brochure",
+        "Sales Process",
+        "Sales Skills",
+        "Sales Tools",
+        "Script",
+        "AE Campaign Library",
+        "StoryBrand",
+        "Retire RIGHT",
+        "Consumer-facing"
+      ]
+    },
+    {
+      "id": "planning",
+      "label": "Planning & Advanced Markets",
+      "blurb": "Tax, income, estate, long-term care and high-net-worth concepts for client cases.",
+      "topics": [
+        "Retirement Income",
+        "Tax, RMDs & IRAs",
+        "Social Security",
+        "Estate & Legacy",
+        "Long-Term Care",
+        "High Net Worth"
+      ],
+      "color": "#7bc4d5",
+      "softColor": "#1c4556",
+      "familiarPages": [
+        "Advanced Markets",
+        "Ask the Experts",
+        "High Net Worth",
+        "Whitepapers",
+        "Life Strategies",
+        "Medicare Solutions"
+      ],
+      "wordpressCategoryRules": [
+        "Retirement Planning",
+        "Income",
+        "Taxes",
+        "RMD",
+        "IRAs",
+        "Roth IRAs",
+        "Social Security",
+        "Estate Planning",
+        "Legacy Planning",
+        "Long-Term Care",
+        "Chronic Illness and Long-Term Care (LTC)",
+        "Health Care",
+        "Medicare",
+        "High Net Worth",
+        "HNW Specified Client Planning",
+        "HNW Estate Planning",
+        "HNW Sale of Highly Appreciated Assets",
+        "HNW Business Planning",
+        "HNW Planned Giving",
+        "Advanced Markets",
+        "Financial Planning",
+        "Investments",
+        "Whitepaper",
+        "Charitable Planning",
+        "Market Volatility",
+        "Risk Management",
+        "Inflation",
+        "Case Study",
+        "Annual Reviews",
+        "One Big Beautiful Bill Act"
+      ]
+    },
+    {
+      "id": "coaching",
+      "label": "Coaching & Training",
+      "blurb": "Practice management, hiring, team training, leadership and coaching programs.",
+      "topics": [
+        "Practice Management",
+        "Hiring & HR Hub",
+        "Onboard Your Staff",
+        "Team Training",
+        "Leadership",
+        "Coaching Programs"
+      ],
+      "color": "#d6b884",
+      "softColor": "#3a3122",
+      "familiarPages": [
+        "HR Hub",
+        "Advisor Talent Solutions",
+        "Improve Your Business",
+        "Onboard Your Staff",
+        "STRETCH Leadership",
+        "TechPath"
+      ],
+      "wordpressCategoryRules": [
+        "Practice Management",
+        "Leadership",
+        "Team Development",
+        "Hiring",
+        "Staffing",
+        "HR Hub",
+        "Advisor Talent Solutions",
+        "Culture",
+        "Business Planning",
+        "Profitability",
+        "Metrics",
+        "Advisor Business Owners",
+        "Succession",
+        "Rob Russell Next Generation Coaching Program",
+        "STRETCH: Coaching & Development",
+        "AE Coach",
+        "Scale Track",
+        "CEO Track",
+        "Optimize Track",
+        "Client Experience",
+        "Customer Service",
+        "Training",
+        "Coaching Video",
+        "AE University",
+        "Marketing Director's Playbook",
+        "Advisor Team Development",
+        "Foundational Team Training",
+        "Performance Management",
+        "Job Description",
+        "TechPath",
+        "AE/ai"
+      ]
+    },
+    {
+      "id": "events",
+      "label": "Events",
+      "blurb": "The Journey, WSOS, AExchange, forums and webinar replays.",
+      "topics": [
+        "Upcoming Events",
+        "The Journey",
+        "World Series of Success",
+        "AExchange",
+        "Forums & Summits",
+        "Webinar Replays"
+      ],
+      "color": "#7d83fe",
+      "softColor": "#33367a",
+      "familiarPages": [
+        "The Journey",
+        "World Series of Success",
+        "Event Resources",
+        "Ops Connect",
+        "Marketing Connect",
+        "Live Events Calendar"
+      ],
+      "wordpressCategoryRules": [
+        "<any Event child term>",
+        "The Journey*",
+        "WSOS*",
+        "AExchange*",
+        "High Net Worth Forum",
+        "Inspiring Women",
+        "AE Leadership Summit",
+        "Immersion",
+        "Webinar",
+        "Wealth Elite Symposium",
+        "Ops Connect",
+        "Marketing Connect",
+        "Business Value Bootcamp",
+        "HNW Accelerant Series",
+        "PowerUp",
+        "LIFE LIVE",
+        "Podcast"
+      ]
+    }
+  ],
+  "alsoInNavigation": [
+    "News",
+    "Browse menu (sections + pages you know)",
+    "Apps launcher (ChatAE, AE Portal, Leaderboards, Retirement Analyzer)",
+    "Saved",
+    "Manage (editors)"
+  ],
+  "contentTypes": [
+    {
+      "id": "resource",
+      "label": "Resource",
+      "note": "Files, videos, links and articles"
+    },
+    {
+      "id": "howto",
+      "label": "How-to article",
+      "note": "Instructional pages authored in the Library; badge + filter, no separate section or categories"
+    }
+  ],
+  "filters": [
+    "Type (Resource / How-to)",
+    "Audience (Advisor-facing / Client-ready)",
+    "Licensing (applied from user profile)",
+    "Line of business",
+    "Format",
+    "Carrier & partner",
+    "Program & event",
+    "Presenter",
+    "Updated"
+  ],
+  "reviewWindows": [
+    {
+      "id": "monthly",
+      "label": "Monthly",
+      "months": 1,
+      "defaultFor": [
+        "Commission Schedules",
+        "Annuity Rate Watch",
+        "Rate Shift Report",
+        "AE Indexed Performance Report"
+      ]
+    },
+    {
+      "id": "quarterly",
+      "label": "Every 3 months",
+      "months": 3,
+      "defaultFor": [
+        "Fact Sheet",
+        "Holdings Summary",
+        "Performance",
+        "Carrier & Product Changes"
+      ]
+    },
+    {
+      "id": "semiannual",
+      "label": "Every 6 months",
+      "months": 6,
+      "defaultFor": [
+        "Carrier Guidelines",
+        "Form",
+        "Acceptable Forms of Payment",
+        "Medicare Advantage/PDP Certifications"
+      ]
+    },
+    {
+      "id": "annual",
+      "label": "Every 12 months",
+      "months": 12,
+      "defaultFor": [
+        "Compliance",
+        "Operations how-tos",
+        "Client-ready materials",
+        "Script",
+        "Template",
+        "How-to article"
+      ]
+    },
+    {
+      "id": "biennial",
+      "label": "Every 24 months",
+      "months": 24,
+      "defaultFor": [
+        "Training",
+        "Coaching Video",
+        "Recorded seminars",
+        "Article",
+        "Event replays"
+      ]
+    },
+    {
+      "id": "fixedDate",
+      "label": "On a set date",
+      "months": null,
+      "defaultFor": [
+        "Event registrations",
+        "Promotions",
+        "Enrollment periods"
+      ]
+    }
+  ],
+  "expiryRules": {
+    "reminderDaysBefore": [
+      30,
+      14,
+      3
+    ],
+    "onDue": "hide from readers, search, MCP and AXL; editors still see it",
+    "uploadNewVersionGraceDays": 7,
+    "ownersMayShortenOnly": true,
+    "humanApprovalRequired": true
+  },
+  "approvalRouting": [
+    {
+      "when": "Client-ready material",
+      "approvers": [
+        "Compliance",
+        "Creative Services"
+      ]
+    },
+    {
+      "when": "AEWM material",
+      "approvers": [
+        "AEWM Compliance"
+      ]
+    },
+    {
+      "when": "Carrier documents and forms",
+      "approvers": [
+        "Annuity, Life or Medicare Operations by line of business"
+      ]
+    },
+    {
+      "when": "Everything else",
+      "approvers": [
+        "Section owner"
+      ]
+    }
+  ]
+}

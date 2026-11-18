@@ -11,6 +11,7 @@ Read [AGENTS.md](AGENTS.md), then [current status and handoff](docs/STATUS.md). 
 ## Project documents
 
 - [Active core-platform and general MCP delivery plan](docs/CORE-PLATFORM-AND-MCP.md)
+- [Design handoff: navigation, Manage, viewers and how-to articles](docs/design/README.md)
 
 - [Requirements and scope](docs/PROJECT-BRIEF.md)
 - [Proposed architecture and environments](docs/ARCHITECTURE.md)

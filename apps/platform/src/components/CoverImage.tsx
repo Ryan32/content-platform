@@ -33,15 +33,15 @@ export default function CoverImage() {
     await load(); setBusy(false)
   }
 
-  return <div style={{ background: 'var(--theme-elevation-0)', border: '1px solid var(--theme-elevation-150)', borderRadius: 10, padding: 12, marginBottom: 20 }}>
+  return <div className="ae-card" style={{ padding: 12 }}>
     <strong style={{ display: 'block', marginBottom: 8 }}>Cover image</strong>
     <Thumbnail id={id ?? 0} version={id ? info?.version : null} format={format} title={title} rounded={8} />
     <p style={muted}>{!id ? 'Save the item first, then add a cover image.' : info?.source ? SOURCE[info.source] : 'Shown on library cards. A thumbnail is created automatically from a Vimeo video or PDF, or upload your own.'}</p>
     {id && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
       <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={e => { const f = e.target.files?.[0]; if (f) void send('POST', f) }} />
-      <button type="button" className="btn btn--style-secondary btn--size-small" style={{ margin: 0 }} disabled={busy} onClick={() => input.current?.click()}>
+      <button type="button" className="ae-btn ae-btn--secondary ae-btn--small" disabled={busy} onClick={() => input.current?.click()}>
         {busy ? 'Saving…' : info?.source === 'upload' ? 'Replace' : 'Upload cover'}</button>
-      {info?.source === 'upload' && <button type="button" className="btn btn--style-secondary btn--size-small" style={{ margin: 0 }} disabled={busy} onClick={() => void send('DELETE')}>Use automatic</button>}
+      {info?.source === 'upload' && <button type="button" className="ae-btn ae-btn--secondary ae-btn--small" disabled={busy} onClick={() => void send('DELETE')}>Use automatic</button>}
     </div>}
     {error && <p role="alert" style={{ ...muted, color: 'var(--theme-error-500)' }}>{error}</p>}
   </div>

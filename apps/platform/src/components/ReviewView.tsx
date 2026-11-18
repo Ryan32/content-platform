@@ -7,7 +7,7 @@ const ERRORS: Record<string, string> = {
   conflict: 'The decision could not be applied: the item or suggestion changed since you opened it. Review the current state below before trying again.',
   invalid: 'The review form was incomplete. Check the summary and try again.',
 }
-const box = (color: string): React.CSSProperties => ({ padding: 12, border: `1px solid var(--theme-${color}-500)`, borderRadius: 6, margin: '12px 0' })
+const STATUS: Record<string, [string, string]> = { intake: ['Intake', 'ae-pill'], draft: ['Draft', 'ae-pill ae-pill--warn'], published: ['Published', 'ae-pill ae-pill--ok'], archived: ['Archived', 'ae-pill'] }
 const field: React.CSSProperties = { width: '100%', padding: 10, borderRadius: 4, border: '1px solid var(--theme-elevation-150)', background: 'var(--theme-input-bg)', color: 'var(--theme-text)', font: 'inherit' }
 const when = (value: string) => new Date(value).toLocaleString('en-US', { timeZone: 'America/Chicago' })
 const relId = (value: unknown) => typeof value === 'object' && value && 'id' in value ? Number((value as { id: unknown }).id) : Number(value)
@@ -38,8 +38,8 @@ async function list(payload: Payload, user: unknown) {
         <span><strong>{title(doc)}</strong><br /><span style={muted}>Suggested {when(doc.createdAt)} · {doc.model}</span></span></a>
     })}</div>
       : <p style={muted}>Nothing is waiting. New suggestions appear after a file or Vimeo video is processed and AI tagging finishes.</p>}
-    {recent.docs.length > 0 && <><h2>Recently decided</h2><ul>{recent.docs.map(doc => <li key={doc.id} style={{ margin: '6px 0' }}>
-      <a href={`/admin/review/${doc.id}`}>{title(doc)}</a> <span style={muted}>· {doc.decision === 'accepted' ? 'Accepted' : 'Rejected'}{doc.reviewedAt ? ` ${when(doc.reviewedAt)}` : ''}</span></li>)}</ul></>}
+    {recent.docs.length > 0 && <section className="ae-card" style={{ maxWidth: 900, marginTop: 24 }}><h3>Recently decided</h3><ul className="ae-rows">{recent.docs.map(doc => <li key={doc.id}>
+      <a href={`/admin/review/${doc.id}`}>{title(doc)}</a><span><span className={doc.decision === 'accepted' ? 'ae-pill ae-pill--ok' : 'ae-pill'}>{doc.decision === 'accepted' ? 'Accepted' : 'Rejected'}</span> <span className="ae-muted">{doc.reviewedAt ? when(doc.reviewedAt) : ''}</span></span></li>)}</ul></section>}
   </>
 }
 
@@ -66,11 +66,11 @@ async function detail(payload: Payload, user: unknown, id: string, error?: strin
     <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
       <span style={{ width: 160, flex: 'none' }}><Thumbnail id={contentId} version={content.thumbnailVersion} format={content.format} title={content.title} rounded={8} /></span>
       <div><h1 style={{ marginBottom: 4 }}>{content.title}</h1>
-        <p style={muted}><a href={`/admin/collections/content/${contentId}`}>Open library item</a> · status {content.state} · suggested {when(doc.createdAt)} by {doc.model}</p></div>
+        <p style={muted}><span className={(STATUS[content.state ?? 'intake'] ?? STATUS.intake)[1]}>{(STATUS[content.state ?? 'intake'] ?? STATUS.intake)[0]}</span> · <a href={`/admin/collections/content/${contentId}`}>Open library item</a> · suggested {when(doc.createdAt)} by {doc.model}</p></div>
     </div>
-    {error && <p role="alert" style={box('error')}>{ERRORS[error] ?? 'The decision could not be applied.'}</p>}
-    {warnings.map((w, i) => <p key={i} style={box('warning')}>{w}</p>)}
-    {stale && <p role="alert" style={box('warning')}>The item&apos;s file, Vimeo ID, or tags changed after this suggestion was made, so it can&apos;t be accepted. A new suggestion is created automatically for the current version.</p>}
+    {error && <p role="alert" className="ae-notice ae-notice--fail">{ERRORS[error] ?? 'The decision could not be applied.'}</p>}
+    {warnings.map((w, i) => <p key={i} className="ae-notice ae-notice--warn">{w}</p>)}
+    {stale && <p role="alert" className="ae-notice ae-notice--warn">The item&apos;s file, Vimeo ID, or tags changed after this suggestion was made, so it can&apos;t be accepted. A new suggestion is created automatically for the current version.</p>}
 
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16, margin: '16px 0' }}>
       <section style={panel}><h3 style={{ marginTop: 0 }}>Current</h3>
@@ -95,18 +95,19 @@ async function detail(payload: Payload, user: unknown, id: string, error?: strin
         <textarea name="note" maxLength={2000} rows={2} style={field} /></label>
       <p style={muted}>Accept installs the extracted text as the item&apos;s reading text and citations, applies this summary and these tags, and moves the item to Draft for an administrator to publish.</p>
       <div style={{ display: 'flex', gap: 12 }}>
-        <button className="btn btn--style-primary" style={{ margin: 0 }} name="decision" value="accepted">Accept and apply to draft</button>
-        <button className="btn btn--style-secondary" style={{ margin: 0 }} name="decision" value="rejected">Reject</button>
+        <button className="ae-btn ae-btn--primary" name="decision" value="accepted">Accept and apply to draft</button>
+        <button className="ae-btn ae-btn--secondary" name="decision" value="rejected">Reject</button>
       </div>
     </form> : doc.decision === 'pending' ? <form method="post" action={`/review/${doc.id}/decision`}>
       <input type="hidden" name="decision" value="rejected" /><input type="hidden" name="summary" value="" />
       <input type="hidden" name="expectedUpdatedAt" value={content.updatedAt} /><input type="hidden" name="note" value="Rejected superseded suggestion" />
-      <button className="btn btn--style-secondary" style={{ margin: 0 }} type="submit">Dismiss outdated suggestion</button>
+      <button className="ae-btn ae-btn--secondary" type="submit">Dismiss outdated suggestion</button>
     </form> : <p style={panel}><strong>{doc.decision === 'accepted' ? 'Accepted' : 'Rejected'}</strong>{doc.reviewedAt ? ` on ${when(doc.reviewedAt)}` : ''}{doc.reviewNote ? `. Note: ${doc.reviewNote}` : ''}</p>}
 
-    <h2>Source text ({extraction.passages.length} passages)</h2>
-    <p style={muted}>The extracted text the AI read. Check the summary and tags against it.</p>
-    {extraction.passages.map(p => <details key={p.id} style={{ margin: '6px 0' }}><summary>{p.locator}</summary>
-      <p style={{ whiteSpace: 'pre-wrap', ...panel }}>{p.text}</p></details>)}
+    <section className="ae-card" style={{ maxWidth: 900 }}>
+      <h3>Source text <span className="ae-muted">· {extraction.passages.length} {extraction.passages.length === 1 ? 'passage' : 'passages'}</span></h3>
+      <p className="ae-muted" style={{ marginTop: 0 }}>The extracted text the AI read. Check the summary and tags against it.</p>
+      {extraction.passages.map((p, i) => <details key={p.id} className="ae-passage" open={i === 0}><summary>{p.locator}</summary><p>{p.text}</p></details>)}
+    </section>
   </>
 }

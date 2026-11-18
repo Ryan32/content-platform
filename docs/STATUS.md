@@ -6,6 +6,14 @@ This document captures work completed in the originating Portal conversation. Ve
 
 ### Admin usability, invitations and automation — 2026-11-18
 
+- **Admin polish (after the admin-ux deploy; built locally, not yet deployed).**
+  - Shared admin styles in `custom.css`: cards, buttons, tables, status pills, notices, and a file picker.
+  - Automation status: stat tiles; Steps and Worker cards with On/Off pills; Failed and In progress tables in cards.
+  - Review: status pill, proper Accept/Reject buttons, and a source-text card.
+  - Processing panel: section labels, step pills, and a styled file picker that shows the chosen file name. Upload stays disabled until a file is chosen.
+  - Cover image and publish checklist use the same cards and buttons. Disabled buttons are visibly disabled, and the checklist says why Publish is unavailable.
+  - People, Audiences, and Access profiles show Yes/No pills instead of `true`.
+  - Verified in the local preview; typecheck and 98 tests pass.
 - **Deployed to dev (2026-11-18 ~13:50 CST), commit `6392131`.**
   - Images:
     - web `aecp-dev-cms:dev-platform-admin-ux`: index `sha256:1d1b74b1…`, amd64 `sha256:772d1741…`

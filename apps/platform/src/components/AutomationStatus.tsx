@@ -8,9 +8,6 @@ import { TAGGING_MODELS } from '../globals/AutomationSettings'
 
 const OUTCOMES: Record<string, string> = { retried: 'Job queued again. The worker picks it up within a few seconds.',
   job_not_retryable: 'That job is no longer failed, or belongs to an older processor version.', invalid_id: 'Unknown job.', retry_failed: 'Retry failed. Try again.' }
-const card: React.CSSProperties = { background: 'var(--theme-elevation-0)', border: '1px solid var(--theme-elevation-150)', borderRadius: 10, padding: '12px 16px', minWidth: 150 }
-const muted: React.CSSProperties = { color: 'var(--theme-elevation-500)', fontSize: 13 }
-const cell: React.CSSProperties = { padding: '8px 12px 8px 0', borderBottom: '1px solid var(--theme-elevation-100)', verticalAlign: 'top', textAlign: 'left' }
 const when = (value?: string | null) => value ? new Date(value).toLocaleString('en-US', { timeZone: 'America/Chicago' }) : ''
 
 /** Admin view at /admin/automation: what the background worker is doing, what failed and why, and retry. */
@@ -56,34 +53,48 @@ export default async function AutomationStatus({ initPageResult, params, searchP
   return template(<div style={{ paddingBottom: 48 }}>
     <h1>Automation status</h1>
     <p style={{ maxWidth: 820 }}>What the background worker is doing. When a file is uploaded or a Vimeo ID is set on a library item in Intake or Draft, the worker extracts the text (transcribing audio if needed), then asks the AI for a summary and tags. Results wait in <a href="/admin/review">Review</a>. Failed steps are listed below with the reason; fix the cause, then retry.</p>
-    {outcome && <p role="status" style={{ padding: 12, border: '1px solid var(--theme-success-500)', borderRadius: 6 }}>{outcome}</p>}
-    {warnings.map(w => <p key={w} role="alert" style={{ padding: 12, border: '1px solid var(--theme-warning-500)', borderRadius: 6 }}>{w}</p>)}
+    {outcome && <p role="status" className="ae-notice ae-notice--ok">{outcome}</p>}
+    {warnings.map(w => <p key={w} role="alert" className="ae-notice ae-notice--warn">{w}</p>)}
 
-    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', margin: '16px 0 24px' }}>
+    <div className="ae-stats">
       {[['Waiting', queued], ['Running', running], ['Failed', failed], ['Done in last 24h', doneToday], [`Paid jobs in last 24h (limit ${settings.dailyPaidJobLimit ?? 200})`, paidToday], ['Waiting for review', pendingReview]]
-        .map(([label, value]) => <div key={String(label)} style={card}><div style={{ fontSize: 24, fontWeight: 600 }}>{value}</div><div style={muted}>{label}</div></div>)}
+        .map(([label, value]) => <div key={String(label)} className="ae-stat"><strong style={label === 'Failed' && Number(value) > 0 ? { color: '#c2414b' } : undefined}>{value}</strong><span className="ae-muted">{label}</span></div>)}
     </div>
-    <p style={muted}>Last worker activity: {recent.docs[0] ? when(recent.docs[0].updatedAt) : 'none yet'} (Central time).</p>
 
-    <h2>Steps</h2>
-    <ul>{steps.map(([label, on, cost]) => <li key={label}>{label}: <strong>{on === false ? 'Off' : 'On'}</strong> <span style={muted}>({cost})</span></li>)}</ul>
-    <p>{isAdmin ? <a href="/admin/globals/automation-settings">Change automation settings →</a> : <span style={muted}>Administrators can change these in Automation settings.</span>}</p>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20, alignItems: 'start' }}>
+      <section className="ae-card">
+        <h2>Steps</h2>
+        <ul className="ae-rows">{steps.map(([label, on, cost]) => <li key={label}><span>{label} <span className="ae-muted">({cost})</span></span>
+          <span className={on === false ? 'ae-pill' : 'ae-pill ae-pill--ok'}>{on === false ? 'Off' : 'On'}</span></li>)}</ul>
+        <p className="ae-muted" style={{ margin: '12px 0 0' }}>{isAdmin ? <a href="/admin/globals/automation-settings">Change automation settings →</a> : 'Administrators can change these in Automation settings.'}</p>
+      </section>
+      <section className="ae-card">
+        <h2>Worker</h2>
+        <ul className="ae-rows">
+          <li><span>Last activity</span><span className="ae-muted">{recent.docs[0] ? `${when(recent.docs[0].updatedAt)} CT` : 'None yet'}</span></li>
+          <li><span>Automation</span><span className={settings.paused ? 'ae-pill ae-pill--warn' : 'ae-pill ae-pill--ok'}>{settings.paused ? 'Paused' : 'Running'}</span></li>
+          <li><span>Paid processing</span><span className={paidEnv ? 'ae-pill ae-pill--ok' : 'ae-pill'}>{paidEnv ? 'Allowed' : 'Off in this environment'}</span></li>
+        </ul>
+      </section>
+    </div>
 
-    <h2>Failed ({failed})</h2>
-    {failures.docs.length ? <table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr>
-      <th style={cell}>Library item</th><th style={cell}>Step</th><th style={cell}>Why it failed</th><th style={cell}>When</th><th style={cell}></th></tr></thead>
-      <tbody>{failures.docs.map(job => <tr key={job.id}>
-        <td style={cell}><a href={itemLink(job)}>{title(job)}</a></td><td style={cell}>{jobLabel(job.stage, job.input)}</td>
-        <td style={cell}>{explain(job.errorCode)}</td><td style={cell}>{when(job.updatedAt)}</td>
-        <td style={cell}>{isAdmin && <form method="post" action={`/library-api/jobs/${job.id}/retry`}><button type="submit" className="btn btn--style-secondary btn--size-small" style={{ margin: 0 }}>Retry</button></form>}</td>
-      </tr>)}</tbody></table> : <p style={muted}>Nothing has failed.</p>}
+    <section className="ae-card">
+      <h2>Failed ({failed})</h2>
+      {failures.docs.length ? <table className="ae-table"><thead><tr><th>Library item</th><th>Step</th><th>Why it failed</th><th>When</th><th></th></tr></thead>
+        <tbody>{failures.docs.map(job => <tr key={job.id}>
+          <td><a href={itemLink(job)}>{title(job)}</a></td><td>{jobLabel(job.stage, job.input)}</td>
+          <td>{explain(job.errorCode)}</td><td className="ae-muted" style={{ whiteSpace: 'nowrap' }}>{when(job.updatedAt)}</td>
+          <td style={{ textAlign: 'right' }}>{isAdmin && <form method="post" action={`/library-api/jobs/${job.id}/retry`}><button type="submit" className="ae-btn ae-btn--secondary ae-btn--small">Retry</button></form>}</td>
+        </tr>)}</tbody></table> : <p className="ae-muted" style={{ margin: 0 }}>Nothing has failed.</p>}
+    </section>
 
-    <h2>In progress ({queued + running})</h2>
-    {active.docs.length ? <table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr>
-      <th style={cell}>Library item</th><th style={cell}>Step</th><th style={cell}>Status</th><th style={cell}>Attempts</th><th style={cell}>Next try</th></tr></thead>
-      <tbody>{active.docs.map(job => <tr key={job.id}><td style={cell}><a href={itemLink(job)}>{title(job)}</a></td><td style={cell}>{jobLabel(job.stage, job.input)}</td>
-        <td style={cell}>{STATE_LABEL[job.state ?? 'queued']}{job.errorCode ? <div style={muted}>{explain(job.errorCode)}</div> : null}</td>
-        <td style={cell}>{job.attempts ?? 0} of 5</td><td style={cell}>{job.state === 'queued' ? when(job.nextRunAt) : ''}</td></tr>)}</tbody></table>
-      : <p style={muted}>The queue is empty.</p>}
+    <section className="ae-card">
+      <h2>In progress ({queued + running})</h2>
+      {active.docs.length ? <table className="ae-table"><thead><tr><th>Library item</th><th>Step</th><th>Status</th><th>Attempts</th><th>Next try</th></tr></thead>
+        <tbody>{active.docs.map(job => <tr key={job.id}><td><a href={itemLink(job)}>{title(job)}</a></td><td>{jobLabel(job.stage, job.input)}</td>
+          <td><span className={job.state === 'running' ? 'ae-pill ae-pill--info' : 'ae-pill'}>{STATE_LABEL[job.state ?? 'queued']}</span>{job.errorCode ? <div className="ae-muted">{explain(job.errorCode)}</div> : null}</td>
+          <td>{job.attempts ?? 0} of 5</td><td className="ae-muted">{job.state === 'queued' ? when(job.nextRunAt) : ''}</td></tr>)}</tbody></table>
+        : <p className="ae-muted" style={{ margin: 0 }}>The queue is empty.</p>}
+    </section>
   </div>)
 }

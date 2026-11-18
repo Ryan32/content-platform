@@ -44,7 +44,7 @@ export default function PublishChecklist() {
     setBusy(false)
   }
 
-  return <div style={{ background: 'var(--theme-elevation-0)', border: '1px solid var(--theme-elevation-150)', borderRadius: 10, padding: '12px 14px', marginBottom: 20 }}>
+  return <div className="ae-card" style={{ padding: '12px 14px' }}>
     <strong>{published ? 'Published' : 'Ready to publish?'}</strong>
     <p style={muted}>{published ? 'Visible to its audience. Editing the text returns it to Draft for re-approval.' : 'Only the audience is required. The rest makes the item useful and findable.'}</p>
     {checks.map(([ok, label, hint, required]) => <div key={label} style={row(ok)}>
@@ -53,9 +53,10 @@ export default function PublishChecklist() {
     </div>)}
     {!published && (isAdmin
       ? <>
-        <button type="button" className="btn btn--style-primary btn--size-small" style={{ margin: '10px 0 0', width: '100%' }} disabled={!canPublish} onClick={publish}>
+        <button type="button" className="ae-btn ae-btn--primary" style={{ margin: '10px 0 0', width: '100%' }} disabled={!canPublish} onClick={publish}>
           {busy ? 'Publishing…' : 'Publish now'}</button>
         {modified && <p style={muted}>Save your changes before publishing.</p>}
+        {!modified && !values.audience && <p style={muted}>Choose an audience and save to enable publishing.</p>}
       </>
       : <p style={muted}>An administrator publishes items.</p>)}
     {error && <p role="alert" style={{ color: 'var(--theme-error-500)', fontSize: 12 }}>{error}</p>}

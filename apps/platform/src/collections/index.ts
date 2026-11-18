@@ -36,7 +36,7 @@ export const Audiences: CollectionConfig = {
       validate: (value: unknown) => typeof value === 'string' && /^[a-z0-9][a-z0-9:._-]{1,99}$/.test(value) || 'Use lowercase letters, numbers and : . _ - (e.g. business-line:annuity).',
       admin: { description: 'Permanent identifier stored on memberships and rules, e.g. business-line:annuity. It cannot be changed after saving; create a new audience and deactivate this one instead.' } },
     { name: 'description', type: 'textarea', label: 'Who belongs here' },
-    { name: 'active', type: 'checkbox', defaultValue: true, label: 'Available to choose', admin: { position: 'sidebar', description: 'Inactive audiences cannot be newly assigned. Existing assignments keep working until removed.' } },
+    { name: 'active', type: 'checkbox', defaultValue: true, label: 'Available to choose', admin: { position: 'sidebar', components: { Cell: '/components/YesNoCell' }, description: 'Inactive audiences cannot be newly assigned. Existing assignments keep working until removed.' } },
   ],
 }
 
@@ -82,7 +82,7 @@ export const Users: CollectionConfig = {
     { name: 'email', type: 'email', label: 'Work email', unique: true, index: true,
       admin: { description: 'The email they sign in with. Their account links to this record the first time they sign in with this verified email.' } },
     { name: 'active', type: 'checkbox', label: 'Can sign in', defaultValue: true,
-      admin: { position: 'sidebar', description: 'Turn off to block access immediately without deleting the person.' } },
+      admin: { position: 'sidebar', components: { Cell: '/components/YesNoCell' }, description: 'Turn off to block access immediately without deleting the person.' } },
     { name: 'roles', type: 'select', label: 'Roles', hasMany: true, defaultValue: ['reader'],
       options: [option('reader', 'Reader'), option('editor', 'Editor'), option('admin', 'Administrator')],
       admin: { position: 'sidebar', description: 'Reader: browses the library. Editor: adds and edits content and reviews AI suggestions. Administrator: also manages people, access, publishing, and automation. Only editors and administrators can open this admin.' } },
@@ -107,7 +107,7 @@ export const AccessProfiles: CollectionConfig = {
     description: 'Reusable audience rules attached to library items, such as "Annuity advisors" or "AE employees". Each rule grants one action (view, AI retrieval, or download) to people whose memberships match its scope and requirements. An item with no profile is visible to no reader.' },
   fields: [
     { name: 'name', type: 'text', required: true, label: 'Profile name', admin: { description: 'Describe the audience, e.g. "AEWM advisors — full active".' } },
-    { name: 'active', type: 'checkbox', defaultValue: false, label: 'In effect', admin: { position: 'sidebar', description: 'Inactive profiles grant nothing, even if attached to items.' } },
+    { name: 'active', type: 'checkbox', defaultValue: false, label: 'In effect', admin: { position: 'sidebar', components: { Cell: '/components/YesNoCell' }, description: 'Inactive profiles grant nothing, even if attached to items.' } },
     { name: 'grants', type: 'array', label: 'Rules', labels: { singular: 'Rule', plural: 'Rules' },
       admin: { description: 'A person qualifies if ANY rule matches one of their memberships. View is required for every other action.' },
       fields: [

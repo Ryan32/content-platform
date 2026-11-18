@@ -6,7 +6,7 @@ This document captures work completed in the originating Portal conversation. Ve
 
 ### Admin usability, invitations and automation — 2026-11-18
 
-- **Admin polish (after the admin-ux deploy; built locally, not yet deployed).**
+- **Admin polish — deployed to dev 2026-11-18 ~14:25 CST (commit `657e4d0`).** Images `dev-platform-admin-polish` (amd64 `sha256:b9cc25b5…`) and `dev-platform-ops-admin-polish` (amd64 `sha256:3df8a57f…`), verified identical to local builds. No schema change; migrate was a no-op and the smoke test passed. Web `aecp-dev-library-web:5` is healthy; worker `aecp-dev-library-worker:3` started and reconciled. Pinned-ALB checks: health, home, and admin login 200.
   - Shared admin styles in `custom.css`: cards, buttons, tables, status pills, notices, and a file picker.
   - Automation status: stat tiles; Steps and Worker cards with On/Off pills; Failed and In progress tables in cards.
   - Review: status pill, proper Accept/Reject buttons, and a source-text card.

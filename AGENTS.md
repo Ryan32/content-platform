@@ -8,6 +8,10 @@ The user wants autonomous progress on authorized work, concise updates, and conc
 
 ## Current phase
 
+Latest priority: core AWS content platform plus client-independent, read-only MCP with per-user Auth0 authorization; read `docs/CORE-PLATFORM-AND-MCP.md`. AXL/Portal findings are documented and deferred. Do not make AXL integration a prerequisite or resume its implementation unless requested. Claude, ChatGPT, and Copilot are compatibility targets, not tested integrations. AWS work is occurring on another laptop; verify deployment evidence rather than inferring state from historical notes below.
+
+The initial application is now in `apps/platform`; read `docs/APPLICATION-FOUNDATION.md` before changing it. Maintain its ADRs/requirements ledger and `docs/STATUS.md` as implementation evolves, as explicitly requested by the user. Verify with `npm run typecheck`, `npm test`, and `npm run build` using the pinned Node runtime. Do not claim interactive Auth0, live migrations, workers or client certification from synthetic tests alone.
+
 The user explicitly prioritized WordPress backup validation and Vimeo access before platform setup. The DBR WordPress backup is at `data/dbr-backup`; the user confirmed copy completion on 2026-11-17. An offline SQL/file inventory and proposed 200-record past-year pilot are available under ignored `data/wordpress-inventory/scan-2026-11-17-v2/`; see `docs/WORDPRESS-PILOT.md`. This is not a verified live-site reconciliation or restore. One Vimeo download was previously tested; a later direct-ID metadata check succeeded for 16 pilot videos before rate limiting stopped the batch. Full Vimeo coverage is unresolved.
 
 Payload is the working architecture candidate, not an implemented application or irrevocable procurement decision. On 2026-11-17 the user selected AWS ECS/Fargate containers and required Amazon RDS PostgreSQL; see `docs/AWS-SETUP-HANDOFF.md` for the other-laptop setup instructions. No AWS provisioning has been performed. Retain Vimeo playback initially. Do not silently add a second editorial KB or a RAG product without a demonstrated requirement.

@@ -1,0 +1,60 @@
+# Application foundation and traceable implementation decisions
+
+Implemented locally beginning 2026-11-17. Application: `apps/platform`. This document supplements the [active delivery plan](CORE-PLATFORM-AND-MCP.md), which remains the wider scope. No AWS deployment or live Auth0 client certification is implied.
+
+## Decision record
+
+| ID | Decision and rationale | Consequence / revisit trigger |
+| --- | --- | --- |
+| ADR-001 | Use a single Next.js/Payload application for the initial CMS, branded reader, and MCP transport. One shared authorization/retrieval layer prevents divergent policies. | Separate workers remain a later process; no dependency on Portal or AXL deployments. |
+| ADR-002 | Pin Payload 3.94.0, Next 16.4.6, React 19.3.1, MCP SDK 1.32.2 and Node 24.22.3; commit the npm lockfile. Node was raised because Payload's engine range excludes the laptop's Node 22.17.1. | The project-local development Node package permits testing without changing the user's global runtime. Container runtime is pinned separately. Audit before deployment. |
+| ADR-003 | RDS PostgreSQL adapter with certificate verification and `push: false`; generate a versioned initial migration instead of runtime schema push. | Generated SQL is reviewable but not yet executed against RDS. Do not use this migration against a shared/unknown schema. |
+| ADR-004 | Server-maintained principal records keyed by issuer + subject; explicit active status and scoped membership clauses. No auto-provisioning on login. | Initial membership provisioning and the authoritative membership synchronization mechanism remain to implement. Unknown users cannot gain access. |
+| ADR-005 | Auth0 RS256 bearer access tokens, audience/issuer/expiry validation; disable Payload local-password authentication. | No open first-admin signup or password fallback. Interactive Auth0 browser sessions/admin sign-in are not implemented yet. No user credentials were requested or read. |
+| ADR-006 | Separate view, retrieve, download grants. Conditions in a clause must match one scope membership; complete clauses are OR. Admin/editor privileges do not implicitly grant reader MCP access. | Tests cover crossed-firm entitlements and action separation. Fine-grained editorial scopes are a later extension; initial trusted editors are global. |
+| ADR-007 | Restrict access profiles, membership changes, publication, evidence and source identifiers to admins. Editors can maintain draft content, accepted taxonomy, and suggestion decisions. Editing published evidence withdraws it to draft. | Approval is an initial admin gate, not yet the full compliance workflow. Accepting a suggestion does not automatically mutate accepted tags. |
+| ADR-008 | Shared read service enforces current publication/access dates in database queries; raw reader responses are allowlisted. Asset metadata has no public binary delivery endpoint. | No original downloads/previews or signed S3 links until separate delivery authorization is implemented. |
+| ADR-009 | Stateless Streamable HTTP MCP with three read tools, bounded payloads, token scopes and fresh principal lookup; no shared user credential cache. | OAuth registration/consent/refresh must be tested in actual clients. Discovery metadata alone is not a complete OAuth integration. |
+| ADR-010 | Plain text bodies and versioned passage records in the first slice; keyword matching initially. | No claim of vector retrieval, OCR, transcription or real import yet. Typed page/time locators and extraction jobs are next. |
+| ADR-011 | Portal-aligned semantic colors, responsive library and detail templates, accessible forms and focus styles. No invented content, statistics or sign-in success. | Initial typography is a system fallback if Geist is not installed. Exact branding/assets, font packaging, PDF/Vimeo viewers and visual review remain. |
+| ADR-012 | Build and test only against synthetic evidence; do not load the private backup into a new app without policy mapping. | Generated fixtures are clearly synthetic; source backup is untouched. |
+
+## Requirements ledger
+
+Follow-on ingestion work: [WordPress import package](WORDPRESS-IMPORT-PACKAGE.md) records ADR-013–016 and REQ-IMPORT-01–04. The [transactional Payload adapter](PAYLOAD-IMPORT-ADAPTER.md) adds ADR-017–020, immutable private staging, preview/apply and retry tests. Isolated RDS acceptance and processing workers remain pending.
+
+These IDs are implementation traceability anchors, not a claim that the full business requirements have been approved.
+
+| Requirement | Current evidence | Status |
+| --- | --- | --- |
+| REQ-CMS-01: manual authoring separated from policy/publication | Collections and `tests/collections.test.ts` | Implemented rules; real admin UI workflow awaits browser sign-in and database |
+| REQ-AUTH-01: fail-closed scoped permissions | `src/domain/access.ts`, `tests/access.test.ts` | Unit-tested; actual RDS/API isolation still required |
+| REQ-AUTH-02: validated API identity | `src/auth/verify.ts`, `tests/auth.test.ts` | JWT cryptography tested with local keys; Auth0 tenant untested |
+| REQ-MCP-01: generic read tools and transport | `src/mcp/server.ts`, `src/app/mcp/route.ts`, `tests/mcp.test.ts` | SDK client + stateless HTTP tests; real client/OAuth matrix pending |
+| REQ-CITE-01: stable links and version checks | Library service, detail route, superseded-citation test | Basic implementation; typed extraction locators pending |
+| REQ-UI-01: branded library/detail/search states | Reader route group and semantic CSS | Implemented shell; no browser/visual acceptance yet |
+| REQ-INGEST-01: idempotent ingestion and retries | Unique source/job keys, transactional package importer and completion receipts | Synthetic rollback/retry and preservation tests pass; real RDS and processing workers pending |
+| REQ-AI-01: suggested tags separate from manual decisions | Suggestions collection | Schema only; model pipeline not implemented |
+| REQ-SEARCH-01: lexical/vector retrieval | Permission-filtered keyword query | Keyword foundation only; full-text ranking/embeddings pending |
+| REQ-ASSET-01: protected previews/downloads | Private asset metadata collection | Delivery deliberately unavailable until implemented |
+| REQ-AWS-01: deployable app and versioned schema | Dockerfile, standalone build, generated migration | Build verified locally; image and RDS migration not exercised |
+
+## Run and configure
+
+From `apps/platform`, use Node 24.22.3 and `npm ci`. `npm run typecheck`, `npm test`, and `npm run build` verify the foundation. `npm run dev` binds to loopback. Existing Node 22 can install the project-local Node dependency but emits engine warnings; npm scripts use that local binary. Prefer the documented Node version on CI and the AWS laptop.
+
+The reader shell and `/health` can run without data configuration. The health route is liveness only, not proof of database readiness. Protected operations fail closed when configuration is missing. The shell reports that reader sign-in is not yet connected; it never substitutes a demo identity.
+
+Copy the app's `.env.example` to a private `.env.local` or inject settings through the deployment environment. Do not reuse the repository root's Vimeo diagnostic file. Configure `DATABASE_URI`, `DATABASE_CA_FILE` when required by the approved RDS CA chain, `PAYLOAD_SECRET`, `PLATFORM_ORIGIN`, `AUTH0_ISSUER`, and `AUTH0_AUDIENCE`. Use Secrets Manager for secrets. The canonical MCP resource must match the configured API audience. No secrets belong in image build arguments.
+
+`npm run generate:types` updates Payload types. `npm run migrate:create -- NAME` generates a reviewed schema migration without connecting to a database; `npm run migrate` executes migrations and must only target the verified environment. This task generated the initial migration but did not execute it. Initial users require a trusted provisioning step; no bootstrap endpoint is exposed. A migration task image/command and membership provisioning tooling are still needed before first launch.
+
+Docker build context must be `apps/platform`, not the repository root. `.dockerignore` excludes secrets and build output; the repository root also excludes the backup if accidentally selected. The runtime image runs as non-root and expects secrets/configuration at runtime. Docker build/run has not been tested here.
+
+## Validation and limitations
+
+Type checking, automated tests, migration generation and production-build results are recorded in `STATUS.md`. Tests use no live Auth0, AWS, Vimeo, database, or private content. MCP protocol tests exercise an independent SDK client and Web-standard HTTP transport; they do not certify Claude, ChatGPT or Copilot OAuth flows.
+
+Initial dependency audit reported 22 affected packages including DOMPurify. Pinned a patched DOMPurify 3.4.18 override, removing the critical/low findings. Remaining audit findings include transitive picomatch (high) and legacy esbuild (moderate) through Payload tooling. Do not declare production-ready until the remaining advisories are resolved or reviewed for the actual runtime paths. `npm audit fix` itself failed with an npm dependency-graph error; no forced major-version upgrades were applied. The lockfile and final audit totals are the reproducible evidence.
+
+Next: validate the RDS migration in the isolated dev environment; implement secure identity provisioning plus interactive Auth0 sessions for reader/admin; test real two-user API/MCP isolation; then wire S3 delivery and the approved sample ingestion. Keep each decision, acceptance result and deviation in this ledger/status as implementation proceeds.

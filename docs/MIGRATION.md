@@ -37,6 +37,8 @@ Retain Vimeo playback. A downloaded processing copy is not authorization to expo
 
 ## Phase 3: representative ingestion
 
+Offline preparation is now implemented in `scripts/build_wordpress_import.py`: a deterministic small pilot package, source snapshots/relationships, verified file fingerprints and editorial-preserving dry-run reconciliation. See [package contract and validation](WORDPRESS-IMPORT-PACKAGE.md). This prepares restricted intake proposals; no Payload/RDS writer or live import is implemented by that step.
+
 Start with approximately 200 items, including restricted content, scans, tables, legacy shortcodes, slide notes/charts, recordings, reused assets, and broken references. Expand to approximately 1,000 only after schema, permissions, extraction, and editor experience pass review.
 
 Use source-system/source-ID keys, hashes, job attempts, source modification dates, and processor versions. Separate immutable source capture, generated derivatives, and editorial overrides. On source changes, reconcile rather than blindly overwriting editorial cleanup.

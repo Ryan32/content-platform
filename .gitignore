@@ -11,3 +11,10 @@
 /.vscode/
 __pycache__/
 *.py[cod]
+
+# Application dependencies and generated output
+node_modules/
+.next/
+dist/
+coverage/
+*.tsbuildinfo

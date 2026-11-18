@@ -1,12 +1,20 @@
 # Proposed architecture and environments
 
+Implementation update: the initial `apps/platform` application combines Payload/Next.js, the Portal-styled reader shell, shared scoped authorization, and stateless MCP transport. See [application foundation](APPLICATION-FOUNDATION.md) for ADRs, requirements, tested boundaries, and missing integration work. Earlier statements that no application exists are historical; cloud deployment remains unverified here.
+
 Status: nothing below has been provisioned. On 2026-11-17, the user selected ECS/Fargate containers and required Amazon RDS PostgreSQL for the AWS setup handoff. Detailed sizing and processing design remain proposals. See [AWS setup handoff](AWS-SETUP-HANDOFF.md).
 
 ## Application boundary
 
+**Current priority:** [core platform and general MCP](CORE-PLATFORM-AND-MCP.md). Serve authorized readers and independent AI clients through one content/retrieval policy layer. Auth0 identifies each MCP user; firm/LOB/action policy stays server-side. AXL reuse and Portal integration paragraphs below describe deferred options. No AXL backend is required for this milestone.
+
+Latest recommendation after the MCP-first discussion and backend source review: host a standalone Portal-styled reader with branded AXL chat, reuse the existing AI backend through a dedicated library agent, and expose content retrieval through read-only MCP. See [backend review](AXL-BACKEND-REVIEW.md). Native Portal integration described below is optional later work; the backend checkout is now available and reviewed. Its external authorizer and deployed behavior still need validation.
+
 Payload is the working CMS candidate because its TypeScript/React model aligns with Portal and its MIT core permits custom authentication and workflows. Its packaged enterprise SSO and publishing workflow products are commercial; custom implementations are engineering work, not free turnkey features. Enterprise pricing remains quote-only.
 
 The existing Portal in `D:/source/portal-v2` uses React/TypeScript and Auth0. A separate Payload service can supply APIs to that frontend; adopting Payload does not imply rewriting Portal in Next.js.
+
+The 2026-11-17 source review recommends a native reader feature in Portal's current React/Vite shell, reusing its design tokens, semantic view framework, and AXL navigation. The [Portal/AXL integration contract](PORTAL-AXL-INTEGRATION.md) defines authorized passage retrieval, versioned citations, exact-location links, reader UI, and acceptance tests. Resolve the API-token/delegation contract before wiring live content: Portal's current token helper returns an ID token. The referenced AI backend checkout was unavailable, so its retrieval/MCP implementation remains unverified.
 
 ## Processing flow
 
@@ -16,7 +24,7 @@ The existing Portal in `D:/source/portal-v2` uses React/TypeScript and Auth0. A 
 4. Workers save versioned text, page/timestamp mappings, captions, summaries, and proposed tags.
 5. Editors resolve classification, ownership, and access decisions.
 6. Published eligible content enters a permission-filtered retrieval index.
-7. Portal renders content and Axl retrieves approved evidence through MCP.
+7. Portal renders content and Axl's backend retrieves approved evidence through an authorized service adapter; reader MCP exposes the same retrieval policy and operations. Exact transport/tool registration awaits backend review.
 
 Keep Vimeo IDs and embed metadata as the stable playback reference. Obtain authorized file URLs only when processing; do not store expiring URLs as canonical identifiers. Prefer existing accurate captions before paying to retranscribe. Speech alone does not describe silent charts or demonstrations; evaluate selective visual extraction.
 

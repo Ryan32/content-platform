@@ -2,7 +2,11 @@
 
 Prepared 2026-11-17 for the laptop with AWS CLI tooling. This is an implementation brief, not an executed deployment or a tested infrastructure template.
 
+Local implementation update: the [transactional import adapter runbook](PAYLOAD-IMPORT-ADAPTER.md) describes the next operations image, versioned migrations, private package transfer boundary and preview/apply acceptance. These edits need a subsequent build after the current upload. No deployment or RDS import has been verified here.
+
 ## 1. Direction and scope
+
+Latest scope: prioritize the [core platform and general MCP](CORE-PLATFORM-AND-MCP.md); AXL integration is deferred. Include authenticated HTTPS Streamable HTTP MCP ingress, OAuth resource discovery, Auth0 API/client configuration, stable reader links, and per-user policy enforcement. Independent clients must not require Portal cookies or the AXL backend. Verify cloud-client network reachability and the specific Copilot product/channel. Keep AWS foundation choices below unchanged.
 
 The user selected **ECS/Fargate containers** after discussing direct EC2 hosting. **PostgreSQL must be Amazon RDS**. Do not deploy PostgreSQL in a container, on EC2, or through another database host. Vercel is not the selected deployment path.
 
@@ -16,9 +20,9 @@ This request authorizes preparing these instructions. On the destination laptop,
 
 Read `AGENTS.md`, `README.md`, `docs/STATUS.md`, `docs/ARCHITECTURE.md`, `docs/MIGRATION.md`, and `docs/GOVERNANCE.md` before implementation. Paths are relative to the transferred workspace; do not assume the other laptop uses `D:/source`.
 
-- There is no Payload application or infrastructure code in this workspace at handoff time. These must be created, not assumed present. Project documentation and diagnostic tooling are being checked into `https://github.com/Ryan32/content-platform.git`; clone that repository on the other laptop, and transfer ignored credentials/backups separately.
-- `data/dbr-backup` contains an extracted WordPress tree. On 2026-11-17 the user was still copying an approximately 20 GB folder. `wp-content/mysql.sql` was observed at 1,948,630,258 bytes. Neither completeness nor a successful restore is established.
-- Finish the source copy, preserve the untouched source, and reconcile manifests/hashes when transferring between laptops. Do not certify a moving dataset. Ask about the original archive/timestamp if not available in local evidence.
+- Application update: `apps/platform` now contains a Payload/Next foundation, reader shell, protected MCP tools, generated initial migration and Dockerfile. See `APPLICATION-FOUNDATION.md` for validation and release gates; interactive sign-in, user provisioning, actual RDS migration and image verification remain. Do not assume the other laptop has these uncommitted changes until they are explicitly transferred or checked in. Infrastructure state must still be reconciled separately. Transfer ignored credentials/backups securely.
+- `data/dbr-backup` contains an extracted WordPress tree; the user confirmed copy completion. Offline inventory and a 200-record pilot are documented in `WORDPRESS-PILOT.md`. The SQL dump is 1,948,630,258 bytes. Live-source reconciliation and a successful restore remain unverified.
+- Preserve the untouched source and reconcile manifests/hashes when transferring between laptops. Ask about the original archive/timestamp if not available in local evidence.
 - `.env.local` contains a Vimeo token. Transfer through the user's secure local method; never paste credentials into chat, source control, build arguments, logs, or this document. One known-video test succeeded; full coverage is unverified.
 - Keep `data/`, `.env.local`, local manifests, and private reports ignored. Add `.dockerignore` before any build to exclude `data/`, `.env*` except a safe example if needed, `.git/`, temporary files, and unrelated local content. Send only an allowlisted application directory to remote builds.
 - WordPress's MySQL dump cannot be restored into the new PostgreSQL database. Inspect/restore it separately in an isolated MySQL-compatible environment with outbound mail, cron, webhooks, and production callbacks disabled before WordPress starts. Import through a transformation pipeline.
@@ -26,6 +30,8 @@ Read `AGENTS.md`, `README.md`, `docs/STATUS.md`, `docs/ARCHITECTURE.md`, `docs/M
 Source validation remains required before real migration. An empty dev platform can be prepared independently once provisioning is authorized.
 
 ## 3. Discover and record the environment
+
+Selected naming: **AE Library**, with development origin `https://library-dev.advisorsexcel.com` and production origin `https://library.advisorsexcel.com`. Use the development origin for `PLATFORM_ORIGIN` and its `/mcp` URL as the planned Auth0 API audience/resource identifier. Production uses its own corresponding values. Reuse Portal's existing Auth0 tenant; create/configure separate library application/API registrations. Verify DNS ownership and existing records before changes; DNS/certificates and OAuth registrations have not been confirmed here. Reader, `/admin`, `/api/...` and `/mcp` share each environment's host. Final browser callback paths will follow the implemented login SDK; do not guess registrations from the hostname alone.
 
 Use existing account conventions and resources where appropriate; never silently modify shared VPCs, IAM roles, DNS zones, or databases. Record unresolved inputs in the implementation plan:
 

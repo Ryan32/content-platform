@@ -2,6 +2,8 @@
 
 ## Confirmed direction
 
+- Before another deployment, implement local permission/build checks, bounded PDF/Office/Vimeo processing, an RDS job queue, AI proposal review and protected reader delivery. ADR-021–027 are in [processing and review](PROCESSING-AND-REVIEW.md). This does not authorize paid processing, AWS resource changes or automatic publication. SQS/outbox integration and large-media/OCR/vector work remain distinct follow-on tasks.
+
 - Implemented a bounded transactional Payload importer with immutable source staging and completion receipts. ADR-017–020 and requirement/test mappings are in the [adapter runbook](PAYLOAD-IMPORT-ADAPTER.md). Live isolated RDS validation remains pending; importer writes are confined to explicit operations tasks and do not publish content or overwrite editorial decisions.
 
 - Proceed with a small, repeatable WordPress intake package while AWS is pending. Preserve source snapshots and relationship identities, keep unresolved permissions restricted, and stage changed source versions without overwriting reviewed edits. ADR-013–016 and requirement/test mappings are in [the importer runbook](WORDPRESS-IMPORT-PACKAGE.md). No live publication, paid AI processing or CMS writes are part of this offline slice.

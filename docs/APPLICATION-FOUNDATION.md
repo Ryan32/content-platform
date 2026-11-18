@@ -53,6 +53,12 @@ Docker build context must be `apps/platform`, not the repository root. `.dockeri
 
 ## Validation and limitations
 
+The next local slice is documented in [processing and review](PROCESSING-AND-REVIEW.md), ADR-021–027. REQ-INGEST-02 covers leased/retryable PostgreSQL jobs and provider polling; REQ-AI-01 covers schema-validated evidence/taxonomy proposals; REQ-REVIEW-01 covers stale-safe human decisions and immutable provenance; REQ-ASSET-02 covers current-policy/source-version PDF and download delivery. Tests in `processing.test.ts`, `job-store.test.ts`, extraction/provider tests and `permission-matrix.test.ts` use synthetic inputs and mocked cloud/database boundaries. Real RDS concurrency, provider IAM/paid calls and authenticated visual acceptance remain live gates.
+
+Build/config acceptance is in [LOCAL-ACCEPTANCE.md](LOCAL-ACCEPTANCE.md). Dependency remediation and the remaining upstream picomatch blocker are in [DEPENDENCY-REVIEW.md](DEPENDENCY-REVIEW.md); historical audit totals below describe the original foundation only.
+
+Pre-deployment browser corrections (2026-11-18): the Payload route-group layout explicitly imports `@payloadcms/next/css`; keep it when regenerating/customizing the layout. Resource sign-in preserves citation parameters. Cookie authentication rejects foreign Origin headers (including same-site siblings), while sign-out requires matching Origin or explicit same-origin Fetch Metadata. Return destinations reject control characters. Existing auth regression cases cover these origin/redirect boundaries; production CSS presence is verified from build output. Live browser acceptance follows deployment.
+
 Type checking, automated tests, migration generation and production-build results are recorded in `STATUS.md`. Tests use no live Auth0, AWS, Vimeo, database, or private content. MCP protocol tests exercise an independent SDK client and Web-standard HTTP transport; they do not certify Claude, ChatGPT or Copilot OAuth flows.
 
 Initial dependency audit reported 22 affected packages including DOMPurify. Pinned a patched DOMPurify 3.4.18 override, removing the critical/low findings. Remaining audit findings include transitive picomatch (high) and legacy esbuild (moderate) through Payload tooling. Do not declare production-ready until the remaining advisories are resolved or reviewed for the actual runtime paths. `npm audit fix` itself failed with an npm dependency-graph error; no forced major-version upgrades were applied. The lockfile and final audit totals are the reproducible evidence.

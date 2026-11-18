@@ -90,6 +90,11 @@ export async function importPackage(input: unknown, store: ImportStore, mode: 'p
     // authoritative read proves the transaction's completion marker is durable.
     const persisted = await store.receipt(p.packageId)
     assertImport(persisted?.state === 'completed' && persisted.packageId === p.packageId, 'commit_not_confirmed')
+    // A concurrent attempt may have committed after ours lost serialization.
+    // Return only durable mappings, never this attempt's provisional row IDs.
+    const durable = persisted.result as ImportResult
+    assertImport(durable?.packageId === p.packageId && Array.isArray(durable.mappings), 'invalid_completion_receipt')
+    return { ...durable, mode, alreadyCompleted: result.alreadyCompleted }
   }
   return result
 }

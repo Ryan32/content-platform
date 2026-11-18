@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     }
     let parsed: unknown
     try { parsed = JSON.parse(Buffer.concat(chunks).toString('utf8')) } catch { return new Response('Invalid JSON', { status: 400 }) }
-    const repository = await authenticatedLibrary(request.headers)
+    const repository = await authenticatedLibrary(request.headers, 'mcp')
     if (!repository) return new Response('Access denied', { status: 403 })
     const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true })
     const server = createContentMcp(repository, origin, identity.scopes)

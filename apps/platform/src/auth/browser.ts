@@ -40,6 +40,15 @@ function cookie(name: string, value: string, maxAge: number) {
 
 export function hasSessionCookie(headers: Headers) { return Boolean(readCookie(headers.get('cookie'), cookieNames().session)) }
 
+/** Same-site sibling applications are not trusted to submit library mutations. */
+export function allowsBrowserSession(headers: Headers) {
+  if (headers.get('sec-fetch-site') === 'cross-site') return false
+  const origin = headers.get('origin')
+  if (!origin) return true // Includes server renders and top-level GET navigation.
+  const configured = process.env.PLATFORM_ORIGIN
+  return Boolean(configured && origin === new URL(configured).origin)
+}
+
 /** Returns the verified issuer/subject from the encrypted session cookie, or null. */
 export async function readSession(cookieHeader: string | null): Promise<BrowserIdentity | null> {
   const key = sessionKey(); const issuer = process.env.AUTH0_ISSUER
@@ -53,7 +62,7 @@ export async function readSession(cookieHeader: string | null): Promise<BrowserI
 }
 
 export function safeReturnTo(value: string | null | undefined) {
-  if (!value || value.length > 500 || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) return '/'
+  if (!value || value.length > 500 || !value.startsWith('/') || value.startsWith('//') || value.includes('\\') || /[\u0000-\u0020\u007f]/.test(value)) return '/'
   return value
 }
 
@@ -149,7 +158,7 @@ export async function logout(request: Request) {
   const settings = config()
   const origin = settings?.origin ?? (process.env.PLATFORM_ORIGIN ? new URL(process.env.PLATFORM_ORIGIN).origin : null)
   const sent = request.headers.get('origin')
-  if (!origin || (sent ? sent !== origin : request.headers.get('sec-fetch-site') === 'cross-site')) return new Response('Forbidden', { status: 403 })
+  if (!origin || (sent ? sent !== origin : request.headers.get('sec-fetch-site') !== 'same-origin')) return new Response('Forbidden', { status: 403 })
   const clear = cookie(cookieNames().session, '', 0)
   if (!settings) return redirect(`${origin}/`, [clear])
   const end = new URL('oidc/logout', settings.base)

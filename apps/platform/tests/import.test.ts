@@ -89,6 +89,16 @@ describe('restricted transactional import', () => {
     const store = new MemoryStore(); store.discardCommit = true
     await expect(importPackage(fixture(), store, 'apply')).rejects.toThrow('commit_not_confirmed')
   })
+  it('returns persisted mappings rather than uncommitted IDs from a concurrent attempt', async () => {
+    const store = new MemoryStore()
+    const receipt = store.receipt.bind(store)
+    store.receipt = async id => {
+      const row = await receipt(id)
+      if (row) { const result = row.result as { mappings: { contentId: number }[] }; result.mappings[0].contentId = 999 }
+      return row
+    }
+    expect((await importPackage(fixture(), store, 'apply')).mappings[0].contentId).toBe(999)
+  })
   it('previews without writes and does not restage a known snapshot in another package', async () => {
     const store = new MemoryStore(), p = fixture()
     expect((await importPackage(p, store, 'preview')).counts.create_restricted_intake).toBe(2)

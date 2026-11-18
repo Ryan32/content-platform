@@ -2,6 +2,8 @@
 
 Prepared 2026-11-17 for the laptop with AWS CLI tooling. This is an implementation brief, not an executed deployment or a tested infrastructure template.
 
+Next image handoff: [processing/review](PROCESSING-AND-REVIEW.md) adds migrations `20261118_091607_processing_review` and `20261118_092849_review_receipt`, optional worker operations, private content delivery and human review. Apply those migrations before the new web image; updated web/smoke startup checks require it. Run the local build/config gates, review the unresolved dependency advisory, and configure separate worker/web IAM before live processing. No new AWS changes were performed for this local slice.
+
 The [transactional import adapter runbook](PAYLOAD-IMPORT-ADAPTER.md) describes the next operations image, versioned migrations, private package transfer boundary, and preview/apply acceptance. This newer application is not the initial CMS image verified in the dev deployment below. No deployment of `apps/platform` or RDS content import has been verified.
 
 ## 1. Direction and scope

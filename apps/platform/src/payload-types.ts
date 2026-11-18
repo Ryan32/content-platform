@@ -249,12 +249,15 @@ export interface Asset {
   createdAt: string;
 }
 /**
+ * Immutable AI proposals. Review and apply at /review; decisions preserve the original proposal.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "suggestions".
  */
 export interface Suggestion {
   id: number;
   content: number | Content;
+  jobKey?: string | null;
   sourceVersion: string;
   model: string;
   proposal:
@@ -268,10 +271,15 @@ export interface Suggestion {
     | null;
   decision?: ('pending' | 'accepted' | 'rejected') | null;
   reviewNote?: string | null;
+  reviewedBy?: (number | null) | User;
+  reviewedAt?: string | null;
+  reviewAttempt?: string | null;
   updatedAt: string;
   createdAt: string;
 }
 /**
+ * Durable worker queue. Use the operations CLI to enqueue/retry; results remain private until reviewed.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "processing-jobs".
  */
@@ -284,6 +292,29 @@ export interface ProcessingJob {
   state?: ('queued' | 'running' | 'succeeded' | 'failed') | null;
   attempts?: number | null;
   errorCode?: string | null;
+  input?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  result?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  processorVersion?: string | null;
+  leaseToken?: string | null;
+  leaseUntil?: string | null;
+  nextRunAt?: string | null;
+  deadlineAt?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -649,11 +680,15 @@ export interface AssetsSelect<T extends boolean = true> {
  */
 export interface SuggestionsSelect<T extends boolean = true> {
   content?: T;
+  jobKey?: T;
   sourceVersion?: T;
   model?: T;
   proposal?: T;
   decision?: T;
   reviewNote?: T;
+  reviewedBy?: T;
+  reviewedAt?: T;
+  reviewAttempt?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -669,6 +704,13 @@ export interface ProcessingJobsSelect<T extends boolean = true> {
   state?: T;
   attempts?: T;
   errorCode?: T;
+  input?: T;
+  result?: T;
+  processorVersion?: T;
+  leaseToken?: T;
+  leaseUntil?: T;
+  nextRunAt?: T;
+  deadlineAt?: T;
   updatedAt?: T;
   createdAt?: T;
 }

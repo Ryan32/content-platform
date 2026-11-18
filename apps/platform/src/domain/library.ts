@@ -4,6 +4,7 @@ export interface Evidence {
 export interface Material {
   id: string; title: string; description: string; format: string; version: string;
   body: string; updatedAt: string; evidence: Evidence[]
+  vimeoId?: string; previewAssetId?: number; downloadAssetIds?: number[]
 }
 export interface LibraryRepository {
   search(query: string, format: string | undefined, page: number, action: 'view' | 'retrieve'): Promise<{ items: Material[]; hasNextPage: boolean }>

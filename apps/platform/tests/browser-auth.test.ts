@@ -91,11 +91,12 @@ describe('REQ-AUTH-03: Auth0 browser sign-in', () => {
   })
 
   it('only returns to same-site relative paths', () => {
-    for (const unsafe of ['//evil.example', 'https://evil.example', '/\\evil.example', 'resources/1', null]) expect(safeReturnTo(unsafe)).toBe('/')
+    for (const unsafe of ['//evil.example', 'https://evil.example', '/\\evil.example', 'resources/1', '/\r\ninvalid', '/\tinvalid', null]) expect(safeReturnTo(unsafe)).toBe('/')
     expect(safeReturnTo('/resources/12?citation=c1')).toBe('/resources/12?citation=c1')
   })
 
   it('signs out only same-origin requests and ends the Auth0 session', async () => {
+    expect((await logout(new Request(`${ORIGIN}/auth/logout`, { method: 'POST' }))).status).toBe(403)
     expect((await logout(new Request(`${ORIGIN}/auth/logout`, { method: 'POST', headers: { origin: 'https://evil.example' } }))).status).toBe(403)
     const response = await logout(new Request(`${ORIGIN}/auth/logout`, { method: 'POST', headers: { origin: ORIGIN } }))
     expect(response.headers.get('location')).toBe(`${ISSUER}oidc/logout?client_id=${CLIENT}&post_logout_redirect_uri=${encodeURIComponent(ORIGIN)}`)
@@ -118,7 +119,9 @@ describe('REQ-AUTH-03: Payload strategy uses sessions only for browser requests'
   it('ignores the cookie for cross-site requests or when an (invalid) bearer token is supplied', async () => {
     const session = cookieValue((await signIn()).callback, '__Host-library-session')!
     payload.find.mockClear()
-    const cases: Record<string, string>[] = [{ cookie: session, 'sec-fetch-site': 'cross-site' }, { cookie: session, authorization: 'Bearer invalid' }]
+    const cases: Record<string, string>[] = [{ cookie: session, 'sec-fetch-site': 'cross-site' },
+      { cookie: session, 'sec-fetch-site': 'same-site', origin: 'https://other.library.example' },
+      { cookie: session, origin: 'null' }, { cookie: session, authorization: 'Bearer invalid' }]
     for (const headers of cases) {
       expect((await authenticate({ headers: new Headers(headers), payload })).user).toBeNull()
     }

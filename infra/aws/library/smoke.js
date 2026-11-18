@@ -22,10 +22,11 @@ async function main() {
       has_schema_privilege(current_user, 'public', 'CREATE') AS ddl,
       has_database_privilege(current_user, current_database(), 'CREATE') AS dbcreate,
       has_table_privilege(current_user, 'public.users', 'SELECT') AS read,
+      EXISTS(SELECT 1 FROM payload_migrations WHERE name='20261118_092849_review_receipt') AS processing_schema,
       (SELECT count(*)::int FROM payload_migrations) AS migrations
       FROM pg_stat_ssl WHERE pid = pg_backend_pid()`)
     console.log('Runtime database check: ' + JSON.stringify(state))
-    if (state?.role !== USER || !state.ssl || state.ddl || state.dbcreate || !state.read || state.migrations !== 2) throw Error('Unexpected runtime database permissions')
+    if (state?.role !== USER || !state.ssl || state.ddl || state.dbcreate || !state.read || !state.processing_schema) throw Error('Unexpected runtime database permissions')
   } finally { await pg.end() }
 
   // The initial CMS database must not be readable with the library runtime credential.

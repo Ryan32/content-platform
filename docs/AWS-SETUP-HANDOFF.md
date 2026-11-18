@@ -96,14 +96,13 @@ RDS manages database infrastructure; the team still owns schema migrations, acce
 
 ## 7. Private S3 and secrets
 
-Use globally unique bucket names containing account, region, project, and environment. Proposed logical separation:
+Use **one private content-platform bucket per environment**, named `aecp-<env>-<account-id>-<region>` (confirm availability before provisioning). Separate storage by object key prefix; use a different bucket for prod.
 
-- Source archive: immutable-by-process source snapshots; the normal app has no write/delete access.
-- Content: originals and versioned previews, extracted text, captions, transcripts, and approved exports.
-- Processing: temporary staged media and intermediates, with a documented cleanup policy after processing.
-- Build artifacts, if needed for CodeBuild: separate from all content buckets.
+- `source/`: WordPress snapshots and migration inputs. Only the migration role can write; grant no delete permissions to that role and no access to the web or worker roles. No automatic expiration.
+- `content/`: originals, previews, extracted text, captions, transcripts, and approved exports. Grant the web and worker roles only the object access they need. Do not expire originals by default.
+- `processing/`: temporary staged media and intermediates. Allow the worker and any explicitly authorized processing service to access only the required keys. Set a prefix-filtered lifecycle rule to expire temporary objects and noncurrent versions after a documented retention period.
 
-Enable Block Public Access, bucket-owner-enforced ownership, encryption, TLS-only policies, and versioning where recovery needs it. Use organizational KMS standards; scope key permissions if using customer-managed keys. Do not expire originals or source archives by default. Configure CORS only for required origins/methods if direct uploads are used.
+Enable bucket-wide Block Public Access, bucket-owner-enforced ownership, encryption, TLS-only access, and versioning. Use organizational KMS standards; scope key permissions if using customer-managed keys. Prefixes are not security boundaries by themselves: scope object actions to the required prefix ARNs and any `s3:ListBucket` grants to the allowed prefixes using `s3:prefix`. Configure CORS only for required origins/methods if direct uploads are used. Keep any CodeBuild artifacts separate from project content.
 
 Use task roles for S3 access, not embedded AWS keys. Keep Payload file access checks enabled. Short-lived signed URLs must be issued only after authorization; they remain usable until expiry, so use short TTLs and an application proxy where immediate revocation is necessary. View-only users receive approved derivatives, not the original through a different URL.
 
@@ -196,6 +195,7 @@ Infrastructure acceptance:
 
 - Correct account/region; all resources reproducible from IaC; inventory and current cost estimate recorded.
 - HTTPS works, admin bootstrap is closed, unauthorized users are denied, tasks and RDS have no public addresses/access, and S3 anonymous access fails.
+- S3 role tests verify intended prefix access and deny web/worker listing, reading, and writing under `source/`. Confirm temporary-object and noncurrent-version expiration applies only to `processing/`.
 - Application uses the nonmaster RDS credential over verified TLS. Secrets are absent from images, source, output, and logs.
 - Upload an authorized sample, restart/replace the task, and verify content survives through RDS/S3.
 - Migration failure prevents release; a bad application release is detected; rollback to a compatible revision works.

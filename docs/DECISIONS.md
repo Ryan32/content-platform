@@ -7,6 +7,7 @@
 - Keep one editorial source of truth, with background processing/search services as needed.
 - Retain Vimeo playback initially; use authorized media access for processing.
 - Use long-lived isolated dev and prod; dev begins as the POC/migration workbench.
+- Use one private S3 content bucket per environment with `source/`, `content/`, and `processing/` prefixes. Enforce access by prefix and limit temporary-file expiration to `processing/`.
 - Separate view and download rights and preserve internal/external/firm boundaries.
 - Support BYO transcription and MCP access for Axl.
 - On 2026-11-17, user selected ECS/Fargate containers after considering Vercel and direct EC2 hosting. PostgreSQL must be Amazon RDS. Requested an AWS setup handoff for another laptop; no provisioning was performed.

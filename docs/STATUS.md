@@ -71,6 +71,7 @@ No full Vimeo inventory, full WordPress backup validation/restore, full-library 
 - Added the requested automated ingestion design: durable upload events, SQS workers, document extraction, Vimeo/captions and AWS Transcribe, AE-specific evidence-backed AI proposals, review, permission-aware indexing, retries, and invalidation. These are implementation instructions, not existing features.
 - Checked relevant current primary Payload/AWS documentation and reviewed the handoff for consistency. No AWS calls, builds, provisioning, application tests, or source processing were performed. Bedrock and pgvector remain proposals.
 - On the other laptop: read the handoff, discover the authorized account/region and existing conventions, then prepare IaC and a costed dev change set. The current request created instructions; apply infrastructure under the destination session's provisioning authorization. Continue source validation before importing real content.
+- Revised the storage plan to one private S3 bucket per environment, with prefix-scoped IAM and expiration limited to `processing/`. Carry these rules into the dev change set and verify them before importing content. No bucket was created.
 
 ### Source validation
 

@@ -24,7 +24,7 @@ Keep Vimeo IDs and embed metadata as the stable playback reference. Obtain autho
 
 - Containerized Payload application and separate workers on ECS/Fargate (user-selected deployment direction).
 - Amazon RDS PostgreSQL (user requirement); evaluate PostgreSQL full-text/vector retrieval during pilot.
-- Private S3 for raw imports, originals, previews, transcripts, and exports.
+- One private, versioned S3 bucket per environment, with prefix-scoped access for `source/` (raw imports), `content/` (originals, previews, transcripts, and exports), and `processing/` (temporary files).
 - SQS or equivalent durable jobs with retry/dead-letter handling.
 - AWS Transcribe for BYO transcription; parser/OCR providers selected by document tests.
 - Secrets Manager, least-privilege IAM roles, logging, monitoring, and budget alerts.

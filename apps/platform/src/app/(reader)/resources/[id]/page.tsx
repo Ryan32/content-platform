@@ -1,12 +1,15 @@
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { authenticatedLibrary } from '../../../../server/library'
+import { readerLibrary } from '../../../../server/library'
 export const dynamic = 'force-dynamic'
 export default async function Detail({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ citation?: string }> }) {
-  const repository = await authenticatedLibrary(await headers())
-  if (!repository) return <div className="empty"><h1>Sign-in required</h1><p>This resource requires an authorized account. Reader sign-in is being connected for this environment.</p><Link href="/">Back to library</Link></div>
-  const item = await repository.get((await params).id, 'view')
+  const { id } = await params
+  const { repository, signedIn } = await readerLibrary(await headers())
+  if (!repository) return signedIn
+    ? <div className="empty"><h1>Access not set up</h1><p>You&apos;re signed in, but this account doesn&apos;t have library access yet. Contact the library administrator.</p><Link href="/">Back to library</Link></div>
+    : <div className="empty"><h1>Sign-in required</h1><p>This resource requires an authorized account.</p><a className="pill" href={`/auth/login?returnTo=${encodeURIComponent(`/resources/${id}`)}`}>Sign in</a></div>
+  const item = await repository.get(id, 'view')
   if (!item) notFound()
   const citation = (await searchParams).citation
   const evidence = citation ? item.evidence.find(e => e.id === citation && e.version === item.version) : undefined

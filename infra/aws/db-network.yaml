@@ -1,0 +1,83 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Isolated AE Content Platform dev database subnets in the existing Web Hosting VPC
+
+Parameters:
+  WebHostingVpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: Existing Web Hosting VPC; do not change this after deployment.
+  DatabaseSubnetACidr:
+    Type: String
+    Description: Network-owner-approved unused IPv4 CIDR inside the VPC.
+  DatabaseSubnetBCidr:
+    Type: String
+    Description: Network-owner-approved unused IPv4 CIDR inside the VPC.
+  DatabaseSubnetAAz:
+    Type: AWS::EC2::AvailabilityZone::Name
+  DatabaseSubnetBAz:
+    Type: AWS::EC2::AvailabilityZone::Name
+
+Rules:
+  DistinctDatabaseSubnetPlacement:
+    Assertions:
+      - Assert:
+          Fn::Not:
+            - Fn::Equals:
+                - !Ref DatabaseSubnetAAz
+                - !Ref DatabaseSubnetBAz
+        AssertDescription: Database subnets must span two different availability zones.
+      - Assert:
+          Fn::Not:
+            - Fn::Equals:
+                - !Ref DatabaseSubnetACidr
+                - !Ref DatabaseSubnetBCidr
+        AssertDescription: Database subnet CIDRs must differ; confirm they do not overlap before deployment.
+
+Resources:
+  DatabaseSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref WebHostingVpcId
+      CidrBlock: !Ref DatabaseSubnetACidr
+      AvailabilityZone: !Ref DatabaseSubnetAAz
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: aecp-dev-db-subnet-a
+
+  DatabaseSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref WebHostingVpcId
+      CidrBlock: !Ref DatabaseSubnetBCidr
+      AvailabilityZone: !Ref DatabaseSubnetBAz
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: aecp-dev-db-subnet-b
+
+  DatabaseRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref WebHostingVpcId
+      Tags:
+        - Key: Name
+          Value: aecp-dev-db-isolated-rt
+
+  DatabaseSubnetARouteAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref DatabaseSubnetA
+      RouteTableId: !Ref DatabaseRouteTable
+
+  DatabaseSubnetBRouteAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref DatabaseSubnetB
+      RouteTableId: !Ref DatabaseRouteTable
+
+Outputs:
+  IsolatedDatabaseSubnets:
+    Description: Comma-separated subnet IDs for the data stack's IsolatedDatabaseSubnets parameter.
+    Value: !Join [',', [!Ref DatabaseSubnetA, !Ref DatabaseSubnetB]]
+  DatabaseRouteTableId:
+    Value: !Ref DatabaseRouteTable

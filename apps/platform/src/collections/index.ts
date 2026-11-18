@@ -1,6 +1,7 @@
 import type { CollectionConfig, Field } from 'payload'
 import { admin, deny, editor, readContent } from './access'
 import { verifyBearer } from '../auth/verify'
+import { readSession } from '../auth/browser'
 
 const entitlements: Field = { name: 'entitlements', type: 'array', fields: [{ name: 'value', type: 'text', required: true }] }
 const locked = { create: admin, read: admin, update: admin, delete: deny }
@@ -8,14 +9,17 @@ const locked = { create: admin, read: admin, update: admin, delete: deny }
 export const Users: CollectionConfig = {
   slug: 'users', admin: { useAsTitle: 'email' },
   auth: { disableLocalStrategy: true, strategies: [{ name: 'auth0', authenticate: async ({ headers, payload }) => {
-    const identity = await verifyBearer(headers.get('authorization'))
+    // A bearer token is authoritative when present (API/MCP); browser cookies are never a fallback for it.
+    const authorization = headers.get('authorization')
+    const identity = authorization ? await verifyBearer(authorization)
+      : headers.get('sec-fetch-site') === 'cross-site' ? null : await readSession(headers.get('cookie'))
     if (!identity) return { user: null }
     // Identity provisioning is explicitly separate; never auto-grant on first login.
     const result = await payload.find({ collection: 'users', overrideAccess: true, depth: 0, limit: 1,
       where: { and: [{ subject: { equals: identity.subject } }, { issuer: { equals: identity.issuer } }, { active: { equals: true } }] } })
     return { user: result.docs[0] ? { ...result.docs[0], collection: 'users' as const } : null }
   } }] },
-  access: locked,
+  access: { ...locked, admin: editor },
   fields: [
     { name: 'subject', type: 'text', required: true, index: true },
     { name: 'issuer', type: 'text', required: true },

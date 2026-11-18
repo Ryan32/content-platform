@@ -1,0 +1,137 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AE Content Platform dev data resources in an existing VPC
+
+Parameters:
+  WebHostingVpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: Existing Web Hosting VPC; the stack does not modify it.
+  IsolatedDatabaseSubnets:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Approved isolated subnets in the VPC, spanning at least two availability zones.
+  Owner:
+    Type: String
+    MinLength: 1
+    MaxLength: 128
+    Description: Team responsible for these resources.
+  PostgresEngineVersion:
+    Type: String
+    AllowedPattern: '^16\.[0-9]+$'
+    ConstraintDescription: Supply a currently orderable PostgreSQL 16 minor version compatible with the CMS.
+
+Resources:
+  ContentBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub 'aecp-dev-${AWS::AccountId}-${AWS::Region}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireTemporaryProcessingObjects
+            Status: Enabled
+            Prefix: processing/
+            ExpirationInDays: 30
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+
+  ContentBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Bucket: !Ref ContentBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !GetAtt ContentBucket.Arn
+              - !Sub '${ContentBucket.Arn}/*'
+            Condition:
+              Bool:
+                'aws:SecureTransport': 'false'
+                'aws:PrincipalIsAWSService': 'false'
+
+  DatabaseSubnets:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: aecp-dev-db-subnets
+      DBSubnetGroupDescription: Approved Web Hosting subnets for AE Content Platform dev
+      SubnetIds: !Ref IsolatedDatabaseSubnets
+
+  DatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: aecp-dev-rds-sg
+      GroupDescription: Content Platform dev database; no inbound rules in the data stack
+      VpcId: !Ref WebHostingVpcId
+
+  DatabaseParameters:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Description: Require TLS for Content Platform dev PostgreSQL
+      Family: postgres16
+      Parameters:
+        rds.force_ssl: '1'
+
+  Postgres:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: aecp-dev-postgres
+      DBInstanceClass: db.t4g.medium
+      Engine: postgres
+      EngineVersion: !Ref PostgresEngineVersion
+      DBName: aecp
+      MasterUsername: aecp_admin
+      ManageMasterUserPassword: true
+      StorageEncrypted: true
+      StorageType: gp3
+      AllocatedStorage: '50'
+      MaxAllocatedStorage: 100
+      BackupRetentionPeriod: 7
+      CopyTagsToSnapshot: true
+      DeletionProtection: true
+      AutoMinorVersionUpgrade: true
+      MultiAZ: false
+      PubliclyAccessible: false
+      DBSubnetGroupName: !Ref DatabaseSubnets
+      DBParameterGroupName: !Ref DatabaseParameters
+      VPCSecurityGroups:
+        - !Ref DatabaseSecurityGroup
+      Tags:
+        - Key: Owner
+          Value: !Ref Owner
+
+Outputs:
+  ContentBucketName:
+    Value: !Ref ContentBucket
+  ContentBucketArn:
+    Value: !GetAtt ContentBucket.Arn
+  DatabaseSecurityGroupId:
+    Value: !Ref DatabaseSecurityGroup
+  DatabaseEndpoint:
+    Value: !GetAtt Postgres.Endpoint.Address
+  DatabaseMasterSecretArn:
+    Description: ARN only; reserve the credential for database bootstrap.
+    Value: !GetAtt Postgres.MasterUserSecret.SecretArn

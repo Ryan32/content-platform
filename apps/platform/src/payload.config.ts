@@ -9,7 +9,8 @@ import { ImportArtifacts, SourceSnapshots, SourceRelations, ImportReviews, Impor
 const baseDir = path.dirname(fileURLToPath(import.meta.url))
 export default buildConfig({
   secret: process.env.PAYLOAD_SECRET || '',
-  admin: { user: 'users', importMap: { baseDir } },
+  admin: { user: 'users', importMap: { baseDir },
+    components: { beforeLogin: ['/components/AdminSignIn'], logout: { Button: '/components/AdminSignOut' } } },
   collections: [Users, AccessProfiles, Taxonomy, Content, Assets, Suggestions, Jobs, ImportArtifacts, SourceSnapshots, SourceRelations, ImportReviews, ImportRuns],
   db: postgresAdapter({
     push: false,

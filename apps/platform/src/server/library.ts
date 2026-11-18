@@ -3,9 +3,18 @@ import config from '../payload.config'
 import { profileIds, publishedWhere } from '../collections/access'
 import type { LibraryRepository, Material } from '../domain/library'
 import { principalFromUser } from '../domain/access'
+import { hasSessionCookie, readSession } from '../auth/browser'
+
+export type LibraryAccess = { repository: LibraryRepository | null; signedIn: boolean }
+
+/** Resolves the reader's library for a page render: signed-in state plus their authorized repository, if provisioned. */
+export async function readerLibrary(headers: Headers): Promise<LibraryAccess> {
+  const signedIn = Boolean(await readSession(headers.get('cookie')))
+  return { signedIn, repository: signedIn ? await authenticatedLibrary(headers) : null }
+}
 
 export async function authenticatedLibrary(headers: Headers): Promise<LibraryRepository | null> {
-  if (!headers.get('authorization')?.startsWith('Bearer ')) return null
+  if (!headers.get('authorization')?.startsWith('Bearer ') && !hasSessionCookie(headers)) return null
   if (!process.env.DATABASE_URI || !process.env.PAYLOAD_SECRET) throw new Error('Content storage is not configured')
   const payload = await getPayload({ config })
   const { user } = await payload.auth({ headers })

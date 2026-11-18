@@ -2,7 +2,7 @@
 
 Prepared 2026-11-17 for the laptop with AWS CLI tooling. This is an implementation brief, not an executed deployment or a tested infrastructure template.
 
-Local implementation update: the [transactional import adapter runbook](PAYLOAD-IMPORT-ADAPTER.md) describes the next operations image, versioned migrations, private package transfer boundary and preview/apply acceptance. These edits need a subsequent build after the current upload. No deployment or RDS import has been verified here.
+The [transactional import adapter runbook](PAYLOAD-IMPORT-ADAPTER.md) describes the next operations image, versioned migrations, private package transfer boundary, and preview/apply acceptance. This newer application is not the initial CMS image verified in the dev deployment below. No deployment of `apps/platform` or RDS content import has been verified.
 
 ## 1. Direction and scope
 
@@ -20,7 +20,7 @@ This request authorizes preparing these instructions. On the destination laptop,
 
 Read `AGENTS.md`, `README.md`, `docs/STATUS.md`, `docs/ARCHITECTURE.md`, `docs/MIGRATION.md`, and `docs/GOVERNANCE.md` before implementation. Paths are relative to the transferred workspace; do not assume the other laptop uses `D:/source`.
 
-- Application update: `apps/platform` now contains a Payload/Next foundation, reader shell, protected MCP tools, generated initial migration and Dockerfile. See `APPLICATION-FOUNDATION.md` for validation and release gates; interactive sign-in, user provisioning, actual RDS migration and image verification remain. Do not assume the other laptop has these uncommitted changes until they are explicitly transferred or checked in. Infrastructure state must still be reconciled separately. Transfer ignored credentials/backups securely.
+- Application update: `apps/platform` now contains a Payload/Next foundation, reader shell, protected MCP tools, generated initial migration and Dockerfile. See `APPLICATION-FOUNDATION.md` for validation and release gates; interactive sign-in, user provisioning, and live validation of this application's image and migrations remain. Reconcile its migration history with the initial CMS before applying migrations to dev RDS. Transfer ignored credentials/backups securely.
 - `data/dbr-backup` contains an extracted WordPress tree; the user confirmed copy completion. Offline inventory and a 200-record pilot are documented in `WORDPRESS-PILOT.md`. The SQL dump is 1,948,630,258 bytes. Live-source reconciliation and a successful restore remain unverified.
 - Preserve the untouched source and reconcile manifests/hashes when transferring between laptops. Ask about the original archive/timestamp if not available in local evidence.
 - `.env.local` contains a Vimeo token. Transfer through the user's secure local method; never paste credentials into chat, source control, build arguments, logs, or this document. One known-video test succeeded; full coverage is unverified.
@@ -62,6 +62,35 @@ Follow existing organizational IaC conventions. If none exist, use CloudFormatio
 Sequence: discovery -> costed design -> foundation/data/ECR -> application implementation and build -> database bootstrap/migration task -> ECS service -> smoke/access tests -> processing workers -> representative import. Treat migrations and initial administrator creation as explicit steps.
 
 Tag resources with project, environment, owner, and managed-by values. Record resource identifiers in a sanitized deployment report under ignored `data/aws-validation/`; document nonsecret configuration and operational instructions in the repository.
+
+### Current dev deployment preparation
+
+The local [data stack template](../infra/aws/data.yaml) is for `aecp-dev-data` in the existing Web Hosting VPC (`vpc-e4c01f81`, `us-east-1`). It creates only the project database and its supporting resources, and one private project bucket. It does not create or alter VPCs, subnets, route tables, NAT, endpoints, DNS, or existing databases. The database starts with no inbound rules; a later application stack must explicitly authorize its own task security groups. The bucket grants no application access in this phase; add prefix-scoped role policies with the tasks that use them. The 30-day `processing/` expiration and 7-day incomplete-upload cleanup are proposed dev defaults.
+
+The `aecp-dev-data` CloudFormation attempt rolled back before creating resources because CloudFormation could not call `ec2:DescribeSubnets`. The user approved creating the same resources directly. The live S3 bucket, database instance, and database prerequisites are not CloudFormation-managed; do not rerun the full data template against them.
+
+The dev bucket is live and empty. Verified Block Public Access, bucket-owner-enforced ownership, SSE-S3, versioning, a TLS-only bucket policy, and lifecycle expiration limited to `processing/`. No application roles have been granted access.
+
+The MFA-authenticated retry created `aecp-dev-postgres`. RDS reports it available, private, encrypted, and protected against deletion, with seven days of backups and an active RDS-managed master secret. The instance is in the project-only isolated subnet group; its security group permits PostgreSQL traffic only from the project task security groups. The attached PostgreSQL 16 parameter group is in sync and reports `rds.force_ssl=1`; the initial CMS verified TLS from private tasks. Earlier KMS denials were resolved by authenticating the AWS CLI with MFA, without changing IAM or KMS.
+
+Read-only preflight on 2026-11-17 found no isolated subnet pair in the Web Hosting VPC. PostgreSQL 16.15 was orderable with `db.t4g.medium` and gp3 in `us-east-1`; compatibility with the actual application remains untested. Both `cfn-lint` and CloudFormation `validate-template` passed; neither validates capacity or subnet placement.
+
+The [database network template](../infra/aws/db-network.yaml) records the intended topology. Its CloudFormation stack, `aecp-dev-db-network`, rolled back without creating resources after reporting `AccessDenied` for `ec2:DescribeAvailabilityZones`. The user then approved direct EC2 CLI creation of the same network. **Do not rerun the network template for dev**: it does not manage the live subnets.
+
+The two project-owned subnets are now available in separate AZs with automatic public-address assignment disabled. Both are explicitly associated with a new dedicated route table with only VPC-local routes and no propagation. No existing subnets, routes, or gateways were changed. The verified IDs are in the ignored local inventory `data/aws-validation/dev-db-network.json`. After rechecking the isolation, supply those subnet IDs to the data stack's `IsolatedDatabaseSubnets` parameter. Do not remove the direct-managed resources while the database or its subnet group uses them.
+
+AWS Price List estimate for the dev data stack in `us-east-1`, before discounts or taxes:
+
+| Item | Basis | Monthly USD |
+|---|---|---:|
+| Single-AZ PostgreSQL `db.t4g.medium` | 730 hours at $0.065/hour | $47.45 |
+| RDS gp3 | 50 GB at $0.115/GB-month | $5.75 |
+| RDS-managed master secret | One secret | $0.40 |
+| **Baseline before usage** | | **$53.60** |
+
+S3 Standard storage at the first-tier rate adds $0.023/GB-month, including retained object versions (e.g., $1.15/month for 50 GB). Requests, transfer, excess backups/storage autoscaling, and RDS surplus CPU credits are extra if incurred. This estimate excludes the later ECS/ALB and ingestion stages.
+
+The data template does not manage the live application. The user published the Linux `amd64` [CMS](../cms/) image, and `aecp-dev-web` now runs its pinned platform manifest in private Fargate subnets. The initial migration ran over verified RDS TLS with a separate migration role. Startup checked TLS and verified that the runtime role can read the migrated schema but cannot create objects in the public schema. No load balancer, public IP, or initial admin was configured. Confirm restricted access and authentication, bootstrap the first admin, and configure or disable password recovery before exposing the service. The managed GuardDuty sidecar reported a pull denial while the CMS stayed healthy; have the AWS security owner review it without disabling monitoring.
 
 ## 5. Network, HTTPS, and access
 

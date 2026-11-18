@@ -1,0 +1,5 @@
+import { completeLogin } from '../../../auth/browser'
+
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+export const GET = (request: Request) => completeLogin(request)

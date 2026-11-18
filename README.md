@@ -48,4 +48,8 @@ Offline inventory tooling and the private 200-record pilot are documented in [th
 
 `.env.local` already exists and contains the user's Vimeo token. Never print it or overwrite it. `.env.example` documents variable names without secrets. Local credentials, downloads, and raw backups are excluded by `.gitignore`.
 
-The application foundation is local; no AWS database or production deployment has been verified from this workspace. Project source is versioned at https://github.com/Ryan32/content-platform. Backups and credentials must be transferred separately through secure local methods; they are not included in a clone.
+Dev networking, private S3, and private RDS PostgreSQL are provisioned. The newer [apps/platform](apps/platform) AE Library app runs as ECS service `aecp-dev-library-web` with its own `aecp_library` database at `https://library-dev.advisorsexcel.com`, behind an HTTPS load balancer restricted to approved IPs, with Auth0 browser sign-in; see [infra/aws/library](infra/aws/library). The initial [cms/](cms/) deployment has been retired. See [current status](docs/STATUS.md); no production deployment has been verified.
+
+The initial [CMS](cms/) builds with Node 24.22.3 or a compatible 24.x release, `npm ci`, and `npm run build`. For local migrations or smoke tests, use a disposable PostgreSQL database and a separate `PAYLOAD_SECRET` of at least 32 characters, not the dev RDS credentials. Public first-user registration is disabled. See the [application foundation runbook](docs/APPLICATION-FOUNDATION.md) for the newer app.
+
+Project source is versioned at https://github.com/Ryan32/content-platform. Backups and credentials must be transferred separately through secure local methods; they are not included in a clone.

@@ -1,5 +1,14 @@
 # Backup validation and migration runbook
 
+## Separate one-time migration track (owner decision, 2026-11-18)
+
+The WordPress load is a **held-aside, one-time backend process**, run separately from the platform build-out. The platform itself is built for a select group of administrators and editors who add new content and configure it with AI tagging, transcription, content analysis and search; it has no WordPress screens and does not depend on the migration. The migration writes through the trusted operations CLI and keeps its provenance tables (hidden from the admin).
+
+Requirements recorded for when the migration runs:
+
+- **Retain original dates.** WordPress `post_date`/`post_modified` (with `post_date_gmt`) must become the item's created/updated dates and original publication date, not the import time. The current intake seed does not yet carry dates; add this before the real load.
+- **Use the real WordPress preview images.** Each post's featured image (`_thumbnail_id`) becomes the item's thumbnail as-is — no generated or synthetic imagery. `scripts/plan_wordpress_pilot.py` now records it as an asset with field `featured_image` (attachment ID, chosen size variant, path, status). It prefers the smallest WordPress-generated size at least 640 px wide and falls back to the original upload, and only JPEG, PNG, or WebP is accepted. The asset is hashed and verified like other pilot files, so the builder carries it into the package as a verified blob. Applying it means uploading the verified bytes as the item's cover (`thumbnail_source = upload`, so automatic Vimeo/PDF thumbnails never replace it). That apply step is not implemented yet. The planner must be re-run on the machine holding `data/dbr-backup` into a **new** scan directory; the 2026-11-17 v2 scan predates this field.
+
 ## Phase 0: source access (current)
 
 The DBR WordPress backup is located at `data/dbr-backup`. The user confirmed copy completion on 2026-11-17. A stable SQL hash, selected-table extraction, local file inventory, and proposed pilot are recorded under `data/wordpress-inventory/scan-2026-11-17-v2/`; see `WORDPRESS-PILOT.md`. These establish observed local content, not full live-source completeness or restore readiness. The visible source is an extracted WordPress tree; availability of its original archive is unresolved. Preserve the untouched source and, if available, the original archive; record backup timestamp, site identity, and size. Check archive paths and available disk space before any additional extraction.

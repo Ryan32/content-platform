@@ -23,6 +23,9 @@ FORMATS = {'.pdf': 'pdf', '.doc': 'word', '.docx': 'word', '.ppt': 'slides', '.p
            '.xls': 'spreadsheet', '.xlsx': 'spreadsheet', '.csv': 'spreadsheet',
            '.mp3': 'audio', '.wav': 'audio', '.m4a': 'audio', '.mp4': 'video', '.mov': 'video',
            '.zip': 'archive'}
+# Featured images become library thumbnails as-is (no generation); only formats the library serves.
+FEATURED_TYPES = {'.jpg', '.jpeg', '.png', '.webp'}
+FEATURED_MIN_WIDTH = 640
 
 
 class PHPData:
@@ -142,6 +145,39 @@ def local_reference(value, files, basename_index, source_hosts=None):
     return {'status': 'missing', 'path': None, 'basename_candidates': hints}
 
 
+def featured_image(thumb_id, posts, meta, files, basenames):
+    """The post's WordPress featured image (`_thumbnail_id`) as an asset, preferring the smallest generated size
+    at least FEATURED_MIN_WIDTH wide so the library thumbnail stays small; falls back to the original upload."""
+    thumb_id = str(thumb_id or '').strip()
+    if not thumb_id:
+        return None
+    base = {'field': 'featured_image', 'format': 'other', 'attachment_id': thumb_id}
+    post = posts.get(thumb_id)
+    values = dict(meta.get(thumb_id, []))
+    attached = values.get('_wp_attached_file')
+    if not thumb_id.isdigit() or not post or post['post_type'] != 'attachment' or not attached:
+        return {**base, 'reference': thumb_id, 'status': 'unresolved', 'path': None}
+    try:
+        info = decode_php(values.get('_wp_attachment_metadata', ''))
+    except (ValueError, IndexError, UnicodeError, TypeError):
+        info = None
+    sizes = info.get('sizes') if isinstance(info, dict) else None
+    folder = PurePosixPath(attached).parent
+    variants = []
+    for name, size in (sizes.items() if isinstance(sizes, dict) else []):
+        width = size.get('width') if isinstance(size, dict) else None
+        if isinstance(size.get('file') if isinstance(size, dict) else None, str) and str(width).isdigit() and int(width) >= FEATURED_MIN_WIDTH \
+                and '/' not in size['file'] and PurePosixPath(size['file']).suffix.lower() in FEATURED_TYPES:
+            variants.append((int(width), str(name), (folder / size['file']).as_posix()))
+    choices = [(variant, reference) for _, variant, reference in sorted(variants)] + [('full', attached)]
+    for variant, reference in choices:
+        found = local_reference(reference, files, basenames)
+        if found['status'] == 'present' or variant == 'full':
+            break
+    status = found['status'] if PurePosixPath(reference).suffix.lower() in FEATURED_TYPES else 'unsupported_image_type'
+    return {**base, **found, 'reference': reference, 'variant': variant, 'mime_type': post.get('post_mime_type'), 'status': status}
+
+
 def inventory_files(source, output):
     files = {}
     for base, dirs, names in os.walk(source, followlinks=False):
@@ -195,7 +231,7 @@ def analyze(scan, source, since, as_of, limit):
     # Builder history/drafts are preserved in SQLite, but must not contaminate current-content results.
     keys = ['__wpdm_files','__wpdm_access','__wpdm_expire_date','__wpdm_publish_date',
             '__wpdm_individual_file_download','__wpdm_package_dir','__wpdm_fileinfo',
-            '__wpdm_password_lock','__wpdm_email_lock','_wp_attached_file','_thumbnail_id',
+            '__wpdm_password_lock','__wpdm_email_lock','_wp_attached_file','_wp_attachment_metadata','_thumbnail_id',
             'embed_code','video_embed','video_embed_code','__wpdm_video_embed',
             'page_description','notes','ad_review_number','intro','subheadline','kicker',
             '_fl_builder_data','_links_to','_expiration-date','_expiration-date-options',
@@ -275,6 +311,9 @@ def analyze(scan, source, since, as_of, limit):
             attached = dict(meta.get(aid, [])).get('_wp_attached_file')
             if attached:
                 assets.append({'field': 'attachment:' + aid, 'reference': attached, 'format': FORMATS.get(PurePosixPath(attached).suffix.lower(), 'other'), **local_reference(attached, files, basenames)})
+        featured = featured_image(values.get('_thumbnail_id'), posts, meta, files, basenames)
+        if featured:
+            assets.append(featured)
         unique = {}
         for asset in assets:
             unique[(asset['reference'], asset['field'])] = asset
@@ -403,6 +442,7 @@ def analyze(scan, source, since, as_of, limit):
                'past_year_no_description': sum(not r['descriptions'] for r in eligible),
                'past_year_unique_vimeo_ids': len({v['id'] for r in eligible for v in r['vimeo']}),
                'past_year_asset_status': dict(Counter(a['status'] for r in eligible for a in r['assets'])),
+               'past_year_featured_image_status': dict(Counter(next((a['status'] for a in r['assets'] if a['field'] == 'featured_image'), 'none') for r in eligible)),
                'pilot_records':len(selected), 'pilot_formats':dict(Counter(f for r in selected.values() for f in r['formats'])),
                'pilot_unique_vimeo_ids':len({v['id'] for r in selected.values() for v in r['vimeo']}),
                'pilot_local_files_hashed':len(fingerprints), 'pilot_asset_status':dict(Counter(a['status'] for r in selected.values() for a in r['assets'])),

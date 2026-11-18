@@ -1,7 +1,7 @@
 """Parser tests using synthetic content only."""
 import unittest
 from inventory_wordpress import parse_values
-from plan_wordpress_pilot import decode_php, local_reference, VIMEO
+from plan_wordpress_pilot import decode_php, featured_image, local_reference, VIMEO
 
 
 class DumpParserTests(unittest.TestCase):
@@ -41,6 +41,23 @@ class ManifestTests(unittest.TestCase):
 
     def test_vimeo_embed_and_management_ids(self):
         self.assertEqual(VIMEO.findall('https://player.vimeo.com/video/123456?h=example https://vimeo.com/manage/videos/789012'), ['123456','789012'])
+
+    def test_featured_image_prefers_a_present_640px_variant(self):
+        posts = {'5': {'post_type': 'attachment', 'post_mime_type': 'image/jpeg'}, '6': {'post_type': 'post'}}
+        sizes = 'a:1:{s:5:"sizes";a:3:{s:9:"thumbnail";a:2:{s:4:"file";s:17:"cover-150x150.jpg";s:5:"width";i:150;}' \
+                's:12:"medium_large";a:2:{s:4:"file";s:17:"cover-768x432.jpg";s:5:"width";i:768;}' \
+                's:5:"large";a:2:{s:4:"file";s:18:"cover-1024x576.jpg";s:5:"width";i:1024;}}}'
+        meta = {'5': [('_wp_attached_file', '2025/03/cover.jpg'), ('_wp_attachment_metadata', sizes)]}
+        files = {'wp-content/uploads/2025/03/' + n: {'bytes': 10} for n in ('cover.jpg', 'cover-768x432.jpg', 'cover-1024x576.jpg')}
+        first = featured_image('5', posts, meta, files, {})
+        self.assertEqual((first['field'], first['variant'], first['status']), ('featured_image', 'medium_large', 'present'))
+        self.assertEqual(first['path'], 'wp-content/uploads/2025/03/cover-768x432.jpg')
+        del files['wp-content/uploads/2025/03/cover-768x432.jpg']
+        self.assertEqual(featured_image('5', posts, meta, files, {})['variant'], 'large')
+        self.assertEqual(featured_image('6', posts, meta, files, {})['status'], 'unresolved')
+        self.assertIsNone(featured_image('', posts, meta, files, {}))
+        gif = {'5': [('_wp_attached_file', '2025/03/anim.gif')]}
+        self.assertEqual(featured_image('5', posts, gif, {'wp-content/uploads/2025/03/anim.gif': {'bytes': 5}}, {})['status'], 'unsupported_image_type')
 
 
 if __name__ == '__main__':

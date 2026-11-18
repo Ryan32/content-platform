@@ -25,6 +25,8 @@ $definition = @{
     family = $service; networkMode = 'awsvpc'; requiresCompatibilities = @('FARGATE'); cpu = '1024'; memory = '2048'
     runtimePlatform = @{ cpuArchitecture = 'X86_64'; operatingSystemFamily = 'LINUX' }
     executionRoleArn = "arn:aws:iam::${account}:role/aecp-dev-library-web-execution"
+    # Read-only access to content/ in the dev bucket for protected file delivery.
+    taskRoleArn = "arn:aws:iam::${account}:role/aecp-dev-library-web-task"
     containerDefinitions = @(@{
         name = 'library'; image = $image; essential = $true
         entryPoint = @('node', '-e'); command = @([IO.File]::ReadAllText((Join-Path $PSScriptRoot 'web.js')))
@@ -34,7 +36,13 @@ $definition = @{
             @{ name = 'PLATFORM_ORIGIN'; value = 'https://library-dev.advisorsexcel.com' },
             @{ name = 'AUTH0_ISSUER'; value = 'https://auth-dev.advisorsexcel.com/' },
             @{ name = 'AUTH0_AUDIENCE'; value = 'https://library-dev.advisorsexcel.com/mcp' },
-            @{ name = 'AUTH0_CLIENT_ID'; value = 'gjl6CvHxdWvPOtsTph3O1tToxDD93CNB' })
+            @{ name = 'AUTH0_CLIENT_ID'; value = 'gjl6CvHxdWvPOtsTph3O1tToxDD93CNB' },
+            @{ name = 'CONTENT_BUCKET'; value = 'aecp-dev-381003255014-us-east-1' },
+            # Status display only: the web app never calls paid providers. The worker enforces these.
+            @{ name = 'ALLOW_PAID_PROCESSING'; value = 'true' },
+            @{ name = 'BEDROCK_MODEL_IDS'; value = 'us.anthropic.claude-haiku-5-5,us.anthropic.claude-sonnet-5-5' },
+            # Azure AD (waad) email is asserted by the company directory and may link an email invitation.
+            @{ name = 'AUTH0_TRUSTED_EMAIL_CONNECTIONS'; value = 'waad' })
         secrets = @(
             @{ name = 'DB_PASSWORD'; valueFrom = "${secret}:aecp-dev-library-db-runtime-TKkby2" },
             @{ name = 'PAYLOAD_SECRET'; valueFrom = "${secret}:aecp-dev-library-payload-secret-JHvUB0" },

@@ -7,6 +7,9 @@ param(
     [Parameter(Mandatory)] [ValidateSet('bootstrap', 'migrate', 'smoke', 'retire-initial-cms', 'provision-admin')] [string] $Step,
     # Auth0 user_id for -Step provision-admin.
     [string] $AdminSubject,
+    # Linux/amd64 manifest digests in aecp-dev-cms; defaults are the currently deployed release.
+    [ValidatePattern('^sha256:[0-9a-f]{64}$')] [string] $OperationsDigest = 'sha256:34262a3e7ba67d4e838d5534bf1fe7879141cdf834c7cb7cdf436717b9f9864b',
+    [ValidatePattern('^sha256:[0-9a-f]{64}$')] [string] $RuntimeDigest = 'sha256:5f61161aad59004d335077d281483c3d625b33b7cbdaa4cf608265f1bab122b8',
     [string] $Profile = 'ae-dev-mfa'
 )
 $ErrorActionPreference = 'Stop'
@@ -19,9 +22,8 @@ $dbHost = 'aecp-dev-postgres.cwgidnxxj114.us-east-1.rds.amazonaws.com'
 $logGroup = '/ecs/aecp-dev/library'
 $subnets = 'subnet-0065c49d9550686c6,subnet-0c59417bf207bca9c'
 
-# Linux/amd64 manifests of dev-platform-ops-59d2311 and dev-platform-59d2311.
-$operationsImage = "$repo@sha256:34262a3e7ba67d4e838d5534bf1fe7879141cdf834c7cb7cdf436717b9f9864b"
-$runtimeImage = "$repo@sha256:5f61161aad59004d335077d281483c3d625b33b7cbdaa4cf608265f1bab122b8"
+$operationsImage = "$repo@$OperationsDigest"
+$runtimeImage = "$repo@$RuntimeDigest"
 
 $steps = @{
     bootstrap = @{ image = $operationsImage; role = 'aecp-dev-library-bootstrap-execution'; sg = 'sg-0bdbe5d2db5acacf6'; cpu = '512'; memory = '1024'

@@ -67,13 +67,14 @@ export interface Config {
   };
   blocks: {};
   collections: {
-    users: User;
-    'access-profiles': AccessProfile;
-    taxonomy: Taxonomy;
     content: Content;
+    taxonomy: Taxonomy;
     assets: Asset;
     suggestions: Suggestion;
     'processing-jobs': ProcessingJob;
+    users: User;
+    audiences: Audience;
+    'access-profiles': AccessProfile;
     'import-artifacts': ImportArtifact;
     'source-snapshots': SourceSnapshot;
     'source-relations': SourceRelation;
@@ -86,13 +87,14 @@ export interface Config {
   };
   collectionsJoins: {};
   collectionsSelect: {
-    users: UsersSelect<false> | UsersSelect<true>;
-    'access-profiles': AccessProfilesSelect<false> | AccessProfilesSelect<true>;
-    taxonomy: TaxonomySelect<false> | TaxonomySelect<true>;
     content: ContentSelect<false> | ContentSelect<true>;
+    taxonomy: TaxonomySelect<false> | TaxonomySelect<true>;
     assets: AssetsSelect<false> | AssetsSelect<true>;
     suggestions: SuggestionsSelect<false> | SuggestionsSelect<true>;
     'processing-jobs': ProcessingJobsSelect<false> | ProcessingJobsSelect<true>;
+    users: UsersSelect<false> | UsersSelect<true>;
+    audiences: AudiencesSelect<false> | AudiencesSelect<true>;
+    'access-profiles': AccessProfilesSelect<false> | AccessProfilesSelect<true>;
     'import-artifacts': ImportArtifactsSelect<false> | ImportArtifactsSelect<true>;
     'source-snapshots': SourceSnapshotsSelect<false> | SourceSnapshotsSelect<true>;
     'source-relations': SourceRelationsSelect<false> | SourceRelationsSelect<true>;
@@ -107,8 +109,12 @@ export interface Config {
     defaultIDType: number;
   };
   fallbackLocale: null;
-  globals: {};
-  globalsSelect: {};
+  globals: {
+    'automation-settings': AutomationSetting;
+  };
+  globalsSelect: {
+    'automation-settings': AutomationSettingsSelect<false> | AutomationSettingsSelect<true>;
+  };
   locale: null;
   widgets: {
     collections: CollectionsWidget;
@@ -138,89 +144,60 @@ export interface UserAuthOperations {
   };
 }
 /**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "users".
- */
-export interface User {
-  id: number;
-  subject: string;
-  issuer: string;
-  active?: boolean | null;
-  roles?: ('reader' | 'editor' | 'admin')[] | null;
-  memberships?:
-    | {
-        scope: string;
-        entitlements?:
-          | {
-              value: string;
-              id?: string | null;
-            }[]
-          | null;
-        id?: string | null;
-      }[]
-    | null;
-  updatedAt: string;
-  createdAt: string;
-  collection: 'users';
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "access-profiles".
- */
-export interface AccessProfile {
-  id: number;
-  name: string;
-  active?: boolean | null;
-  grants?:
-    | {
-        action: 'view' | 'retrieve' | 'download';
-        scope: string;
-        entitlements?:
-          | {
-              value: string;
-              id?: string | null;
-            }[]
-          | null;
-        id?: string | null;
-      }[]
-    | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "taxonomy".
- */
-export interface Taxonomy {
-  id: number;
-  key: string;
-  label: string;
-  definition?: string | null;
-  dimension: 'business-line' | 'topic' | 'audience' | 'format' | 'program' | 'entity';
-  updatedAt: string;
-  createdAt: string;
-}
-/**
+ * Every article, document, and video in AE Library. To add one: create it with a title and format, save, then upload its file or enter a Vimeo ID in the Processing panel. Text extraction     and AI tagging run automatically, and suggestions appear in Review. An administrator publishes it with an access profile.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "content".
  */
 export interface Content {
   id: number;
   title: string;
+  format: 'article' | 'pdf' | 'video' | 'audio' | 'slides' | 'document';
+  /**
+   * Two or three sentences readers see in search results. AI tagging proposes one you can edit in Review.
+   */
   description?: string | null;
   /**
-   * Plain text in the first slice; no untrusted HTML rendering.
+   * The number from the Vimeo link. Captions are used when available; otherwise the audio is transcribed.
+   */
+  vimeoId?: string | null;
+  thumbnailVersion?: string | null;
+  thumbnailKey?: string | null;
+  thumbnailSource?: ('upload' | 'vimeo' | 'pdf' | 'unavailable') | null;
+  thumbnailFor?: string | null;
+  /**
+   * Plain text shown to readers. Filled from the extracted file when you accept its suggestion in Review; editing it by hand clears citations until re-reviewed.
    */
   body?: string | null;
-  format: 'article' | 'pdf' | 'video' | 'audio' | 'slides' | 'document';
-  state: 'intake' | 'draft' | 'published' | 'archived';
-  accessProfile?: (number | null) | AccessProfile;
-  availableAt?: string | null;
-  expiresAt?: string | null;
+  /**
+   * Confirmed tags from Tags & topics.
+   */
   acceptedTags?: (number | Taxonomy)[] | null;
+  /**
+   * Only administrators change status. Editing a published item returns it to draft for re-approval.
+   */
+  state: 'intake' | 'draft' | 'published' | 'archived';
+  /**
+   * Who can see this item once published. Required to publish.
+   */
+  accessProfile?: (number | null) | AccessProfile;
+  /**
+   * Optional embargo.
+   */
+  availableAt?: string | null;
+  /**
+   * Optional. Hidden from readers and AI after this date.
+   */
+  expiresAt?: string | null;
+  /**
+   * Where this item came from, e.g. wordpress:dbr:post:1 or manual:42.
+   */
   sourceKey?: string | null;
   sourceHash?: string | null;
   evidenceVersion: string;
+  /**
+   * Installed from reviewed extraction. Used for citations in the reader and AI assistants.
+   */
   passages?:
     | {
         citationId: string;
@@ -230,26 +207,89 @@ export interface Content {
         id?: string | null;
       }[]
     | null;
-  vimeoId?: string | null;
   updatedAt: string;
   createdAt: string;
 }
 /**
+ * The approved vocabulary for describing content. AI tagging can only suggest tags from this list, and editors confirm them in Review. Tags help people find content; they never grant access.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "taxonomy".
+ */
+export interface Taxonomy {
+  id: number;
+  label: string;
+  dimension: 'business-line' | 'topic' | 'audience' | 'format' | 'program' | 'entity';
+  /**
+   * One or two sentences. The AI reads this to decide when the tag applies.
+   */
+  definition?: string | null;
+  /**
+   * Lowercase identifier that never changes, e.g. topic:tax-planning.
+   */
+  key: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Reusable audience rules attached to library items, such as "Annuity advisors" or "AE employees". Each rule grants one action (view, AI retrieval, or download) to people whose memberships match its scope and requirements. An item with no profile is visible to no reader.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "access-profiles".
+ */
+export interface AccessProfile {
+  id: number;
+  /**
+   * Describe the audience, e.g. "AEWM advisors — full active".
+   */
+  name: string;
+  /**
+   * Inactive profiles grant nothing, even if attached to items.
+   */
+  active?: boolean | null;
+  /**
+   * A person qualifies if ANY rule matches one of their memberships. View is required for every other action.
+   */
+  grants?:
+    | {
+        action: 'view' | 'retrieve' | 'download';
+        /**
+         * Who the rule applies to.
+         */
+        scope: string;
+        /**
+         * Every requirement listed here must be held (AND). Leave empty if the scope alone is enough. Example: plan:full-active.
+         */
+        entitlements?:
+          | {
+              value: string;
+              id?: string | null;
+            }[]
+          | null;
+        id?: string | null;
+      }[]
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Original files attached to library items, stored privately and never changed once uploaded. Upload files from a library item's Processing panel; this list is for reference.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "assets".
  */
 export interface Asset {
   id: number;
   content: number | Content;
+  mimeType: string;
   objectKey: string;
   sha256: string;
-  mimeType: string;
   version: string;
   updatedAt: string;
   createdAt: string;
 }
 /**
- * Immutable AI proposals. Review and apply at /review; decisions preserve the original proposal.
+ * Summaries and tags proposed by AI tagging. Nothing here changes content until an editor accepts it. Open Review (/review) to read the evidence, edit, and accept or reject each one.
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "suggestions".
@@ -257,9 +297,13 @@ export interface Asset {
 export interface Suggestion {
   id: number;
   content: number | Content;
+  decision?: ('pending' | 'accepted' | 'rejected') | null;
+  model: string;
+  reviewNote?: string | null;
+  reviewedBy?: (number | null) | User;
+  reviewedAt?: string | null;
   jobKey?: string | null;
   sourceVersion: string;
-  model: string;
   proposal:
     | {
         [k: string]: unknown;
@@ -269,29 +313,80 @@ export interface Suggestion {
     | number
     | boolean
     | null;
-  decision?: ('pending' | 'accepted' | 'rejected') | null;
-  reviewNote?: string | null;
-  reviewedBy?: (number | null) | User;
-  reviewedAt?: string | null;
   reviewAttempt?: string | null;
   updatedAt: string;
   createdAt: string;
 }
 /**
- * Durable worker queue. Use the operations CLI to enqueue/retry; results remain private until reviewed.
+ * Everyone who can sign in to AE Library. Add a person with their work email and role; their account links automatically the first time they sign in with that email. Roles control what they can do here; memberships control which library content they can see.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "users".
+ */
+export interface User {
+  id: number;
+  /**
+   * Shown throughout the admin. Filled in from their sign-in profile if left blank.
+   */
+  name?: string | null;
+  /**
+   * The email they sign in with. Their account links to this record the first time they sign in with this verified email.
+   */
+  email?: string | null;
+  /**
+   * Turn off to block access immediately without deleting the person.
+   */
+  active?: boolean | null;
+  /**
+   * Reader: browses the library. Editor: adds and edits content and reviews AI suggestions. Administrator: also manages people, access, publishing, and automation. Only editors and administrators can open this admin.
+   */
+  roles?: ('reader' | 'editor' | 'admin')[] | null;
+  lastSignInAt?: string | null;
+  /**
+   * Which audiences this person belongs to. A reader sees an item only when one of its access profile rules matches a membership here. Choose audiences from the approved list (People & access → Audiences).
+   */
+  memberships?:
+    | {
+        /**
+         * The audience this person belongs to.
+         */
+        scope: string;
+        /**
+         * Every requirement listed here must be held (AND). Leave empty if the scope alone is enough. Example: plan:full-active.
+         */
+        entitlements?:
+          | {
+              value: string;
+              id?: string | null;
+            }[]
+          | null;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Linked automatically at first sign-in. Leave blank when inviting someone.
+   */
+  subject?: string | null;
+  issuer?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  collection: 'users';
+}
+/**
+ * The automatic work queue: text extraction, captions, transcription, and AI tagging. Jobs are created when files are uploaded or a Vimeo ID is set, and run in the background. Failures and retries are managed on the Automation status page.
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "processing-jobs".
  */
 export interface ProcessingJob {
   id: number;
-  idempotencyKey: string;
   content: number | Content;
-  sourceVersion: string;
   stage: 'extract' | 'transcribe' | 'classify' | 'index';
   state?: ('queued' | 'running' | 'succeeded' | 'failed') | null;
-  attempts?: number | null;
   errorCode?: string | null;
+  attempts?: number | null;
+  idempotencyKey: string;
+  sourceVersion: string;
   input?:
     | {
         [k: string]: unknown;
@@ -319,6 +414,33 @@ export interface ProcessingJob {
   createdAt: string;
 }
 /**
+ * The approved list of groups that content can be shared with: firms, business lines, internal teams, programs, or plans. People are placed into audiences (under People → Library access), and access profile rules grant content to audiences. Picking from this list prevents typos that would silently block access.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "audiences".
+ */
+export interface Audience {
+  id: number;
+  /**
+   * e.g. "Annuity business line" or "AE employees".
+   */
+  label: string;
+  kind: 'business-line' | 'firm' | 'internal' | 'program' | 'plan' | 'other';
+  /**
+   * Permanent identifier stored on memberships and rules, e.g. business-line:annuity. It cannot be changed after saving; create a new audience and deactivate this one instead.
+   */
+  key: string;
+  description?: string | null;
+  /**
+   * Inactive audiences cannot be newly assigned. Existing assignments keep working until removed.
+   */
+  active?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Read-only record of each file, video, or taxonomy reference found in the WordPress export. Written only by the import tool; used to trace where content came from.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "import-artifacts".
  */
@@ -340,6 +462,8 @@ export interface ImportArtifact {
   createdAt: string;
 }
 /**
+ * Read-only copy of each WordPress post exactly as imported, kept separate from the edited library item so the original is never lost.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "source-snapshots".
  */
@@ -382,6 +506,8 @@ export interface SourceSnapshot {
   createdAt: string;
 }
 /**
+ * Read-only links between imported posts and their files, videos, and related posts, preserved from WordPress.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "source-relations".
  */
@@ -407,6 +533,8 @@ export interface SourceRelation {
   createdAt: string;
 }
 /**
+ * WordPress posts the import held back because their source permissions could not be confirmed. They stay restricted until the source owner decides.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "import-reviews".
  */
@@ -429,6 +557,8 @@ export interface ImportReview {
   createdAt: string;
 }
 /**
+ * Receipt for each completed WordPress import package, with counts and provenance. Re-running the same package changes nothing.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "import-runs".
  */
@@ -483,20 +613,12 @@ export interface PayloadLockedDocument {
   id: number;
   document?:
     | ({
-        relationTo: 'users';
-        value: number | User;
-      } | null)
-    | ({
-        relationTo: 'access-profiles';
-        value: number | AccessProfile;
+        relationTo: 'content';
+        value: number | Content;
       } | null)
     | ({
         relationTo: 'taxonomy';
         value: number | Taxonomy;
-      } | null)
-    | ({
-        relationTo: 'content';
-        value: number | Content;
       } | null)
     | ({
         relationTo: 'assets';
@@ -509,6 +631,18 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'processing-jobs';
         value: number | ProcessingJob;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: number | User;
+      } | null)
+    | ({
+        relationTo: 'audiences';
+        value: number | Audience;
+      } | null)
+    | ({
+        relationTo: 'access-profiles';
+        value: number | AccessProfile;
       } | null)
     | ({
         relationTo: 'import-artifacts';
@@ -574,13 +708,113 @@ export interface PayloadMigration {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "content_select".
+ */
+export interface ContentSelect<T extends boolean = true> {
+  title?: T;
+  format?: T;
+  description?: T;
+  vimeoId?: T;
+  thumbnailVersion?: T;
+  thumbnailKey?: T;
+  thumbnailSource?: T;
+  thumbnailFor?: T;
+  body?: T;
+  acceptedTags?: T;
+  state?: T;
+  accessProfile?: T;
+  availableAt?: T;
+  expiresAt?: T;
+  sourceKey?: T;
+  sourceHash?: T;
+  evidenceVersion?: T;
+  passages?:
+    | T
+    | {
+        citationId?: T;
+        version?: T;
+        text?: T;
+        locator?: T;
+        id?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "taxonomy_select".
+ */
+export interface TaxonomySelect<T extends boolean = true> {
+  label?: T;
+  dimension?: T;
+  definition?: T;
+  key?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "assets_select".
+ */
+export interface AssetsSelect<T extends boolean = true> {
+  content?: T;
+  mimeType?: T;
+  objectKey?: T;
+  sha256?: T;
+  version?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "suggestions_select".
+ */
+export interface SuggestionsSelect<T extends boolean = true> {
+  content?: T;
+  decision?: T;
+  model?: T;
+  reviewNote?: T;
+  reviewedBy?: T;
+  reviewedAt?: T;
+  jobKey?: T;
+  sourceVersion?: T;
+  proposal?: T;
+  reviewAttempt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "processing-jobs_select".
+ */
+export interface ProcessingJobsSelect<T extends boolean = true> {
+  content?: T;
+  stage?: T;
+  state?: T;
+  errorCode?: T;
+  attempts?: T;
+  idempotencyKey?: T;
+  sourceVersion?: T;
+  input?: T;
+  result?: T;
+  processorVersion?: T;
+  leaseToken?: T;
+  leaseUntil?: T;
+  nextRunAt?: T;
+  deadlineAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "users_select".
  */
 export interface UsersSelect<T extends boolean = true> {
-  subject?: T;
-  issuer?: T;
+  name?: T;
+  email?: T;
   active?: T;
   roles?: T;
+  lastSignInAt?: T;
   memberships?:
     | T
     | {
@@ -593,6 +827,21 @@ export interface UsersSelect<T extends boolean = true> {
             };
         id?: T;
       };
+  subject?: T;
+  issuer?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "audiences_select".
+ */
+export interface AudiencesSelect<T extends boolean = true> {
+  label?: T;
+  kind?: T;
+  key?: T;
+  description?: T;
+  active?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -616,101 +865,6 @@ export interface AccessProfilesSelect<T extends boolean = true> {
             };
         id?: T;
       };
-  updatedAt?: T;
-  createdAt?: T;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "taxonomy_select".
- */
-export interface TaxonomySelect<T extends boolean = true> {
-  key?: T;
-  label?: T;
-  definition?: T;
-  dimension?: T;
-  updatedAt?: T;
-  createdAt?: T;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "content_select".
- */
-export interface ContentSelect<T extends boolean = true> {
-  title?: T;
-  description?: T;
-  body?: T;
-  format?: T;
-  state?: T;
-  accessProfile?: T;
-  availableAt?: T;
-  expiresAt?: T;
-  acceptedTags?: T;
-  sourceKey?: T;
-  sourceHash?: T;
-  evidenceVersion?: T;
-  passages?:
-    | T
-    | {
-        citationId?: T;
-        version?: T;
-        text?: T;
-        locator?: T;
-        id?: T;
-      };
-  vimeoId?: T;
-  updatedAt?: T;
-  createdAt?: T;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "assets_select".
- */
-export interface AssetsSelect<T extends boolean = true> {
-  content?: T;
-  objectKey?: T;
-  sha256?: T;
-  mimeType?: T;
-  version?: T;
-  updatedAt?: T;
-  createdAt?: T;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "suggestions_select".
- */
-export interface SuggestionsSelect<T extends boolean = true> {
-  content?: T;
-  jobKey?: T;
-  sourceVersion?: T;
-  model?: T;
-  proposal?: T;
-  decision?: T;
-  reviewNote?: T;
-  reviewedBy?: T;
-  reviewedAt?: T;
-  reviewAttempt?: T;
-  updatedAt?: T;
-  createdAt?: T;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "processing-jobs_select".
- */
-export interface ProcessingJobsSelect<T extends boolean = true> {
-  idempotencyKey?: T;
-  content?: T;
-  sourceVersion?: T;
-  stage?: T;
-  state?: T;
-  attempts?: T;
-  errorCode?: T;
-  input?: T;
-  result?: T;
-  processorVersion?: T;
-  leaseToken?: T;
-  leaseUntil?: T;
-  nextRunAt?: T;
-  deadlineAt?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -824,6 +978,68 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
   batch?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * Controls what happens automatically after content is added. Free steps (text extraction, Vimeo captions) and paid steps (transcription, AI tagging) can be switched on or off independently. Nothing here publishes content or grants access: every AI result waits in Review for an editor. The background worker picks up changes within a minute. See Automation status for the queue and failures.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "automation-settings".
+ */
+export interface AutomationSetting {
+  id: number;
+  /**
+   * Stops the background worker from starting new work. Queued jobs wait and resume when unpaused.
+   */
+  paused?: boolean | null;
+  /**
+   * PDF, Word, PowerPoint, Excel, caption (VTT) and text files. Scanned PDFs without a text layer are reported, not guessed.
+   */
+  documentsEnabled?: boolean | null;
+  /**
+   * When a library item has a Vimeo ID, its existing captions become the reading text and citations.
+   */
+  vimeoEnabled?: boolean | null;
+  /**
+   * Uses the Vimeo video thumbnail, or a picture of the first page of a PDF, when an item has no uploaded cover image.
+   */
+  thumbnailsEnabled?: boolean | null;
+  /**
+   * Uploaded audio/video, and Vimeo videos with no captions, are transcribed with timestamps. Roughly $0.024 per minute of audio. Files are limited to 50 MB.
+   */
+  transcriptionEnabled?: boolean | null;
+  /**
+   * The AI reads the extracted text and proposes a summary, key takeaways, and tags chosen only from Tags & topics. Editors accept, edit, or reject each suggestion in Review.
+   */
+  taggingEnabled?: boolean | null;
+  taggingModel: 'us.anthropic.claude-haiku-5-5' | 'us.anthropic.claude-sonnet-5-5';
+  /**
+   * Only tags in these categories are offered to the AI. At least one tag must exist in Tags & topics.
+   */
+  taggingDimensions?: ('topic' | 'business-line' | 'audience' | 'format' | 'program' | 'entity')[] | null;
+  /**
+   * Transcription and AI tagging jobs started in the last 24 hours. When reached, new paid work waits until the window clears. Set 0 to stop paid work.
+   */
+  dailyPaidJobLimit: number;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "automation-settings_select".
+ */
+export interface AutomationSettingsSelect<T extends boolean = true> {
+  paused?: T;
+  documentsEnabled?: T;
+  vimeoEnabled?: T;
+  thumbnailsEnabled?: T;
+  transcriptionEnabled?: T;
+  taggingEnabled?: T;
+  taggingModel?: T;
+  taggingDimensions?: T;
+  dailyPaidJobLimit?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

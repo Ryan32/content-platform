@@ -56,7 +56,7 @@ describe('REQ-AUTH-03: Auth0 browser sign-in', () => {
     expect(start.status).toBe(303)
     expect(`${authorize.origin}${authorize.pathname}`).toBe(`${ISSUER}authorize`)
     expect(Object.fromEntries(authorize.searchParams)).toMatchObject({ response_type: 'code', client_id: CLIENT,
-      redirect_uri: `${ORIGIN}/auth/callback`, scope: 'openid', code_challenge_method: 'S256' })
+      redirect_uri: `${ORIGIN}/auth/callback`, scope: 'openid profile email', code_challenge_method: 'S256' })
     expect(loginCookie).toBeTruthy()
     expect(start.headers.getSetCookie()[0]).toMatch(/HttpOnly; SameSite=Lax; Max-Age=600; Secure/)
   })

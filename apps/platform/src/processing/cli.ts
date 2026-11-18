@@ -6,11 +6,13 @@ import { S3Client } from '@aws-sdk/client-s3'
 import { JobStore, inputSchema, ProcessingError } from './jobs'
 import { workOnce } from './engine'
 import { stageOriginal, MAX_DOCUMENT_BYTES } from './storage'
+import { approvedModels, readSettings } from './settings'
+import { reconcile } from './reconcile'
 
 let pool: Pool | undefined
 try {
   const [command, expectedTarget, ...args] = process.argv.slice(2)
-  if (!['enqueue', 'work', 'retry', 'stage'].includes(command) || process.env.PROCESSING_ENVIRONMENT !== 'development') throw new ProcessingError('development_operation_required')
+  if (!['enqueue', 'work', 'retry', 'stage', 'loop'].includes(command) || process.env.PROCESSING_ENVIRONMENT !== 'development') throw new ProcessingError('development_operation_required')
   if (!process.env.DATABASE_URI) throw new ProcessingError('database_configuration_required')
   const url = new URL(process.env.DATABASE_URI)
   if (!['postgres:', 'postgresql:'].includes(url.protocol) || expectedTarget !== `${url.hostname}${url.port ? ':' + url.port : ''}${url.pathname}`) throw new ProcessingError('database_target_mismatch')
@@ -20,7 +22,53 @@ try {
     ssl: { rejectUnauthorized: true, ...(process.env.DATABASE_CA_FILE ? { ca: readFileSync(process.env.DATABASE_CA_FILE, 'utf8') } : {}) } })
   const store = new JobStore(pool)
   const positive = (arg: string) => { const n = Number(arg); if (!Number.isSafeInteger(n) || n < 1) throw new ProcessingError('invalid_id'); return n }
-  if (command === 'work') {
+  if (command === 'loop') {
+    // Always-on worker: honor settings, queue the next automatic steps, then work one job at a time.
+    if (args.length) throw new ProcessingError('unexpected_arguments')
+    const { runtimeProcessors } = await import('./runtime')
+    const processors = runtimeProcessors(pool)
+    let stopping = false
+    for (const signal of ['SIGTERM', 'SIGINT'] as const) process.on(signal, () => { stopping = true })
+    const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+    let lastScan = 0, lastThumbs = 0, lastSummary = ''
+    const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3')
+    const { readOriginal } = await import('./storage')
+    const [{ syncThumbnails, vimeoThumbnail }, { renderPdfThumbnail }] = await Promise.all([import('./thumbnails'), import('./pdf-thumbnail')])
+    const s3 = new S3Client({})
+    const thumbnailDeps = {
+      readOriginal: (key: string, sha: string) => readOriginal(s3, process.env.CONTENT_BUCKET!, key, sha).then(b => new Uint8Array(b)),
+      put: async (key: string, bytes: Uint8Array, mime: string) => { await s3.send(new PutObjectCommand({ Bucket: process.env.CONTENT_BUCKET, Key: key, Body: bytes, ContentType: mime, ServerSideEncryption: 'AES256' })) },
+      vimeo: process.env.VIMEO_ACCESS_TOKEN ? (id: string) => vimeoThumbnail(id, process.env.VIMEO_ACCESS_TOKEN!) : undefined,
+      pdf: (bytes: Uint8Array) => renderPdfThumbnail(bytes),
+    }
+    console.log(JSON.stringify({ status: 'worker_started' }))
+    while (!stopping) {
+      try {
+        const settings = await readSettings(pool)
+        if (settings.paused) { await sleep(15000); continue }
+        if (Date.now() - lastScan > 10000) {
+          lastScan = Date.now()
+          const scan = await reconcile(pool, store, settings)
+          const summary = JSON.stringify({ status: 'reconciled', ...scan })
+          if (scan.queued || summary !== lastSummary) console.log(summary)
+          lastSummary = summary
+        }
+        if (settings.thumbnailsEnabled && process.env.CONTENT_BUCKET && Date.now() - lastThumbs > 30000) {
+          lastThumbs = Date.now()
+          const made = await syncThumbnails(pool, thumbnailDeps)
+          if (made.length) console.log(JSON.stringify({ status: 'thumbnails', results: made }))
+        }
+        const outcome = await workOnce(store, processors)
+        if (outcome.status === 'idle') await sleep(5000)
+        else console.log(JSON.stringify(outcome))
+      } catch (error) {
+        // Database or network interruption: log a fixed code and back off; ECS restarts the task if it exits.
+        console.error(JSON.stringify({ status: 'worker_error', code: error instanceof ProcessingError ? error.code : (error as { code?: string }).code ?? 'unknown' }))
+        await sleep(30000)
+      }
+    }
+    console.log(JSON.stringify({ status: 'worker_stopped' }))
+  } else if (command === 'work') {
     if (args.length) throw new ProcessingError('unexpected_arguments')
     const { runtimeProcessors } = await import('./runtime')
     const outcome = await workOnce(store, runtimeProcessors(pool))
@@ -36,7 +84,7 @@ try {
     const input = inputSchema.parse(JSON.parse(await readFile(args[1], 'utf8')))
     // Capture taxonomy from the database, never caller-invented model vocabulary.
     if (input.kind === 'classify') {
-      if (input.modelId !== process.env.BEDROCK_MODEL_ID) throw new ProcessingError('model_not_approved')
+      if (!approvedModels().includes(input.modelId)) throw new ProcessingError('model_not_approved')
       const { rows } = await pool.query('SELECT id,label,COALESCE(definition,\'\') AS definition,dimension FROM taxonomy WHERE id=ANY($1) ORDER BY id', [input.taxonomy.map(t => t.id)])
       if (rows.length !== new Set(input.taxonomy.map(t => t.id)).size) throw new ProcessingError('unknown_taxonomy')
       input.taxonomy = rows

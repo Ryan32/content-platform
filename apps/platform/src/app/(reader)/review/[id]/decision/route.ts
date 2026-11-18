@@ -2,6 +2,7 @@ import { createLocalReq } from 'payload'
 import { editorContext } from '../../../../../server/editor'
 import { reviewInput, reviewPatch, proposalEnvelope, taxonomyUnchanged } from '../../../../../processing/review'
 import { randomUUID } from 'node:crypto'
+const back = (id: string, error?: string) => new Response(null, { status: 303, headers: { Location: `/admin/review/${id}${error ? `?error=${error}` : ''}`, 'Cache-Control': 'no-store' } })
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const origin = process.env.PLATFORM_ORIGIN
   if (!origin || request.headers.get('origin') !== new URL(origin).origin) return new Response('Forbidden', { status: 403 })
@@ -19,7 +20,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   text += decoder.decode()
   const form = new URLSearchParams(text)
   const input = reviewInput.safeParse({ decision: form.get('decision'), summary: form.get('summary'), tags: form.getAll('tags').map(Number), note: form.get('note'), expectedUpdatedAt: form.get('expectedUpdatedAt') })
-  if (!input.success) return new Response('Invalid review', { status: 400 })
+  if (!input.success) return back(id, 'invalid')
   const tx = await ctx.payload.db.beginTransaction({ isolationLevel: 'serializable' })
   const reviewAttempt = randomUUID()
   if (tx === null || tx === undefined) return new Response('Review unavailable', { status: 503 })
@@ -42,9 +43,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     await ctx.payload.db.commitTransaction(tx)
     const persisted = await ctx.payload.findByID({ collection: 'suggestions', id: Number(id), user: ctx.user, overrideAccess: false, depth: 0 })
     if (persisted.reviewAttempt !== reviewAttempt) throw new Error('commit_unconfirmed')
-    return new Response(null, { status: 303, headers: { Location: `/review/${id}`, 'Cache-Control': 'no-store' } })
+    return back(id)
   } catch {
     await ctx.payload.db.rollbackTransaction(tx)
-    return new Response('Review could not be applied. Reload the proposal to check its current state before retrying.', { status: 409, headers: { 'Cache-Control': 'no-store' } })
+    return back(id, 'conflict')
   }
 }

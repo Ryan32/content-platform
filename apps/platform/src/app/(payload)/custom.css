@@ -1,0 +1,20 @@
+/* AE Library admin: align Payload's theme with AE Portal (navy menu, light grey canvas, white cards, Portal blue). */
+.btn--style-primary { --bg-color: #3d5af1; --hover-bg: #2e4ad8; --color: #ffffff; --hover-color: #ffffff }
+html[data-theme=dark] .btn--style-primary { --bg-color: #4a66f0; --hover-bg: #5c77f5 }
+
+html[data-theme=light] { --theme-bg: #f6f7f9 }
+html[data-theme=light] .card { background: #ffffff; box-shadow: 0 1px 2px rgba(16, 24, 40, .05) }
+html[data-theme=light] .card:hover { border-color: #c9d1ff }
+html[data-theme=light] .app-header, html[data-theme=light] .app-header__bg { background: #ffffff }
+
+/* Navy menu in light mode, like Portal. Scoped variables keep Payload's own nav styling working. */
+html[data-theme=light] .nav {
+  background: #1b2433; border-right: 0; color: #d4dae4;
+  --theme-text: #d4dae4; --theme-elevation-400: #8b97aa; --theme-elevation-500: #8b97aa; --theme-elevation-600: #b6c0ce;
+  --theme-elevation-100: rgba(255, 255, 255, .08); --theme-elevation-150: rgba(255, 255, 255, .12); --theme-elevation-200: rgba(255, 255, 255, .2);
+  --theme-elevation-50: rgba(255, 255, 255, .05); --theme-elevation-0: #1b2433; --theme-elevation-800: #ffffff; --theme-elevation-1000: #ffffff;
+}
+html[data-theme=light] .nav a, html[data-theme=light] .nav__link { color: #d4dae4 }
+html[data-theme=light] .nav__link:hover { color: #ffffff }
+html[data-theme=light] .nav__link-indicator { background: #6f87ff }
+html[data-theme=light] .nav .btn--style-secondary { --bg-color: transparent; --color: #d4dae4; --hover-bg: rgba(255, 255, 255, .08); --hover-color: #ffffff; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .2) }

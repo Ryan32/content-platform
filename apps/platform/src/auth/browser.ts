@@ -3,6 +3,18 @@ import { createHash, randomBytes } from 'node:crypto'
 
 /** Server-held browser identity. Authorization still comes from the provisioned users record. */
 export interface BrowserIdentity { issuer: string; subject: string }
+/** Verified ID-token profile passed to the sign-in hook. Display data only; never an authorization grant by itself. */
+export interface SignedInProfile extends BrowserIdentity { email?: string; emailTrusted: boolean; name?: string }
+
+/**
+ * Enterprise connections (e.g. Azure AD `waad`) assert email from the company directory. Other connections must
+ * report `email_verified: true` before an email may link an invitation.
+ */
+export function emailTrusted(subject: string, verified: unknown) {
+  const connection = subject.split('|')[0]
+  const trusted = (process.env.AUTH0_TRUSTED_EMAIL_CONNECTIONS ?? 'waad').split(',').map(value => value.trim()).filter(Boolean)
+  return verified === true || trusted.includes(connection)
+}
 
 const SESSION_AUDIENCE = 'ae-library-session'
 const LOGIN_AUDIENCE = 'ae-library-login'
@@ -92,7 +104,7 @@ export async function beginLogin(request: Request) {
   const authorize = new URL('authorize', settings.base)
   authorize.search = new URLSearchParams({
     response_type: 'code', client_id: settings.clientId, redirect_uri: `${settings.origin}/auth/callback`,
-    scope: 'openid', state, nonce,
+    scope: 'openid profile email', state, nonce,
     code_challenge: createHash('sha256').update(verifier).digest('base64url'), code_challenge_method: 'S256',
   }).toString()
   return redirect(authorize.toString(), [cookie(cookieNames().login, transaction, LOGIN_SECONDS)])
@@ -111,7 +123,7 @@ async function verifyIdToken(token: string, settings: NonNullable<ReturnType<typ
 }
 
 /** GET /auth/callback: validates state, exchanges the code, verifies the ID token, and sets the session cookie. */
-export async function completeLogin(request: Request) {
+export async function completeLogin(request: Request, onSignedIn?: (profile: SignedInProfile) => Promise<void>) {
   const settings = config()
   if (!settings) return unavailable()
   const names = cookieNames()
@@ -145,6 +157,13 @@ export async function completeLogin(request: Request) {
     const idToken = await verifyIdToken(tokens.id_token, settings)
     if (idToken.nonce !== transaction.nonce) return failed('nonce_mismatch')
     if (typeof idToken.sub !== 'string' || !idToken.sub) return failed('missing_subject')
+    if (onSignedIn) {
+      const email = typeof idToken.email === 'string' && /^[^\s@]{1,64}@[^\s@]{1,255}$/.test(idToken.email) ? idToken.email.toLowerCase() : undefined
+      const name = typeof idToken.name === 'string' ? idToken.name.slice(0, 200) : undefined
+      // Profile sync never blocks sign-in; authorization is still decided per request from the users record.
+      await onSignedIn({ issuer: settings.issuer, subject: idToken.sub, email, name, emailTrusted: Boolean(email) && emailTrusted(idToken.sub, idToken.email_verified) })
+        .catch(error => signInFailure(`profile_sync:${(error as { code?: string }).code ?? (error as Error).name}`))
+    }
     const session = await new EncryptJWT({ idp: settings.issuer, sub: idToken.sub })
       .setProtectedHeader({ alg: 'dir', enc: 'A256GCM' }).setAudience(SESSION_AUDIENCE).setIssuedAt().setExpirationTime(`${SESSION_SECONDS}s`)
       .encrypt(settings.key)

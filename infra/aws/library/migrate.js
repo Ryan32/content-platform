@@ -7,7 +7,8 @@ const { writeFileSync } = require('node:fs')
 const DATABASE = 'aecp_library'
 const USER = 'aecp_library_migration'
 const RUNTIME = 'aecp_library_runtime'
-const EXPECTED = ['20261118_030155_foundation', '20261118_041309_import_adapter']
+// Keep in order with apps/platform/src/migrations/index.ts.
+const EXPECTED = ['20261118_030155_foundation', '20261118_041309_import_adapter', '20261118_091607_processing_review', '20261118_092849_review_receipt', '20261118_190233_admin_usability']
 
 async function main() {
   const response = await fetch('https://truststore.pki.rds.amazonaws.com/us-east-1/us-east-1-bundle.pem', { signal: AbortSignal.timeout(15000) })
@@ -40,10 +41,10 @@ async function main() {
   const verify = client()
   await verify.connect()
   try {
+    // Earlier migrations ran in batch 1; this release may add later batches. Names and order must match exactly.
     const { rows } = await verify.query('SELECT name, batch FROM payload_migrations ORDER BY id')
-    const ledger = rows.map(row => `${row.name}:${row.batch}`)
-    console.log('Migration ledger: ' + ledger.join(', '))
-    if (ledger.join(',') !== EXPECTED.map(name => `${name}:1`).join(',')) throw Error('Unexpected migration ledger')
+    console.log('Migration ledger: ' + rows.map(row => `${row.name}:${row.batch}`).join(', '))
+    if (rows.map(row => row.name).join(',') !== EXPECTED.join(',')) throw Error('Unexpected migration ledger')
   } finally { await verify.end() }
   console.log('Verified TLS, applied library migrations, and confirmed rerun was a no-op')
 }

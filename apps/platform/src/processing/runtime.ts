@@ -7,9 +7,11 @@ import { ProcessingError, type Job } from './jobs'
 import { extractionSchema } from './review'
 import type { Processors } from './engine'
 import { stageVimeoMedia } from './vimeo-media'
+import { approvedModels, paidBlock, type PaidStep } from './settings'
 
-function paid() {
-  if (process.env.ALLOW_PAID_PROCESSING !== 'true') throw new ProcessingError('paid_processing_disabled')
+async function paid(db: Pool, step: PaidStep) {
+  const blocked = await paidBlock(db, step, undefined, true)
+  if (blocked) throw new ProcessingError(blocked)
 }
 function bucket() {
   if (!process.env.CONTENT_BUCKET) throw new ProcessingError('content_bucket_required')
@@ -49,23 +51,23 @@ export function runtimeProcessors(db: Pool): Processors {
         if (!process.env.VIMEO_ACCESS_TOKEN) throw new ProcessingError('vimeo_configuration_required')
         const result = await getVimeoCaptions(content.vimeo_id, process.env.VIMEO_ACCESS_TOKEN)
         if (result) return result
-        paid()
+        await paid(db, 'transcription')
         const inputKey = await stageVimeoMedia(content.vimeo_id, process.env.VIMEO_ACCESS_TOKEN, bucket(), job.idempotency_key)
         const speech = await transcribeMedia({ bucket: bucket(), inputKey, outputPrefix: 'processing/transcribe/', jobKey: job.idempotency_key, mediaFormat: 'mp4' })
         return speech.status === 'pending' ? null : speech.extraction
       }
       const file = await asset(job, input.assetId)
       if (input.kind === 'document') return extractDocument(await readOriginal(new S3Client({}), bucket(), file.object_key, file.sha256), input.format)
-      paid()
+      await paid(db, 'transcription')
       // Stage originals under immutable hashed keys. Reverify bytes before paid processing.
       await readOriginal(new S3Client({}), bucket(), file.object_key, file.sha256)
       const result = await transcribeMedia({ bucket: bucket(), inputKey: file.object_key, outputPrefix: 'processing/transcribe/', jobKey: job.idempotency_key })
       return result.status === 'pending' ? null : result.extraction
     }),
     classify: job => wrap(async () => {
-      await current(job); paid()
+      await current(job); await paid(db, 'tagging')
       const input = job.input
-      if (input.kind !== 'classify' || !process.env.BEDROCK_MODEL_ID || input.modelId !== process.env.BEDROCK_MODEL_ID) throw new ProcessingError('model_not_approved')
+      if (input.kind !== 'classify' || !approvedModels().includes(input.modelId)) throw new ProcessingError('model_not_approved')
       const { rows } = await db.query(`SELECT result,input FROM processing_jobs WHERE id=$1 AND content_id=$2 AND source_version=$3 AND state='succeeded' AND stage IN ('extract','transcribe')`,
       [input.extractionJobId, job.content_id, job.source_version])
       const extraction = extractionSchema.parse(rows[0]?.result)

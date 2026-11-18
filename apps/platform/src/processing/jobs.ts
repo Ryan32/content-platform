@@ -27,9 +27,11 @@ export class JobStore {
     const input = inputSchema.parse(value)
     const key = jobKey(contentId, sourceVersion, input)
     const stage = input.kind === 'classify' ? 'classify' : input.kind === 'transcribe' ? 'transcribe' : 'extract'
+    // Explicit casts: PostgreSQL cannot infer one type for a parameter used in both the select list and WHERE.
     const { rows } = await this.pool.query(`INSERT INTO processing_jobs
       (idempotency_key,content_id,source_version,stage,state,attempts,input,processor_version,next_run_at,deadline_at)
-      SELECT $1,id,$3,$4,'queued',0,$5,$6,now(),now()+interval '24 hours' FROM content WHERE id=$2 AND source_hash=$3
+      SELECT $1::varchar,id,$3::varchar,$4::enum_processing_jobs_stage,'queued',0,$5::jsonb,$6::varchar,now(),now()+interval '24 hours'
+      FROM content WHERE id=$2::integer AND source_hash=$3::varchar
       ON CONFLICT (idempotency_key) DO UPDATE SET idempotency_key=EXCLUDED.idempotency_key RETURNING id`,
     [key, contentId, sourceVersion, stage, JSON.stringify(input), PROCESSOR])
     if (!rows[0]) throw new ProcessingError('source_version_mismatch')
@@ -76,7 +78,7 @@ export class JobStore {
   async fail(job: Job, error: unknown) {
     const known = error instanceof ProcessingError
     const retry = known && error.retryable && job.attempts < 5
-    await this.pool.query(`UPDATE processing_jobs SET state=$3,error_code=$4,next_run_at=now()+($5 * interval '1 second'),
+    await this.pool.query(`UPDATE processing_jobs SET state=$3::enum_processing_jobs_state,error_code=$4,next_run_at=now()+($5::integer * interval '1 second'),
       lease_token=NULL,lease_until=NULL,updated_at=now() WHERE id=$1 AND lease_token=$2 AND state='running' AND lease_until>now()`,
     [job.id, job.lease_token, retry ? 'queued' : 'failed', known ? error.code : 'processing_failed', Math.min(900, 30 * 2 ** job.attempts)])
   }

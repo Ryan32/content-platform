@@ -4,6 +4,13 @@ This document captures work completed in the originating Portal conversation. Ve
 
 ## Active priority — core platform and general MCP
 
+### Navigation v2, phase 0 — 2026-11-18
+
+- **Implemented, not deployed.** Reader sidebar with Home and six sections (active section expands to its topics and familiar pages; collapses to a rail on resource pages), and one search centered in the top bar on every page.
+- **Ctrl K / `/` search window:** live, debounced results from the authorized ranked search via `GET /library-api/suggest` (no AI call, `private, no-store`), type chips with counts (Documents, Videos, Slides, Pages), keyboard navigation, and "See all results".
+- **Section pages** at `/sections/[id]`. Topics and familiar pages link to search until section tagging lands (P1).
+- Typecheck, 106 tests (incl. REQ-NAV-01/02) and production build pass. Not yet built: Home AXL hero, P1–P5 from the brief.
+
 ### Design handoff — 2026-11-18
 
 - **Proposed, not implemented.** Navigation v2, carrier pages, saved views for familiar WordPress pages, how-to articles as a content type, Manage (review windows and expiry), and asset viewers. Brief, seed data, tokens and AXL assets are in [`docs/design/`](design/README.md), reconciled against `85c9fe1`. Visual source: the "AE Library — design" canvas. Open decisions A–G are listed in the brief.

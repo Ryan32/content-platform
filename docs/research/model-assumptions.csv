@@ -1,0 +1,52 @@
+parameter,value,basis_or_formula
+Research date,2026-11-17,Public-source research not hands-on product benchmark
+Readers,3500,User confirmed mixed internal and external; held constant in three-year model
+Editors,25,User confirmed; assumed additional to readers for conservative licensing scope
+Initial documents,20000,Planning assumption; actual WordPress inventory not supplied
+Initial document pages,100000,Planning assumption
+Initial media GB,500,Planning assumption; originals only
+Initial media hours,1000,Independent planning assumption; not derived from GB
+Annual content growth,20%,Assumed compounding from day zero; 864GB and 1728 media hours by end of year3
+Engineering hourly cost USD,125,Planning fully burdened rate; no vendor or partner quote
+Technical operations rate USD,125,Same rate as engineering
+Content steward hourly cost USD,60,Planning rate for cleanup and owner review; separate from technical operations
+Setup scope,Migration tooling and configuration and UI integration and SSO and ingestion and evaluation,Content rewriting and manual file-by-file remediation excluded
+Annual infrastructure scope,Application database search workers storage backups logging media delivery and ingestion,Capacity allowance through year3; includes production and small staging; not a cloud bill of materials
+Three-year calculation,Setup plus 3 times annual platform cost,Constant-dollar planning; capacity ranges accommodate content growth; no automatic 20% software price escalation
+Initial content cleanup hours low,500,1.5 minutes average per initial document; bulk triage only
+Initial content cleanup hours high,1000,3 minutes average per initial document; deep rewriting costs extra
+Initial content cleanup USD low,30000,500 times 60
+Initial content cleanup USD high,60000,1000 times 60
+Reviewed active items year1,5000,Illustrative consolidation to 25% active items; remaining items archived outside Axl retrieval
+Review minutes per active item,10,Planning assumption; substantive rewrites excluded
+Annual review USD year1,50000,5000 times 10 divided by 60 times 60
+Annual review USD year2,60000,6000 active items at same review effort
+Annual review USD year3,72000,7200 active items at same review effort
+Three-year review USD,182000,50000 plus 60000 plus 72000
+Full 20000-item review USD year1,200000,Without reducing active inventory; review every item annually
+Full-inventory review USD three years,728000,20000 then 24000 then 28800 reviewed items at 10minutes and 60/hour
+Axl questions monthly,35000,10 per reader per month; actual adoption unmeasured
+Axl cost per answer low USD,0.01,Scenario assumption including answer model; not a model price quote
+Axl cost per answer high USD,0.05,Scenario assumption including answer model; not a model price quote
+Axl generation annual USD low,4200,35000 times 12 times 0.01
+Axl generation annual USD high,21000,35000 times 12 times 0.05
+Axl generation three years USD low,12600,3 times 4200; held constant rather than tied to media growth
+Axl generation three years USD high,63000,3 times 21000
+Common first-year extras USD low,84200,Cleanup30000 plus review50000 plus Axl4200
+Common first-year extras USD high,131000,Cleanup60000 plus review50000 plus Axl21000
+Common three-year extras USD low,224600,Cleanup30000 plus review182000 plus Axl12600
+Common three-year extras USD high,305000,Cleanup60000 plus review182000 plus Axl63000
+Contingency,20% recommended,Excluded from all displayed totals; add to selected procurement budget
+Other exclusions,Taxes and finance costs and new identity licensing and deep content remediation,Existing Auth0 capacity and identity reuse assumed; tenant and external access license terms must be confirmed
+AWS batch transcription USD per minute,0.006,https://aws.amazon.com/transcribe/pricing/ US East batch worked example checked 2026-11-17
+Backlog speech transcription USD,360,1000 hours times 60 times 0.006; no visual understanding or redaction
+Backlog plus three-year new media speech USD,622.08,1728 cumulative hours processed once times 60 times 0.006; retries and revisions extra
+AWS plain OCR USD per page,0.0015,https://aws.amazon.com/textract/pricing/ US West Oregon first million plain-text pages
+Initial 100000 pages plain OCR USD,150,100000 times 0.0015; unnecessary for native text; layout and tables extra
+R2 standard storage USD per GB-month,0.015,https://developers.cloudflare.com/r2/pricing/ excludes operations and ignores free tier
+500GB originals R2 monthly USD,7.5,500 times 0.015; optional alternative to S3 and not video streaming cost
+Stream storage USD per 1000minutes-month,5,https://developers.cloudflare.com/stream/pricing/
+1000hour Stream monthly storage USD,300,60000 minutes divided by 1000 times 5
+Stream delivery USD per 1000minutes,1,https://developers.cloudflare.com/stream/pricing/
+1000viewer-hours Stream monthly delivery USD,60,60000 minutes divided by 1000 times 1; optional managed playback service
+Directus 25-editor selfhost annual USD,14988,12 times (499 plus (25 minus 10) times 50) https://directus.com/pricing

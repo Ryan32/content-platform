@@ -1,0 +1,13 @@
+# Local credentials
+.env
+.env.*
+!.env.example
+
+# Downloaded source content and processing output
+/data/
+/tmp/
+
+# Local editor settings and Python caches
+/.vscode/
+__pycache__/
+*.py[cod]

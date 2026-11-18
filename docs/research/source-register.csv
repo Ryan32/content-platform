@@ -1,0 +1,39 @@
+checked_date,product,verified_fact_or_scope,source,qualification
+2026-11-17,Payload,MIT core license,https://github.com/payloadcms/payload/blob/main/LICENSE.md,Optional commercial products not covered by core cost assumption
+2026-11-17,Payload,Official MCP plugin supports collection operations and custom tools,https://payloadcms.com/docs/plugins/mcp,Pin version; website and main-branch documentation differ on authorization details
+2026-11-17,Payload,Custom authentication strategies are supported,https://payloadcms.com/docs/authentication/custom-strategies,Auth0 integration still requires engineering
+2026-11-17,Payload,Drafts versions and scheduled publishing,https://payloadcms.com/docs/versions/drafts,Annual review governance is additional application logic
+2026-11-17,Payload,Background and future jobs,https://payloadcms.com/docs/jobs-queue/overview,Does not provide complete document or speech ingestion by itself
+2026-11-17,Drupal,Core Content Moderation and Workflows,https://www.drupal.org/docs/8/core/modules/content-moderation/overview,Annual reminders and extraction require configuration or modules
+2026-11-17,Drupal,Contributed MCP server and companion authorization modules,https://www.drupal.org/project/mcp_server,Current quickstart includes beta and alpha modules; assess release maturity
+2026-11-17,Directus,MSCL source-available license,https://github.com/directus/directus,Not equivalent to unrestricted MIT or GPL for current releases
+2026-11-17,Directus,Selfhost Team499/month annual with10 Studio seats and50/month extra seats,https://directus.com/pricing,25 Studio editors14988/year; cloud hosting extra; quote retention and support needs
+2026-11-17,Directus,Official MCP setup,https://directus.com/docs/guides/ai/mcp/installation,Content access is distinct from file parsing and transcription
+2026-11-17,Bloomfire,Native media transcription and indexed timestamps advertised,https://bloomfire.com/kms/ai-enterprise-search/,Vendor capability claim not hands-on validation; BYO transcript substitution unverified
+2026-11-17,Bloomfire,MCP and API with individual authentication advertised,https://bloomfire.com/eie/ai-connect/,Detailed tool schema and tag mutation scope need vendor proof
+2026-11-17,Bloomfire,Auto tagging and taxonomy advertised,https://bloomfire.com/eie/data-quality-for-ai/,Measure accuracy on AE vocabulary
+2026-11-17,Bloomfire,Content conflict and duplicate detection with assigned remediation,https://bloomfire.com/kms/content-reliability/,Annual attestation and overdue suppression require demonstration
+2026-11-17,Bloomfire,Brand colors and configurable homepages,https://bloomfire.com/kms/layout-customization/,Exact Portal rendering via API is not demonstrated by theme options
+2026-11-17,Bloomfire,Custom scoped pricing with no consumption charges or user counts advertised,https://bloomfire.com/pricing/,No public dollar price; contract must explicitly include mixed external audience and corpus
+2026-11-17,Document360,Semantic search article write workflow and review reminder MCP tools,https://docs.document360.com/help/docs/supported-mcp-tools,Read/write tools share plan-specific limits; tag-write schema requires verification
+2026-11-17,Document360,Annual review reminders and stale status,https://docs.document360.com/docs/review-reminders,Stale article remains visible to readers; retrieval suppression is separate
+2026-11-17,Document360,PDF attachment keyword search capped at10MB,https://docs.document360.com/docs/search-in-knowledge-base-site,Do not generalize this keyword limit to every Eddy AI feature
+2026-11-17,Document360,JWT integration for readers of an existing app,https://docs.document360.com/docs/configuring-the-jwt-sso,Validate audience group mapping and contract reader pricing
+2026-11-17,Document360,Current plans custom priced,https://document360.com/pricing/,Public dated tier prices should not be used as quotes
+2026-11-17,Sanity,Context read-only KB MCP distinct from authoring MCP,https://www.sanity.io/docs/context/introduction,New capability; agents bring their own model and harness
+2026-11-17,Sanity,PDF DOCX PPTX XLSX text/layout extraction,https://www.sanity.io/docs/context/sources-documents-chunks,Office extraction is now documented; native media speech pipeline not established here
+2026-11-17,Sanity,Context organization token and endpoint-level content scopes,https://www.sanity.io/docs/context/content-access,KB exposes all included content; GROQ filters do not constrain followed references
+2026-11-17,Sanity,Selfserve Context50000 source chunks; sales add-ons100000 chunks,https://www.sanity.io/docs/context/limits,Full assumed corpus likely exceeds selfserve scope
+2026-11-17,Sanity,Growth15/editor/month and Context299/month plus optional quota299/month,https://www.sanity.io/pricing,SAML and Media Library enterprise scope; minimal list prices are not complete project costs
+2026-11-17,Strapi,MIT community core; review workflows and audit logs Enterprise,https://strapi.io/pricing-cms,BYO AI Enterprise add-on is distinct from writing an external AWS ingestion integration
+2026-11-17,Strapi,Official MCP generally available,https://strapi.io/blog/the-strapi-mcp-server-is-now-ga,Admin API token scope must not become a broad reader credential
+2026-11-17,Guru,Current custom platform and expertise pricing,https://www.getguru.com/pricing,Do not multiply3500 by historical25/user price as a current quote
+2026-11-17,Microsoft,External guests limited to basic collaboration without own-tenant licenses,https://learn.microsoft.com/en-us/sharepoint/external-sharing-overview,Validate actual portal and app access entitlement; do not assume an app token removes user licensing
+2026-11-17,Microsoft,Document processing and taxonomy pay-as-you-go,https://learn.microsoft.com/en-us/microsoft-365/documentprocessing/syntex-pay-as-you-go-services,Incremental service cost excludes labor and possible existing licenses
+2026-11-17,Docling,Document and media parsing support,https://github.com/docling-project/docling,Extraction quality and model licenses require testing; not a CMS
+2026-11-17,AWS Transcribe,Batch0.006/minute in US East worked example,https://aws.amazon.com/transcribe/pricing/,Speech processing only; older0.024/minute references differ from current page
+2026-11-17,AWS Transcribe,S3 input with timestamped JSON output,https://docs.aws.amazon.com/transcribe/latest/dg/how-input.html,Transcription does not interpret slides or visual demonstrations
+2026-11-17,AWS Transcribe,WebVTT and SRT subtitle output,https://docs.aws.amazon.com/transcribe/latest/dg/subtitles.html,Link captions and source record versions explicitly
+2026-11-17,AWS Textract,Plain text OCR0.0015/page in Oregon example,https://aws.amazon.com/textract/pricing/,Layout tables forms and vision costs differ
+2026-11-17,Cloudflare R2,Standard storage0.015/GB-month,https://developers.cloudflare.com/r2/pricing/,Original object storage excludes managed playback and operations
+2026-11-17,Cloudflare Stream,Storage5/1000minutes-month and delivery1/1000minutes,https://developers.cloudflare.com/stream/pricing/,Optional video service benchmark; usage depends on stored and watched minutes

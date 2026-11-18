@@ -8,7 +8,7 @@ The user wants autonomous progress on authorized work, concise updates, and conc
 
 ## Current phase
 
-The user explicitly prioritized WordPress backup validation and Vimeo access before platform setup. The DBR WordPress backup is at `data/dbr-backup`; as of 2026-11-17, the user is still copying an approximately 20 GB bulk folder. Treat the backup as incomplete until copy completion is confirmed and validation is performed. Vimeo download access has been validated for one known video. Neither a full library inventory nor a backup restore has been completed.
+The user explicitly prioritized WordPress backup validation and Vimeo access before platform setup. The DBR WordPress backup is at `data/dbr-backup`; the user confirmed copy completion on 2026-11-17. An offline SQL/file inventory and proposed 200-record past-year pilot are available under ignored `data/wordpress-inventory/scan-2026-11-17-v2/`; see `docs/WORDPRESS-PILOT.md`. This is not a verified live-site reconciliation or restore. One Vimeo download was previously tested; a later direct-ID metadata check succeeded for 16 pilot videos before rate limiting stopped the batch. Full Vimeo coverage is unresolved.
 
 Payload is the working architecture candidate, not an implemented application or irrevocable procurement decision. On 2026-11-17 the user selected AWS ECS/Fargate containers and required Amazon RDS PostgreSQL; see `docs/AWS-SETUP-HANDOFF.md` for the other-laptop setup instructions. No AWS provisioning has been performed. Retain Vimeo playback initially. Do not silently add a second editorial KB or a RAG product without a demonstrated requirement.
 

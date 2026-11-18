@@ -2,7 +2,7 @@
 
 ## Phase 0: source access (current)
 
-The DBR WordPress backup is located at `data/dbr-backup`. As of 2026-11-17, the user reports that an approximately 20 GB bulk folder is still copying. Wait for copy completion before creating a definitive manifest or assessing completeness. The visible source is an extracted WordPress tree; availability of its original archive is unresolved. Preserve the untouched source and, if available, the original archive; record stable hashes, backup timestamp, site identity, and size. Check archive paths and available disk space before any additional extraction.
+The DBR WordPress backup is located at `data/dbr-backup`. The user confirmed copy completion on 2026-11-17. A stable SQL hash, selected-table extraction, local file inventory, and proposed pilot are recorded under `data/wordpress-inventory/scan-2026-11-17-v2/`; see `WORDPRESS-PILOT.md`. These establish observed local content, not full live-source completeness or restore readiness. The visible source is an extracted WordPress tree; availability of its original archive is unresolved. Preserve the untouched source and, if available, the original archive; record backup timestamp, site identity, and size. Check archive paths and available disk space before any additional extraction.
 
 Inventory the database dump, uploads, plugins, themes, and relevant configuration. Do not assume the archive contains offloaded media or external Vimeo assets. WordPress WXR is supplemental: it omits attachment binaries and site options.
 

@@ -2,6 +2,8 @@
 
 Status: starting proposal to validate against the inventory and content owners.
 
+The source-grounded proposal is now detailed in [AE taxonomy and access model](TAXONOMY-AND-ACCESS-MODEL.md), including separate descriptive facets, identity entitlements, scoped action roles, permission profiles, AI suggestions, and manual overrides. It remains proposed business policy until owners approve the mappings.
+
 ## Content model
 
 Separate content entries from reusable assets, taxonomy terms, audiences/groups, ownership, source records, and processing jobs. Preserve versions and relationships between replacements and superseded items.

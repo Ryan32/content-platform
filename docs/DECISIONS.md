@@ -21,7 +21,7 @@
 
 ## Unresolved prerequisites
 
-- DBR WordPress backup is located at `data/dbr-backup`; the user reports an approximately 20 GB bulk folder is still copying. Final completeness/size, backup timestamp, original archive availability, and original site's architecture remain unresolved.
+- User confirmed the copy into `data/dbr-backup` complete. Offline SQL/file inventory and a proposed past-year pilot are available; live-source reconciliation, isolated restore, backup timestamp, and original archive availability remain unresolved.
 - Custom WordPress content types, page-builder/plugin data, audience/download enforcement, and offloaded files.
 - Actual corpus size, media duration, duplicates, and ownership gaps.
 - Vimeo workspace/account coverage, transcript access, plan entitlements, and API limits.
@@ -29,6 +29,7 @@
 - Existing AWS/identity/Axl infrastructure and approved deployment conventions.
 - Internal/external reader split and per-firm access rules.
 - Editorial stakeholders, final taxonomy, review/retention policy, and cutover ownership.
+- Proposed source-grounded taxonomy/access model is in `TAXONOMY-AND-ACCESS-MODEL.md`. Identity/membership authority, business-line gates, Full Active/tier inheritance, firm delegation, access-profile owners, and Axl restrictions require business confirmation. AI tags must never act as access grants.
 - Production availability/recovery requirements and permitted dev data access.
 
 ## Evidence boundaries

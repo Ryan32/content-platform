@@ -6,7 +6,7 @@ This document captures work completed in the originating Portal conversation. Ve
 
 - Compared commercial, open-source, and source-available CMS/KB options using multiple research agents and primary documentation.
 - Selected Payload as the working custom-platform candidate, with Bloomfire as the packaged benchmark and Directus as another self-hosted option.
-- User supplied the DBR WordPress backup at `data/dbr-backup`; the bulk file copy is still in progress (user reports approximately 20 GB). Completeness is not yet verified.
+- User supplied the DBR WordPress backup at `data/dbr-backup` and later confirmed copy completion. Offline inventory is complete as described below; live-source completeness and restore readiness remain unverified.
 - Created this workspace, `.env.local`, `.gitignore`, and the Vimeo diagnostic script.
 - User created an authenticated Vimeo API token and placed it locally. Do not expose or overwrite it.
 - Downloaded the configured video successfully without enabling viewer downloads or modifying Vimeo settings.
@@ -29,7 +29,22 @@ Local artifacts (ignored): `data/vimeo-validation/1247791213-test.mp4` and `data
 
 ## Not completed
 
-No full Vimeo inventory, full WordPress backup validation/restore, content extraction, transcription, cleanup, taxonomy approval, CMS installation, cloud provisioning, or production deployment.
+No full Vimeo inventory, full WordPress backup validation/restore, full-library document extraction, transcription, cleanup, taxonomy approval, CMS installation, cloud provisioning, or production deployment. Offline metadata extraction and bounded document probes have been completed.
+
+## Offline inventory, pilot, and governance proposal — 2026-11-17
+
+- User confirmed that the bulk backup copy is complete. Source files were not changed, and WordPress/PHP was not executed.
+- Authoritative scan output: `data/wordpress-inventory/scan-2026-11-17-v2/`. Earlier scan artifacts are exploratory; the corrected v2 parser preserves escaped paired quotes in serialized builder data. Both passes observed the same unchanged source hash. Completion-marker handling was also corrected for this dump's bare `-- Dump completed` footer.
+- SQL dump: 1,948,630,258 bytes; SHA-256 `af580deb9af330c182fc52671331ef0e7a0d0b01adb9991a595add6639072e31`. Extracted 9,664 posts, 442,946 postmeta rows, 1,526 terms/taxonomy rows, and 37,797 taxonomy relationships, plus selected supporting tables. SQLite integrity and extracted table counts passed. This is literal extraction, not a MySQL restore.
+- Observed local tree: 58,939 files, 23,036,880,763 bytes. All 1,835 WordPress attachment records resolve to nonempty local files. This does not establish completeness of offloaded/external material. Found 3,927 orphan postmeta rows and no orphan taxonomy-ID relationships; investigate orphan metadata as source residue, not automatically missing content.
+- Material candidates after status/availability/expiry screening: 5,280. Of these, 1,348 were published within 2025-11-17 through 2026-11-17, and 2,727 older records were modified in that window. Audience authorization remains unresolved/restricted intake. Recent material references 204 distinct Vimeo IDs.
+- Created a deterministic 200-record proposed pilot and 20 stratified negative controls. Pilot format labels overlap: 107 PDF-linked, 56 Vimeo-linked, 12 Word-linked, 10 slide-linked, 8 audio-linked, 5 video-file-linked, 6 spreadsheet-linked, and 30 article records. Hashed 321 distinct locally present pilot files; all remained stable during hashing.
+- Across recent active candidates: 3 unresolved local image references represent 2 distinct paths, plus 78 external asset-reference occurrences (including staging/third-party links). No recent referenced local PDF/Office file was classified as missing by the implemented resolver. One recent builder value remains unparsed; 47 recent candidate records have no description in the directly extracted descriptive fields. Canonical URLs, complex relationships, and actual source access enforcement still require review.
+- Bounded native-text probes: 20 PDFs (first three pages only), 10 Word documents, and 10 PowerPoint decks. Text was found in 39; one PDF needs OCR/inspection. This is not a full quality/layout validation. Pinned optional pypdf dependency installed only under ignored `tmp/`.
+- Direct read-only Vimeo checks confirmed metadata and authorized MP4-link presence for 16 final-pilot videos, 15 with caption tracks reported. The next request returned HTTP 429 and the batch stopped. No media/caption download, API mutation, or full-library coverage claim. Sanitized results are linked to the final pilot in `vimeo-pilot-check.json`.
+- Added reusable inventory, pilot selection, document probe, and Vimeo diagnostic scripts; eight synthetic parser/path/serialization tests pass. Source SQL, PHP, and serialized objects are never executed by the inventory tooling. Data/credential exclusion remains intact.
+- Added `docs/WORDPRESS-PILOT.md` and `docs/TAXONOMY-AND-ACCESS-MODEL.md`. The latter separates descriptive facets, user memberships, scoped action roles, and named access profiles; AI suggestions remain separate from manual decisions and security policy.
+- No private material was sent to an AI model. No AWS resources, vector index, MCP endpoint, or application were created by this workspace's scan. The user subsequently requested check-in of the inventory tooling and updated plans; this check-in includes those scripts/docs, while private scan artifacts and credentials remain excluded.
 
 ## Initial source-control check-in — 2026-11-17
 
@@ -59,13 +74,13 @@ No full Vimeo inventory, full WordPress backup validation/restore, content extra
 
 ### Source validation
 
-1. After the user confirms the copy into `data/dbr-backup` has finished, preserve the source and record a stable manifest/hashes. Establish backup timestamp, source totals, and whether the original archive is also available; do not assume the extracted tree is the original archive.
-2. Validate the database dump and file inventory, reconcile against available source evidence, and report missing or unresolved components. Then plan an isolated restore using compatible versions and disabled outbound integrations.
-3. Extract a source manifest, including custom fields/access rules and Vimeo references.
-4. Inventory Vimeo API coverage with pagination and sanitized output, then reconcile against actual WordPress video IDs. Check workspace/account context rather than assuming the personal-library endpoint covers everything.
-5. Resolve access and missing-content exceptions before platform provisioning or large downloads.
+1. Review the proposed 200-record pilot in `data/wordpress-inventory/scan-2026-11-17-v2/pilot-review.csv` and approve a 25-item smoke set with owners/audiences.
+2. Resolve the two local image paths, external/staging references, unparsed builder value, canonical URLs, and source permission/firm hierarchy mappings. Establish original archive, backup timestamp, and live-source totals; plan an isolated restore for behavioral validation.
+3. Confirm the taxonomy/access proposal's identity authority, business-line/profile rules, and human approval responsibilities. Keep all pilot intake restricted until mapping is approved.
+4. Resume bounded Vimeo checks only when rate limits permit, then expand coverage and reconcile against source IDs. Check account/workspace context; do not assume personal-library enumeration covers everything.
+5. Implement the local/dev smoke pipeline and labeled AI/retrieval/MCP evaluation described in `WORDPRESS-PILOT.md`, before expanding or running paid bulk processing.
 
-While the backup copy is in progress, a read-only Vimeo metadata inventory is useful independent work when requested. Avoid bulk media downloads merely to count videos.
+Avoid bulk media downloads merely to count videos. Preserve the source backup and previous scan evidence.
 
 ## Suggested opening prompt for the new engagement
 

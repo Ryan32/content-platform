@@ -13,6 +13,8 @@ Read [AGENTS.md](AGENTS.md), then [current status and handoff](docs/STATUS.md). 
 - [AWS setup handoff for the other laptop](docs/AWS-SETUP-HANDOFF.md) — ECS/Fargate, mandatory RDS PostgreSQL, and automated ingestion plan.
 - [Source validation and migration runbook](docs/MIGRATION.md)
 - [Taxonomy, permissions, and governance](docs/GOVERNANCE.md)
+- [Proposed AE taxonomy and access model](docs/TAXONOMY-AND-ACCESS-MODEL.md)
+- [WordPress inventory and AI retrieval pilot](docs/WORDPRESS-PILOT.md)
 - [Decisions and unresolved questions](docs/DECISIONS.md)
 - [Research findings and cost qualifications](docs/RESEARCH.md)
 - [Current status and next engagement](docs/STATUS.md)
@@ -31,6 +33,8 @@ python scripts/test_vimeo_download.py
 The script intentionally refuses to overwrite a completed test file. A partial `.part` file may be overwritten on retry. It validates HTTP Content-Length and an MP4 signature; it does not fully decode the video. This is a diagnostic script, not the production importer.
 
 ## Local configuration
+
+Offline inventory tooling and the private 200-record pilot are documented in [the pilot runbook](docs/WORDPRESS-PILOT.md). Generated databases, manifests, text probes, and Vimeo validation reports stay under ignored `data/`; they are not included in a clone.
 
 `.env.local` already exists and contains the user's Vimeo token. Never print it or overwrite it. `.env.example` documents variable names without secrets. Local credentials, downloads, and raw backups are excluded by `.gitignore`.
 

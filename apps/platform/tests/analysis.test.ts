@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Pool } from 'pg'
-import { modelPassages, validateAnalysis, type Analysis } from '../src/processing/analysis'
+import { modelPassages, normalizeAnalysis, validateAnalysis, type Analysis } from '../src/processing/analysis'
+import { ProcessingError } from '../src/processing/jobs'
 import { analyzeItem } from '../src/processing/analyze-runtime'
 import type { Job } from '../src/processing/jobs'
 
@@ -18,6 +19,32 @@ describe('REQ-AI-01: combined item analysis', () => {
     expect(() => validateAnalysis({ ...base, carriers: { ids: [9], reason: '', evidenceIds: [] } }, ids, [3], [8])).toThrow('invalid_proposal_reference')
     expect(() => validateAnalysis({ ...base, takeaways: [{ text: 'x', evidenceIds: ['s9-e1'] }] }, ids, [3], [8])).toThrow('invalid_proposal_reference')
     expect(() => validateAnalysis({ ...base, section: { value: 'not-a-section', reason: '', evidenceIds: [] } }, ids, [3], [8])).toThrow('invalid_proposal')
+  })
+
+  it('tidies malformed model answers without inventing anything, and retries near-empty ones', () => {
+    const ids = new Set(['s1-e1', 's2-e1'])
+    const messy = { ...base, title: { value: '  ', reason: '', evidenceIds: [] }, pages: undefined, program: undefined, invented_key: 1,
+      licensing: { values: ['not-real'], reason: 'x' }, carriers: { ids: [8, 9], reason: '', evidenceIds: [] },
+      tags: JSON.stringify([{ termId: 3, evidenceIds: ['s1-e1', 's9-e1'], confidence: 0.4 }, { termId: 99, evidenceIds: ['s1-e1'], confidence: 1 }]),
+      warnings: Array.from({ length: 25 }, (_, i) => `w${i}`) }
+    const tidy = validateAnalysis(normalizeAnalysis(messy, ids, [3], [8]), ids, [3], [8])
+    expect(tidy.title).toBeNull()
+    expect(tidy.pages).toBeNull()
+    expect(tidy.licensing).toEqual({ values: [], reason: 'x', evidenceIds: [] })
+    expect(tidy.carriers?.ids).toEqual([8])
+    expect(tidy.tags).toEqual([{ termId: 3, evidenceIds: ['s1-e1'], confidence: 0.4 }])
+    expect(tidy.warnings).toHaveLength(20)
+    expect(tidy.warnings.at(-1)).toContain('could not be matched')
+    expect(normalizeAnalysis(base, ids, [3], [8]).warnings).toEqual(base.warnings)
+    const empty = { title: null, summary: base.summary }
+    try { normalizeAnalysis(empty, ids, [3], [8]); expect.unreachable() } catch (e) { expect((e as ProcessingError).retryable).toBe(true) }
+  })
+
+  it('budgets the serialized passage, so thousands of tiny cells cannot overflow the request', () => {
+    const cells = Array.from({ length: 5000 }, (_, i) => ({ id: `s1-e${i}`, locator: `Sheet "Performance" cell R${i}C2`, text: '1.2' }))
+    const picked = modelPassages(cells, 20000)
+    expect(JSON.stringify(picked.passages).length).toBeLessThanOrEqual(20000 + picked.passages.length)
+    expect(picked.truncated).toBe(true)
   })
 
   it('samples every source within the model budget so one long file cannot crowd out the rest', () => {

@@ -13,6 +13,7 @@ import { bedrockEmbedder, semanticSearchEnabled, type Embed } from '../processin
 let embedder: Embed | undefined
 const queryEmbedder = () => semanticSearchEnabled() ? (embedder ??= bedrockEmbedder()) : undefined
 import { isInlineType } from '../domain/viewers'
+import { embedHashes } from '../processing/vimeo-embeds'
 
 export type ReaderLibrary = LibraryRepository & ReaderExtras
 export type LibraryAccess = { repository: ReaderLibrary | null; signedIn: boolean }
@@ -160,6 +161,12 @@ export async function authenticatedLibrary(headers: Headers, mode: 'browser' | '
           ...(a.bytes ? { bytes: Number(a.bytes) } : {}), ...(a.description ? { description: a.description } : {}) }))
         item.moreVideos = ((meta.moreVideos ?? []) as { vimeoId?: string; title?: string | null }[])
           .filter(v => v.vimeoId && /^\d+$/.test(v.vimeoId)).map(v => ({ vimeoId: v.vimeoId!, ...(v.title ? { title: v.title } : {}) }))
+        // Privacy hashes for unlisted videos: only on the page of an item this reader may view.
+        if (pool && (item.vimeoId || item.moreVideos.length)) {
+          const hashes = await embedHashes(pool, [item.vimeoId, ...item.moreVideos.map(v => v.vimeoId)].filter((v): v is string => Boolean(v))).catch(() => new Map<string, string>())
+          if (item.vimeoId && hashes.has(item.vimeoId)) item.vimeoHash = hashes.get(item.vimeoId)
+          item.moreVideos = item.moreVideos.map(v => hashes.has(v.vimeoId) ? { ...v, hash: hashes.get(v.vimeoId) } : v)
+        }
         if (process.env.CONTENT_BUCKET) {
           const downloadable = await profileIds(req, 'download')
           const policyId = typeof doc.accessProfile === 'number' ? doc.accessProfile : doc.accessProfile?.id

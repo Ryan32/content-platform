@@ -10,7 +10,7 @@ const clock = (s: number) => `${Math.floor(s / 60).toString().padStart(2, '0')}:
  * Vimeo embed with a transcript that follows playback (design: ViewerVideo). Uses Vimeo's postMessage player API directly,
  * so no extra dependency. Transcript lines are the item's reviewed citable passages that carry a time.
  */
-export default function VimeoViewer({ vimeoId, title, passages, start, path }: { vimeoId: string; title: string; passages: { id: string; locator: string; text: string }[]; start?: number | null; path: string }) {
+export default function VimeoViewer({ vimeoId, hash, title, passages, start, path }: { vimeoId: string; hash?: string; title: string; passages: { id: string; locator: string; text: string }[]; start?: number | null; path: string }) {
   const frame = useRef<HTMLIFrameElement>(null)
   const [now, setNow] = useState(start ?? 0)
   const [filter, setFilter] = useState('')
@@ -37,7 +37,8 @@ export default function VimeoViewer({ vimeoId, title, passages, start, path }: {
     try { await navigator.clipboard.writeText(url.toString()) } catch { /* ignore */ }
     setCopied(true); setTimeout(() => setCopied(false), 1600)
   }
-  const src = `https://player.vimeo.com/video/${vimeoId}?dnt=1&api=1&player_id=library${start ? `#t=${Math.floor(start)}s` : ''}`
+  // Unlisted videos play only with their privacy hash.
+  const src = `https://player.vimeo.com/video/${vimeoId}?${hash && /^[0-9a-f]{6,40}$/.test(hash) ? `h=${hash}&` : ''}dnt=1&api=1&player_id=library${start ? `#t=${Math.floor(start)}s` : ''}`
 
   return <div className={`video-viewer-wrap${lines.length ? ' with-transcript' : ''}`}>
     <div className="video-main">

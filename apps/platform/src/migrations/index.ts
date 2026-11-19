@@ -9,6 +9,7 @@ import * as migration_20261119_030446_original_dates from './20261119_030446_ori
 import * as migration_20261119_031820_file_names_and_videos from './20261119_031820_file_names_and_videos';
 import * as migration_20261119_040000_search_and_evidence from './20261119_040000_search_and_evidence';
 import * as migration_20261119_051724_migration_autopilot from './20261119_051724_migration_autopilot';
+import * as migration_20261119_200000_vimeo_embeds from './20261119_200000_vimeo_embeds';
 
 export const migrations = [
   {
@@ -65,5 +66,10 @@ export const migrations = [
     up: migration_20261119_051724_migration_autopilot.up,
     down: migration_20261119_051724_migration_autopilot.down,
     name: '20261119_051724_migration_autopilot'
+  },
+  {
+    up: migration_20261119_200000_vimeo_embeds.up,
+    down: migration_20261119_200000_vimeo_embeds.down,
+    name: '20261119_200000_vimeo_embeds',
   },
 ];

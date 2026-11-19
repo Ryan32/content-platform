@@ -3,6 +3,7 @@ import { migratedDatabase, type TestDb } from './support/migrated-db'
 import { reconcile } from '../src/processing/reconcile'
 import { DEFAULT_SETTINGS } from '../src/processing/settings'
 import { JobStore, PROCESSOR, supersededFailures } from '../src/processing/jobs'
+import { embedHash, embedHashes, syncVimeoEmbeds } from '../src/processing/vimeo-embeds'
 import { analyzeItem, currentRecord } from '../src/processing/analyze-runtime'
 import { embedChunks, syncChunks } from '../src/processing/chunks'
 import { hybridSearch } from '../src/server/search'
@@ -87,6 +88,26 @@ describe('REQ-UPGRADE-02: scheduler, job queue and analysis against the migrated
     await store.retry(902)
     expect((await db.query('SELECT state FROM processing_jobs WHERE id=902')).rows[0].state).toBe('queued')
     await db.query('DELETE FROM processing_jobs WHERE id >= 900')
+  })
+
+  it('keeps Vimeo privacy hashes per video, pauses on rate limits, and returns them only for requested videos', async () => {
+    const calls: string[] = []
+    let limited = true
+    const fetcher = (async (url: string, init: RequestInit) => {
+      expect(new URL(url).hostname).toBe('api.vimeo.com')
+      expect((init.headers as Record<string, string>).Authorization).toBe('Bearer t')
+      const id = new URL(url).pathname.split('/')[2]; calls.push(id)
+      if (id === '111') return Response.json({ player_embed_url: 'https://player.vimeo.com/video/111?h=abc123def&badge=0' })
+      if (limited) return new Response('', { status: 429 })
+      return Response.json({ player_embed_url: 'https://player.vimeo.com/video/222' })
+    }) as unknown as typeof fetch
+    expect(await syncVimeoEmbeds(db as never, 't', fetcher)).toEqual({ unlisted: 1, rate_limited: 1 })
+    limited = false
+    expect(await syncVimeoEmbeds(db as never, 't', fetcher)).toEqual({ public: 1 })
+    expect(await syncVimeoEmbeds(db as never, 't', fetcher)).toEqual({})   // nothing left to check
+    expect(calls).toEqual(['111', '222', '222'])
+    expect([...await embedHashes(db as never, ['111', '222', 'x'])]).toEqual([['111', 'abc123def']])
+    expect(embedHash('https://evil.example/video/1?h=abc123')).toBeNull()
   })
 })
 

@@ -130,10 +130,10 @@ export default async function Detail({ params, searchParams }: { params: Promise
     <div className="detail-grid">
       <div className="detail-main">
         {takeaways}
-        {item.vimeoId && <section className="panel media"><VimeoViewer vimeoId={item.vimeoId} title={item.title} start={startAt} path={path}
+        {item.vimeoId && <section className="panel media"><VimeoViewer vimeoId={item.vimeoId} hash={item.vimeoHash} title={item.title} start={startAt} path={path}
           passages={item.evidence.map(e => ({ id: e.id, locator: e.locator, text: e.text }))} /></section>}
         {(item.moreVideos ?? []).map((v, i) => <section key={v.vimeoId} className="panel media"><h2 className="small-heading">{v.title ?? `Video ${i + 2}`}</h2>
-          <VimeoViewer vimeoId={v.vimeoId} title={v.title ?? item.title} path={path} passages={[]} /></section>)}
+          <VimeoViewer vimeoId={v.vimeoId} hash={v.hash} title={v.title ?? item.title} path={path} passages={[]} /></section>)}
         {item.previewAssetId && <section className="panel media">{(item.files?.length ?? 0) > 1 && <h2 className="small-heading">{item.files!.find(f => f.id === item.previewAssetId)?.name}</h2>}
           <PdfViewer key={item.previewAssetId} src={`/files/${item.previewAssetId}`} title={item.title} initialPage={pdfPage} /></section>}
         {inline.map(asset => {

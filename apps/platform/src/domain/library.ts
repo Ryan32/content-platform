@@ -7,7 +7,7 @@ export interface Material {
   body: string; updatedAt: string; evidence: Evidence[]
   /** Original publication date on the old site (migrated items only). */
   originalPublishedAt?: string
-  vimeoId?: string; previewAssetId?: number; downloadAssetIds?: number[]; thumbnailVersion?: string
+  vimeoId?: string; vimeoHash?: string; previewAssetId?: number; downloadAssetIds?: number[]; thumbnailVersion?: string
   kind?: string; section?: string; topics?: string[]
   audience?: string; licensing?: string[]; lines?: string[]; program?: string; carriers?: number[]; takeaways?: string[]
   /** Set on direct reads for the reader's detail page. */
@@ -19,7 +19,7 @@ export interface Material {
   /** Pictures from the article itself (not offered as downloads). */
   articleImages?: number[]
   /** Additional Vimeo videos on the same page. */
-  moreVideos?: { vimeoId: string; title?: string }[]
+  moreVideos?: { vimeoId: string; hash?: string; title?: string }[]
   /** Search results: where the query matched (a passage, possibly inside one of the page's files). */
   match?: { citationId: string; locator: string; assetId?: number }
 }

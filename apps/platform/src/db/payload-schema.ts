@@ -42,6 +42,7 @@ export const SCHEMA = {
   search_chunks: { owner: 'app', columns: ['id', 'content_id', 'build_version', 'seq', 'source', 'weight', 'asset_id', 'citation_id', 'locator', 'text', 'tsv', 'embedding', 'model'] },
   search_chunk_state: { owner: 'app', columns: ['content_id', 'build_version', 'chunks', 'built_at'] },
   analytics_outbox: { owner: 'app', columns: ['id', 'occurred_at', 'stream', 'event', 'content_id', 'job_id', 'actor', 'data', 'shipped_at'] },
+  vimeo_embeds: { owner: 'app', columns: ['video_id', 'hash', 'status', 'checked_at'] },
 } as const satisfies Record<string, TableSpec>
 
 /** Enum types (Payload names them enum_<collection>_<field>) and the values our SQL compares against or casts to. */

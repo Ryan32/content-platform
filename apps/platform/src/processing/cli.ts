@@ -30,7 +30,7 @@ try {
     let stopping = false
     for (const signal of ['SIGTERM', 'SIGINT'] as const) process.on(signal, () => { stopping = true })
     const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
-    let lastScan = 0, lastThumbs = 0, lastIndex = 0, lastUploads = 0, lastShip = 0, lastAutopilot = 0, lastSeed = 0, lastSummary = ''
+    let lastScan = 0, lastThumbs = 0, lastIndex = 0, lastUploads = 0, lastShip = 0, lastAutopilot = 0, lastSeed = 0, lastEmbeds = 0, lastSummary = ''
     const autopilotSkip = new Set<number>()
     // Payload (for registering large uploads with the same rules as direct uploads) starts on first use.
     let payloadInstance: import('payload').Payload | undefined
@@ -72,6 +72,13 @@ try {
           lastThumbs = Date.now()
           const made = await syncThumbnails(pool, thumbnailDeps)
           if (made.length) console.log(JSON.stringify({ status: 'thumbnails', results: made }))
+        }
+        if (process.env.VIMEO_ACCESS_TOKEN && Date.now() - lastEmbeds > 60000) {
+          // Unlisted videos only play with their privacy hash in the player address.
+          lastEmbeds = Date.now()
+          const { syncVimeoEmbeds } = await import('./vimeo-embeds')
+          const checked = await syncVimeoEmbeds(pool, process.env.VIMEO_ACCESS_TOKEN)
+          if (Object.keys(checked).length) console.log(JSON.stringify({ status: 'vimeo_embeds', ...checked }))
         }
         if (process.env.CONTENT_BUCKET && process.env.PAYLOAD_SECRET && Date.now() - lastUploads > 15000) {
           // Large uploads (over 50 MB) arrive in uploads/; fingerprint, move into place and register them.

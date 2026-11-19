@@ -1,4 +1,5 @@
-import { createLocalReq, getPayload, type Where } from 'payload'
+import { getPayload, type Where } from 'payload'
+import { localRequest, optionalSqlPool } from '../db/payload-db'
 import config from '../payload.config'
 import { profileIds, publishedWhere } from '../collections/access'
 import type { BrowseFilters, Carrier, Kit, LibraryRepository, Material, ReaderExtras } from '../domain/library'
@@ -59,7 +60,7 @@ export async function authenticatedLibrary(headers: Headers, mode: 'browser' | '
     user = users.docs[0] ? { ...users.docs[0], collection: 'users' as const } : null
   } else { user = (await payload.auth({ headers })).user }
   if (!user || !principalFromUser(user)?.active) return null
-  const req = await createLocalReq({ user }, payload)
+  const req = await localRequest(payload, user)
   const map = (doc: any): Material => ({ id: String(doc.id), title: doc.title,
     description: doc.description ?? '', format: doc.format, version: doc.evidenceVersion,
     body: doc.body ?? '', updatedAt: doc.originalUpdatedAt ?? doc.updatedAt, ...(doc.originalPublishedAt ? { originalPublishedAt: doc.originalPublishedAt } : {}), ...(doc.thumbnailVersion ? { thumbnailVersion: doc.thumbnailVersion } : {}),
@@ -86,7 +87,7 @@ export async function authenticatedLibrary(headers: Headers, mode: 'browser' | '
     ...(filters?.updatedSince ? [{ updatedAt: { greater_than_equal: filters.updatedSince } }] : []),
     ...(filters?.ids ? [{ id: { in: filters.ids } }] : []),
   ]
-  const pool = (payload.db as { pool?: { query: (sql: string, values: unknown[]) => Promise<{ rows: any[] }> } } | undefined)?.pool
+  const pool = optionalSqlPool(payload)
   const userId = Number((user as { id: number | string }).id)
   /** View counts for ranking "Most used" and the Most useful sort. Counts only; never who viewed what. */
   async function viewCounts(ids: number[] | null, days: number): Promise<Map<number, number>> {
@@ -105,7 +106,6 @@ export async function authenticatedLibrary(headers: Headers, mode: 'browser' | '
     async search(query, format, page, action, filters) {
       const ids = await profileIds(req, action)
       if (!ids.length) return { items: [], hasNextPage: false }
-      const pool = (payload.db as { pool?: Parameters<typeof rankedContentIds>[0] } | undefined)?.pool
       const found = query && pool ? await hybridSearch(pool, query, queryEmbedder()) : null
       const ranked = found?.ids ?? null
       if (ranked) {

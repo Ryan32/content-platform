@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { T } from '../db/payload-schema'
 import { embeddingModel, vectorLiteral, type Embed } from './embeddings'
 import { emit, type OutboxRow } from './analytics'
 
@@ -92,10 +93,10 @@ async function loadItem(db: Db, id: number): Promise<ChunkInput & { state: strin
   const { rows: [c] } = await db.query(`SELECT id, title, COALESCE(description,'') AS description, evidence_version, state, source_hash FROM content WHERE id=$1`, [id])
   if (!c) return null
   const [takeaways, tags, files, passages] = await Promise.all([
-    db.query('SELECT text FROM content_takeaways WHERE _parent_id=$1 ORDER BY _order', [id]),
-    db.query(`SELECT t.label FROM content_rels r JOIN taxonomy t ON t.id=r.taxonomy_id WHERE r.parent_id=$1 AND r.path='acceptedTags' ORDER BY r."order"`, [id]),
+    db.query(`SELECT text FROM ${T.content_takeaways} WHERE _parent_id=$1 ORDER BY _order`, [id]),
+    db.query(`SELECT t.label FROM ${T.content_rels} r JOIN taxonomy t ON t.id=r.taxonomy_id WHERE r.parent_id=$1 AND r.path='acceptedTags' ORDER BY r."order"`, [id]),
     db.query(`SELECT id, file_name, description, mime_type FROM assets WHERE content_id=$1 AND version=$2 AND COALESCE(role,'download')='download' ORDER BY id`, [id, c.source_hash]),
-    db.query('SELECT citation_id, text, locator, asset_id FROM content_passages WHERE _parent_id=$1 AND version=$2 ORDER BY _order', [id, c.evidence_version]),
+    db.query(`SELECT citation_id, text, locator, asset_id FROM ${T.content_passages} WHERE _parent_id=$1 AND version=$2 ORDER BY _order`, [id, c.evidence_version]),
   ])
   return { title: c.title, description: c.description, state: c.state, evidenceVersion: c.evidence_version,
     takeaways: takeaways.rows.map(r => String(r.text)), tags: tags.rows.map(r => String(r.label)),

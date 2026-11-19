@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
+import { T } from '../db/payload-schema'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 import { DOCUMENT_FORMATS, IMAGE_FORMATS } from './formats'
@@ -72,7 +73,7 @@ export class JobStore {
       if (!r.rowCount) throw new ProcessingError('lease_lost')
       // Current source must still match at completion. Derived data never patches content.
       const current = await db.query(`SELECT id FROM content WHERE id=$1 AND source_hash=$2 AND ($3::text IS NULL OR vimeo_id=$3
-        OR EXISTS (SELECT 1 FROM content_more_videos m WHERE m._parent_id=content.id AND m.vimeo_id=$3)) FOR SHARE`,
+        OR EXISTS (SELECT 1 FROM ${T.content_more_videos} m WHERE m._parent_id=content.id AND m.vimeo_id=$3)) FOR SHARE`,
         [job.content_id, job.source_version, 'videoId' in job.input ? job.input.videoId ?? null : null])
       if (!current.rowCount) throw new ProcessingError('source_version_mismatch')
       if (proposal) await db.query(`INSERT INTO suggestions (job_key,content_id,source_version,model,proposal,decision)

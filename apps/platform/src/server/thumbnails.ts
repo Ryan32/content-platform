@@ -1,4 +1,5 @@
 import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { sqlPool } from '../db/payload-db'
 import { getPayload, type Payload } from 'payload'
 import config from '../payload.config'
 import { editorContext } from './editor'
@@ -55,7 +56,7 @@ export async function clearCoverImage(payload: Payload, contentId: number) {
 
 // Thumbnail columns are system-managed (no admin edits, no version entry, no evidence invalidation), so write them directly.
 async function setThumbnailFields(payload: Payload, contentId: number, values: Record<string, string | null>) {
-  const pool = (payload.db as unknown as { pool: { query: (sql: string, params: unknown[]) => Promise<unknown> } }).pool
+  const pool = sqlPool(payload)
   await pool.query(`UPDATE content SET thumbnail_key = $2, thumbnail_version = $3, thumbnail_source = $4, thumbnail_for = $5 WHERE id = $1`,
     [contentId, values.thumbnail_key, values.thumbnail_version, values.thumbnail_source, values.thumbnail_for])
 }

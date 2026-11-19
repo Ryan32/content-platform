@@ -1,4 +1,5 @@
 import type { Pool, PoolClient } from 'pg'
+import { T } from '../db/payload-schema'
 import { TAGGING_MODELS } from '../globals/AutomationSettings'
 
 export interface AutomationSettings {
@@ -16,7 +17,7 @@ export async function readSettings(db: Pool | PoolClient): Promise<AutomationSet
     tagging_model, daily_paid_job_limit FROM automation_settings ORDER BY id LIMIT 1`)
   const row = rows[0]
   if (!row) return DEFAULT_SETTINGS
-  const dims = await db.query('SELECT value FROM automation_settings_tagging_dimensions WHERE parent_id=$1 ORDER BY "order"', [row.id])
+  const dims = await db.query(`SELECT value FROM ${T.automation_settings_tagging_dimensions} WHERE parent_id=$1 ORDER BY "order"`, [row.id])
   const bool = (value: unknown, fallback: boolean) => typeof value === 'boolean' ? value : fallback
   return {
     paused: bool(row.paused, false), documentsEnabled: bool(row.documents_enabled, true), vimeoEnabled: bool(row.vimeo_enabled, true), thumbnailsEnabled: bool(row.thumbnails_enabled, true),

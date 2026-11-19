@@ -1,4 +1,5 @@
 import type { Pool } from 'pg'
+import { T } from '../db/payload-schema'
 import { S3Client } from '@aws-sdk/client-s3'
 import { extractDocument } from './extract'
 import { getVimeoCaptions, classify, transcribeMedia } from './providers'
@@ -80,7 +81,7 @@ export function runtimeProcessors(db: Pool, sink: EvidenceSink = process.env.CON
     if (!rows[0]) throw new ProcessingError('source_version_mismatch')
     if ('videoId' in job.input && job.input.videoId && rows[0].vimeo_id !== job.input.videoId) {
       // Additional videos on the same item are valid sources too.
-      const more = await db.query('SELECT 1 FROM content_more_videos WHERE _parent_id=$1 AND vimeo_id=$2', [job.content_id, job.input.videoId])
+      const more = await db.query(`SELECT 1 FROM ${T.content_more_videos} WHERE _parent_id=$1 AND vimeo_id=$2`, [job.content_id, job.input.videoId])
       if (!more.rowCount) throw new ProcessingError('vimeo_source_changed')
     }
     return rows[0]

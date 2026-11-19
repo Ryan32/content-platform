@@ -4,6 +4,13 @@ This document captures work completed in the originating Portal conversation. Ve
 
 ## Active priority — core platform and general MCP
 
+### Upgrade safety for Payload — 2026-11-18
+
+- **Implemented and tested locally; no behaviour change.** Payload stays (admin, data model, migrations, rules, versions); our product logic stays outside it. Coupling is now contained: every Payload-generated table/column/enum our SQL uses is registered in `src/db/payload-schema.ts` (convention-named tables via constants); every Payload internal (pool, transactions, local requests, the 3.94 commit-confirmation workaround) goes through `src/db/payload-db.ts`; CSS on Payload's own markup is fenced in `custom.css`. Runbook: [UPGRADING-PAYLOAD.md](UPGRADING-PAYLOAD.md). Payload 4 is in beta (npm `latest` is 3.94.0, which we run).
+- New permanent tests on a real PostgreSQL + pgvector (PGlite, dev dependency `@electric-sql/pglite` 0.5.15 + `@electric-sql/pglite-pgvector` 0.0.16): `schema-contract` (runs all 10 migrations in order, checks every registered table/column/enum, flags raw SQL naming unregistered tables, keeps Payload CSS fenced) and `sql-integration` (scheduler incl. multi-video and NULL-Vimeo readiness, job queue completion and ownership, analysis labels, chunk build/embed, weighted keyword and semantic search to the right file, unpublished exclusion, evidence de-duplication, outbox shipping). First time all migrations have been run together on real PostgreSQL with pgvector locally: they apply cleanly.
+- The review decision route now uses the shared transaction helper; behaviour unchanged (an unconfirmed commit still reports a conflict), and it no longer issues a rollback after a commit.
+- Validation: typecheck; 182 tests in 30 files; production build (10 indexed migrations).
+
 ### Keep everything: lossless evidence, weighted full index, Iceberg analytics lake — 2026-11-18
 
 - **Implemented and tested locally; not deployed or provisioned.** Owner: keep all AI/OCR/transcription output for context and AI/ML; index everything, weighting curated fields above raw text; analytics as Iceberg tables on Amazon S3 Tables read in place by Snowflake (us-east-1). See [AI-PIPELINE.md](AI-PIPELINE.md) "Keep everything", ADR-048–051.

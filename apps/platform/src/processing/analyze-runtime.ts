@@ -1,4 +1,5 @@
 import type { Pool } from 'pg'
+import { T } from '../db/payload-schema'
 import { createHash } from 'node:crypto'
 import { analyze, analysisEnvelope, ANALYSIS_VERSION, type AnalysisEnvelope, type CurrentRecord } from './analysis'
 import { EvidenceBuilder } from './extract'
@@ -15,9 +16,9 @@ export async function currentRecord(db: Pool, contentId: number): Promise<Curren
   if (!c) throw new ProcessingError('source_version_mismatch')
   const many = async (table: string) => (await db.query(`SELECT value FROM ${table} WHERE parent_id=$1 AND value IS NOT NULL ORDER BY "order"`, [contentId])).rows.map(r => String(r.value))
   const [topics, pages, licensing, lines, rels, takeaways, categories] = await Promise.all([
-    many('content_topics'), many('content_pages'), many('content_licensing'), many('content_lines'),
-    db.query('SELECT path, taxonomy_id, carriers_id FROM content_rels WHERE parent_id=$1 ORDER BY "order"', [contentId]),
-    db.query('SELECT text FROM content_takeaways WHERE _parent_id=$1 ORDER BY _order', [contentId]),
+    many(T.content_topics), many(T.content_pages), many(T.content_licensing), many(T.content_lines),
+    db.query(`SELECT path, taxonomy_id, carriers_id FROM ${T.content_rels} WHERE parent_id=$1 ORDER BY "order"`, [contentId]),
+    db.query(`SELECT text FROM ${T.content_takeaways} WHERE _parent_id=$1 ORDER BY _order`, [contentId]),
     // WordPress categories recorded at import: hints for the model, never accepted tags.
     db.query(`SELECT DISTINCT a.data->'source'->>'name' AS name FROM source_relations r JOIN import_artifacts a ON a.id=r.artifact_id
       WHERE r.content_id=$1 AND r.kind='taxonomy' AND a.data->'source'->>'name' IS NOT NULL LIMIT 100`, [contentId]),
@@ -61,7 +62,7 @@ export async function analyzeItem(db: Pool, job: Job, run = analyze): Promise<An
   const assetIds = rows.map(r => Number(r.input?.assetId)).filter(Number.isFinite)
   const [names, videos] = await Promise.all([
     assetIds.length ? db.query('SELECT id, file_name FROM assets WHERE id = ANY($1::int[]) AND content_id=$2', [assetIds, job.content_id]) : { rows: [] },
-    db.query(`SELECT vimeo_id, title FROM content_more_videos WHERE _parent_id=$1 ORDER BY _order`, [job.content_id]),
+    db.query(`SELECT vimeo_id, title FROM ${T.content_more_videos} WHERE _parent_id=$1 ORDER BY _order`, [job.content_id]),
   ])
   const fileName = new Map(names.rows.map(r => [Number(r.id), r.file_name ? String(r.file_name) : '']))
   const videoTitle = new Map(videos.rows.map((r, i) => [String(r.vimeo_id), r.title ? String(r.title) : `Video ${i + 2}`]))

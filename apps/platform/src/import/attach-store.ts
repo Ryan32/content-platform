@@ -1,6 +1,7 @@
 import { CopyObjectCommand, HeadObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import type { Payload } from 'payload'
 import { assertImport } from './package'
+import { sqlPool } from '../db/payload-db'
 import type { AttachDeps } from './attach'
 
 const notFound = (error: unknown) => (error as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode === 404
@@ -38,7 +39,7 @@ export function payloadAttachDeps(payload: Payload, bucket: string, s3 = new S3C
     },
     async cover(contentId, key, version) {
       // Same columns an editor's cover upload sets (server/thumbnails.ts); never replaces an editor's own cover.
-      const pool = (payload.db as unknown as { pool: { query: (sql: string, params: unknown[]) => Promise<{ rowCount: number | null }> } }).pool
+      const pool = sqlPool(payload)
       const result = await pool.query(`UPDATE content SET thumbnail_key=$2, thumbnail_version=$3, thumbnail_source='upload', thumbnail_for='upload'
         WHERE id=$1 AND (thumbnail_source IS DISTINCT FROM 'upload' OR thumbnail_key=$2)`, [contentId, key, version])
       return Boolean(result.rowCount)

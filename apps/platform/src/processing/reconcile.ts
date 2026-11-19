@@ -1,4 +1,5 @@
 import type { Pool } from 'pg'
+import { T } from '../db/payload-schema'
 import type { JobStore } from './jobs'
 import { PROCESSOR } from './jobs'
 import { approvedModels, paidBlock, type AutomationSettings } from './settings'
@@ -43,7 +44,7 @@ export async function reconcile(db: Pool, store: JobStore, settings: AutomationS
 
   if (settings.vimeoEnabled) {
     // Every video on the item (main player and "More videos") is its own source.
-    const videos = await db.query(`SELECT c.id, c.source_hash, v.vimeo_id FROM content c CROSS JOIN LATERAL (SELECT c.vimeo_id AS vimeo_id UNION SELECT m.vimeo_id FROM content_more_videos m WHERE m._parent_id = c.id) v
+    const videos = await db.query(`SELECT c.id, c.source_hash, v.vimeo_id FROM content c CROSS JOIN LATERAL (SELECT c.vimeo_id AS vimeo_id UNION SELECT m.vimeo_id FROM ${T.content_more_videos} m WHERE m._parent_id = c.id) v
       WHERE v.vimeo_id ~ '^[1-9][0-9]{0,19}$' AND c.source_hash IS NOT NULL AND c.state IN ('intake','draft')
       AND NOT EXISTS (SELECT 1 FROM processing_jobs j WHERE j.content_id=c.id AND j.source_version=c.source_hash
         AND j.input->>'kind'='vimeo' AND j.input->>'videoId'=v.vimeo_id)
@@ -65,7 +66,7 @@ export async function reconcile(db: Pool, store: JobStore, settings: AutomationS
         AND NOT EXISTS (SELECT 1 FROM assets a WHERE a.content_id=c.id AND a.version=c.source_hash
           AND lower(substring(a.object_key from '\\.([A-Za-z0-9]+)$')) = ANY($2::text[])
           AND NOT EXISTS (SELECT 1 FROM processing_jobs j WHERE j.content_id=c.id AND j.source_version=c.source_hash AND (j.input->>'assetId')::int=a.id))
-        AND NOT ($3::boolean AND EXISTS (SELECT 1 FROM (SELECT c.vimeo_id AS vimeo_id UNION SELECT m.vimeo_id FROM content_more_videos m WHERE m._parent_id = c.id) v WHERE v.vimeo_id ~ '^[1-9][0-9]{0,19}$'
+        AND NOT ($3::boolean AND EXISTS (SELECT 1 FROM (SELECT c.vimeo_id AS vimeo_id UNION SELECT m.vimeo_id FROM ${T.content_more_videos} m WHERE m._parent_id = c.id) v WHERE v.vimeo_id ~ '^[1-9][0-9]{0,19}$'
           AND NOT EXISTS (SELECT 1 FROM processing_jobs j WHERE j.content_id=c.id AND j.source_version=c.source_hash
             AND j.input->>'kind'='vimeo' AND j.input->>'videoId'=v.vimeo_id)))
         AND NOT EXISTS (SELECT 1 FROM suggestions s WHERE s.content_id=c.id AND s.source_version=c.source_hash AND s.decision='accepted')

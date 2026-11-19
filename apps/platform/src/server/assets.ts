@@ -1,4 +1,5 @@
-import { getPayload, createLocalReq } from 'payload'
+import { getPayload } from 'payload'
+import { localRequest } from '../db/payload-db'
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import config from '../payload.config'
 import { profileIds, publishedWhere } from '../collections/access'
@@ -11,7 +12,7 @@ export async function assetResponse(request: Request, assetId: string, download:
   const payload = await getPayload({ config })
   const { user } = await payload.auth({ headers: request.headers })
   if (!user || !principalFromUser(user)?.active) return denied()
-  const req = await createLocalReq({ user }, payload)
+  const req = await localRequest(payload, user)
   // This endpoint serves originals, including inline PDF; view-only readers use
   // extracted text until an independently stored preview derivative is available.
   const ids = await profileIds(req, 'download')

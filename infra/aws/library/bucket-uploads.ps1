@@ -11,10 +11,12 @@ $env:AWS_PAGER = ''
 $aws = @('--profile', $Profile, '--region', 'us-east-1')
 $bucket = 'aecp-dev-381003255014-us-east-1'
 function Invoke-Aws { $out = & aws @args; if ($LASTEXITCODE) { throw "aws $($args[0]) $($args[1]) failed" }; $out }
+# Probe that may legitimately fail (e.g. not found): Windows PowerShell turns native stderr into a terminating error under 'Stop'.
+function Invoke-AwsOptional { $ErrorActionPreference = 'Continue'; & aws @args 2>$null }
 $tmp = Join-Path $env:TEMP 'aecp-bucket-uploads'; New-Item -ItemType Directory -Force $tmp | Out-Null
 try {
     # CORS
-    $existing = & aws s3api get-bucket-cors @aws --bucket $bucket --output json 2>$null
+    $existing = Invoke-AwsOptional s3api get-bucket-cors @aws --bucket $bucket --output json
     $rules = @(if ($LASTEXITCODE -eq 0 -and $existing) { ($existing | ConvertFrom-Json).CORSRules | Where-Object { $_.ID -ne 'ae-library-uploads' } })
     $rules += [pscustomobject]@{ ID = 'ae-library-uploads'; AllowedMethods = @('PUT'); AllowedOrigins = @($Origin)
         AllowedHeaders = @('content-type', 'x-amz-server-side-encryption', 'x-amz-meta-uploaded-by', 'x-amz-meta-file-name'); ExposeHeaders = @('ETag'); MaxAgeSeconds = 3000 }
@@ -23,7 +25,7 @@ try {
     "CORS: PUT allowed from $Origin ($($rules.Count) rule(s) total)"
 
     # Lifecycle
-    $existing = & aws s3api get-bucket-lifecycle-configuration @aws --bucket $bucket --output json 2>$null
+    $existing = Invoke-AwsOptional s3api get-bucket-lifecycle-configuration @aws --bucket $bucket --output json
     $lifecycle = @(if ($LASTEXITCODE -eq 0 -and $existing) { ($existing | ConvertFrom-Json).Rules | Where-Object { $_.ID -ne 'expire-abandoned-uploads' } })
     $lifecycle += [pscustomobject]@{ ID = 'expire-abandoned-uploads'; Status = 'Enabled'; Filter = @{ Prefix = 'uploads/' }
         Expiration = @{ Days = 2 }; AbortIncompleteMultipartUpload = @{ DaysAfterInitiation = 1 } }

@@ -23,6 +23,8 @@ $streamPrefix = 'aecp-dev-library'
 $errorBucket = 'aecp-dev-381003255014-us-east-1'   # Firehose delivery errors under analytics-errors/
 $role = 'aecp-dev-library-analytics-firehose'
 function Invoke-Aws { $out = & aws @args; if ($LASTEXITCODE) { throw "aws $($args[0]) $($args[1]) failed" }; $out }
+# Probe that may legitimately fail (e.g. not found): Windows PowerShell turns native stderr into a terminating error under 'Stop'.
+function Invoke-AwsOptional { $ErrorActionPreference = 'Continue'; & aws @args 2>$null }
 $tmp = Join-Path $env:TEMP 'aecp-analytics'; New-Item -ItemType Directory -Force $tmp | Out-Null
 
 # Columns shared by every table; `payload` always holds the complete row as JSON text, so nothing is lost to mapping.
@@ -40,29 +42,29 @@ $tables = [ordered]@{
     chunks = @(@{ name = 'chunk_id'; type = 'long' }, @{ name = 'build_version'; type = 'string' }, @{ name = 'seq'; type = 'int' }, @{ name = 'source'; type = 'string' },
         @{ name = 'weight'; type = 'float' }, @{ name = 'asset_id'; type = 'int' }, @{ name = 'citation_id'; type = 'string' }, @{ name = 'locator'; type = 'string' },
         @{ name = 'text'; type = 'string' }, @{ name = 'embedding_model'; type = 'string' },
-        @{ name = 'embedding'; type = @{ type = 'list'; 'element-id' = 1000; element = 'float'; 'element-required' = $false } })
+        @{ name = 'embedding'; type = 'string' })  # JSON array of 1,024 floats (PARSE_JSON in Snowflake)
     items = @(@{ name = 'state'; type = 'string' }, @{ name = 'title'; type = 'string' }, @{ name = 'summary'; type = 'string' }, @{ name = 'evidence_version'; type = 'string' },
         @{ name = 'build_version'; type = 'string' }, @{ name = 'chunk_count'; type = 'int' })
 }
 
 try {
     # 0. The S3 Tables <-> AWS analytics integration (Glue catalog) must exist.
-    & aws glue get-catalog @aws --catalog-id "${account}:s3tablescatalog" --query 'Catalog.Name' --output text 2>$null | Out-Null
+    Invoke-AwsOptional glue get-catalog @aws --catalog-id "${account}:s3tablescatalog" --query 'Catalog.Name' --output text | Out-Null
     if ($LASTEXITCODE) { throw 'S3 Tables integration with AWS analytics services is not enabled. Enable it in the S3 console (Table buckets -> Enable integration), then rerun.' }
 
     # 1. Table bucket and namespace.
     $bucketArn = & aws s3tables list-table-buckets @aws --query "tableBuckets[?name=='$tableBucket'].arn | [0]" --output text
     if (-not $bucketArn -or $bucketArn -eq 'None') { $bucketArn = Invoke-Aws s3tables create-table-bucket @aws --name $tableBucket --query arn --output text; "Created table bucket $tableBucket" }
-    & aws s3tables get-namespace @aws --table-bucket-arn $bucketArn --namespace $namespace 2>$null | Out-Null
+    Invoke-AwsOptional s3tables get-namespace @aws --table-bucket-arn $bucketArn --namespace $namespace | Out-Null
     if ($LASTEXITCODE) { Invoke-Aws s3tables create-namespace @aws --table-bucket-arn $bucketArn --namespace $namespace | Out-Null; "Created namespace $namespace" }
 
     # 2. Iceberg tables (append-only).
     foreach ($name in $tables.Keys) {
-        & aws s3tables get-table @aws --table-bucket-arn $bucketArn --namespace $namespace --name $name 2>$null | Out-Null
+        Invoke-AwsOptional s3tables get-table @aws --table-bucket-arn $bucketArn --namespace $namespace --name $name | Out-Null
         if (-not $LASTEXITCODE) { "Table $namespace.$name exists"; continue }
-        $id = 0
-        $fields = @($common + $tables[$name]) | ForEach-Object { $id++; [ordered]@{ id = $id; name = $_.name; type = $_.type; required = [bool]$_.required } }
-        $metadata = @{ iceberg = @{ schema = @{ type = 'struct'; fields = $fields } } }
+        # S3 Tables CreateTable takes only name/type/required with primitive types (verified 2026-11-18, aws-cli 2.32).
+        $fields = @($common + $tables[$name]) | ForEach-Object { [ordered]@{ name = $_.name; type = $_.type; required = [bool]$_.required } }
+        $metadata = @{ iceberg = @{ schema = @{ fields = $fields } } }
         [IO.File]::WriteAllText("$tmp\$name.json", ($metadata | ConvertTo-Json -Depth 10))
         Invoke-Aws s3tables create-table @aws --table-bucket-arn $bucketArn --namespace $namespace --name $name --format ICEBERG --metadata "file://$tmp\$name.json" | Out-Null
         "Created table $namespace.$name"
@@ -74,7 +76,9 @@ try {
     $policy = @{ Version = '2012-10-17'; Statement = @(
         @{ Sid = 'GlueCatalog'; Effect = 'Allow'; Action = @('glue:GetTable', 'glue:GetDatabase', 'glue:UpdateTable')
            Resource = @("arn:aws:glue:${region}:${account}:catalog", "arn:aws:glue:${region}:${account}:catalog/s3tablescatalog", "arn:aws:glue:${region}:${account}:catalog/s3tablescatalog/*",
-                        "arn:aws:glue:${region}:${account}:database/s3tablescatalog/$tableBucket/$namespace", "arn:aws:glue:${region}:${account}:table/s3tablescatalog/$tableBucket/$namespace/*") },
+                        "arn:aws:glue:${region}:${account}:database/s3tablescatalog/$tableBucket/$namespace", "arn:aws:glue:${region}:${account}:table/s3tablescatalog/$tableBucket/$namespace/*",
+                        # Firehose also authorizes the namespace by its short Glue name (AWS docs use database/* and table/*/*; kept to this namespace).
+                        "arn:aws:glue:${region}:${account}:database/$namespace", "arn:aws:glue:${region}:${account}:table/$namespace/*") },
         @{ Sid = 'S3TablesData'; Effect = 'Allow'; Action = @('s3tables:GetTableData', 's3tables:PutTableData', 's3tables:GetTableMetadataLocation', 's3tables:UpdateTableMetadataLocation', 's3tables:GetNamespace', 's3tables:GetTable')
            Resource = @($bucketArn, "$bucketArn/*") },
         @{ Sid = 'LakeFormationData'; Effect = 'Allow'; Action = 'lakeformation:GetDataAccess'; Resource = '*' },
@@ -93,7 +97,7 @@ try {
     # 4. One Firehose stream per table.
     foreach ($name in $tables.Keys) {
         $stream = "$streamPrefix-$($name.Replace('_', '-'))"
-        & aws firehose describe-delivery-stream @aws --delivery-stream-name $stream 2>$null | Out-Null
+        Invoke-AwsOptional firehose describe-delivery-stream @aws --delivery-stream-name $stream | Out-Null
         if (-not $LASTEXITCODE) { "Stream $stream exists"; continue }
         $config = @{ RoleARN = $roleArn; CatalogConfiguration = @{ CatalogARN = "arn:aws:glue:${region}:${account}:catalog/s3tablescatalog/$tableBucket" }
             DestinationTableConfigurationList = @(@{ DestinationDatabaseName = $namespace; DestinationTableName = $name })

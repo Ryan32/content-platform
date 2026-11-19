@@ -115,6 +115,9 @@ describe('REQ-DATA-01: analytics outbox to Iceberg via Firehose', () => {
     expect(q).toHaveBeenCalledTimes(1)
     expect(toRecord({ id: '5', occurred_at: '2026-11-18T00:00:00Z', stream: 'items', event: 'b', content_id: 2, job_id: null, actor: 'user:3', data: { title: 'T' } }))
       .toContain('"title":"T"')
+    const chunk = JSON.parse(toRecord({ id: '6', occurred_at: '2026-11-18T00:00:00Z', stream: 'chunks', event: 'c', content_id: 2, job_id: null, actor: null, data: { text: 'x', embedding: [0.5, -1] } }))
+    expect(chunk.embedding).toBe('[0.5,-1]')
+    expect(JSON.parse(chunk.payload).embedding).toBeUndefined()
   })
 })
 

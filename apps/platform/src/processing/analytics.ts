@@ -54,11 +54,12 @@ export function firehoseShipper(client = new FirehoseClient({})): Shipper {
 /**
  * One flat JSON record per row. Firehose maps top-level fields to Iceberg columns by name and drops unknown ones, so
  * every record also carries the complete row as `payload` (JSON text): nothing is lost to a column mapping. Nested
- * values become JSON text columns; the chunk `embedding` stays a list of floats.
+ * values, including the chunk `embedding` (a JSON array of floats), become JSON text columns: S3 Tables' CreateTable
+ * accepts only primitive column types, and Snowflake reads the vector with PARSE_JSON.
  */
 export function toRecord(row: { id: string | number; occurred_at: string | Date; stream: string; event: string; content_id: number | null; job_id: number | null; actor: string | null; data: unknown }) {
   const data = (row.data ?? {}) as Record<string, unknown>
-  const flat = Object.fromEntries(Object.entries(data).map(([k, v]) => [k, k === 'embedding' || v === null || typeof v !== 'object' ? v : JSON.stringify(v)]))
+  const flat = Object.fromEntries(Object.entries(data).map(([k, v]) => [k, v === null || typeof v !== 'object' ? v : JSON.stringify(v)]))
   const { embedding: _, ...rest } = data
   return JSON.stringify({ ...flat, outbox_id: Number(row.id), occurred_at: new Date(row.occurred_at).toISOString(), event: row.event,
     content_id: row.content_id, job_id: row.job_id, actor: row.actor, environment: process.env.ANALYTICS_ENVIRONMENT ?? 'dev', payload: JSON.stringify(rest) })

@@ -65,6 +65,9 @@ export default async function AddContent(props: AdminViewServerProps) {
               return <label key={t.id} className="ae-tag check"><input type="checkbox" name="tags" value={t.id} defaultChecked={Boolean(p)} />{t.label}{p ? ` · ${Math.round(p.confidence * 100)}%` : ''}</label> })}</div></fieldset>}
             <div className="ae-actions"><button className="ae-btn ae-btn--secondary" name="decision" value="rejected">Reject</button><button className="ae-btn ae-btn--primary" name="decision" value="accepted">Accept AI summary, takeaways and tags</button></div>
           </form>}
+          {!proposal && suggestionRef && <section className="ae-card"><div className="ae-card-row"><h2>AI analysis is ready</h2><span className="ae-muted">Nothing goes live until it&apos;s approved.</span></div>
+            <p>The AI read everything attached to this item and suggested a summary, where it belongs, filters, tags and key takeaways.</p>
+            <a className="ae-btn ae-btn--primary" href={`/admin/review/${suggestionRef.id}`}>Review field by field</a></section>}
           {accepted && <p className="ae-notice ae-notice--ok">AI summary, takeaways and tags accepted. The extracted text is now the item&apos;s reading text and citations.</p>}
           {!working && !proposal && !accepted && <p className="ae-notice">No AI suggestion yet. Check <a href="/admin/automation">Automation status</a> if processing failed, or fill in the details yourself.</p>}
 

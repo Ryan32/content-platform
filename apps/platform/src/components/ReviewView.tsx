@@ -2,6 +2,8 @@ import type { AdminViewServerProps, Payload } from 'payload'
 import { AdminPage, muted, panel } from './AdminPage'
 import { proposalEnvelope, taxonomyUnchanged } from '../processing/review'
 import { Thumbnail } from './Thumbnail'
+import { AnalysisReview } from './AnalysisReview'
+import { analysisEnvelope } from '../processing/analysis'
 
 const ERRORS: Record<string, string> = {
   conflict: 'The decision could not be applied: the item or suggestion changed since you opened it. Review the current state below before trying again.',
@@ -29,7 +31,7 @@ async function list(payload: Payload, user: unknown) {
   const title = (doc: { content?: unknown }) => typeof doc.content === 'object' && doc.content && 'title' in doc.content ? String((doc.content as { title: string }).title) : 'Library item'
   return <>
     <h1>Review AI suggestions</h1>
-    <p style={{ maxWidth: 820 }}>Each suggestion is a proposed summary and tags for one library item, with the passages that support it. Accepting copies the extracted text and your edited summary and tags into the item and moves it to Draft. It never publishes the item or changes who can see it. Oldest first.</p>
+    <p style={{ maxWidth: 820 }}>Each suggestion is the AI&apos;s reading of one library item — all its files, video and article text — compared with what the item says now. You choose, field by field, what to keep and what to take. Team-written values are kept by default; empty fields are pre-filled. Accepting never publishes the item or changes who can see it. Oldest first.</p>
     <h2>Waiting ({pending.totalDocs})</h2>
     {pending.docs.length ? <div style={{ display: 'grid', gap: 10, maxWidth: 900 }}>{pending.docs.map(doc => {
       const c = typeof doc.content === 'object' && doc.content ? doc.content as { id: number; format?: string; thumbnailVersion?: string | null } : null
@@ -37,7 +39,7 @@ async function list(payload: Payload, user: unknown) {
         <span style={{ width: 120, flex: 'none' }}><Thumbnail id={c?.id ?? 0} version={c?.thumbnailVersion} format={c?.format ?? 'document'} title={title(doc)} rounded={6} /></span>
         <span><strong>{title(doc)}</strong><br /><span style={muted}>Suggested {when(doc.createdAt)} · {doc.model}</span></span></a>
     })}</div>
-      : <p style={muted}>Nothing is waiting. New suggestions appear after a file or Vimeo video is processed and AI tagging finishes.</p>}
+      : <p style={muted}>Nothing is waiting. A new suggestion appears once all of an item&apos;s files, video and text have been processed and analyzed.</p>}
     {recent.docs.length > 0 && <section className="ae-card" style={{ maxWidth: 900, marginTop: 24 }}><h3>Recently decided</h3><ul className="ae-rows">{recent.docs.map(doc => <li key={doc.id}>
       <a href={`/admin/review/${doc.id}`}>{title(doc)}</a><span><span className={doc.decision === 'accepted' ? 'ae-pill ae-pill--ok' : 'ae-pill'}>{doc.decision === 'accepted' ? 'Accepted' : 'Rejected'}</span> <span className="ae-muted">{doc.reviewedAt ? when(doc.reviewedAt) : ''}</span></span></li>)}</ul></section>}
   </>
@@ -47,6 +49,13 @@ async function detail(payload: Payload, user: unknown, id: string, error?: strin
   if (!/^\d+$/.test(id)) return <><h1>Suggestion not found</h1><a href="/admin/review">Back to Review</a></>
   const doc = (await payload.find({ collection: 'suggestions', user: user as never, overrideAccess: false, depth: 0, limit: 1, where: { id: { equals: Number(id) } } })).docs[0]
   if (!doc) return <><h1>Suggestion not found</h1><a href="/admin/review">Back to Review</a></>
+  const combined = analysisEnvelope.safeParse(doc.proposal)
+  if (combined.success) {
+    const contentDoc = await payload.findByID({ collection: 'content', id: relId(doc.content), user: user as never, overrideAccess: false, depth: 0 })
+    const e = combined.data
+    const stale = contentDoc.sourceHash !== doc.sourceVersion || Boolean(e.sourceVimeoId && e.sourceVimeoId !== contentDoc.vimeoId)
+    return AnalysisReview({ payload, user, doc: doc as never, e, content: contentDoc as never, error, errors: ERRORS, stale })
+  }
   const parsed = proposalEnvelope.safeParse(doc.proposal)
   if (!parsed.success) return <><h1>Suggestion needs investigation</h1><p>This suggestion does not match the current review format. No changes have been applied.</p></>
   const contentId = relId(doc.content)

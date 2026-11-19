@@ -4,6 +4,11 @@ This document captures work completed in the originating Portal conversation. Ve
 
 ## Active priority — core platform and general MCP
 
+### Access model decided — 2026-11-18
+
+- **Documented, not implemented.** [ACCESS-MODEL.md](ACCESS-MODEL.md): WordPress's 29 roles (90.5% of 3,686 active packages fall under four rules) mapped to 3 audiences (Employees / All members / Full-Active), 4 restriction types (AEWM-restricted incl. AE/AEWM staff, minimum signature tier inheriting upward, firm group, program), firm-shared library roles managed in Office Manager (full / by section / none, plus manage), and a new Access Steward role. Access Management is the single identity source (Basic/Full-Active from the AM role; other fields to confirm in the AM payload); Azure AD groups identify employees. Licensing does not gate access; baseline commission schedules are open to all members; events are not migrated.
+- Open: confirm AM payload fields; decide the 86 "AEWM or Full-Active" items; Sub-Advisor and guest roles.
+
 ### Upgrade safety for Payload — 2026-11-18
 
 - **Implemented and tested locally; no behaviour change.** Payload stays (admin, data model, migrations, rules, versions); our product logic stays outside it. Coupling is now contained: every Payload-generated table/column/enum our SQL uses is registered in `src/db/payload-schema.ts` (convention-named tables via constants); every Payload internal (pool, transactions, local requests, the 3.94 commit-confirmation workaround) goes through `src/db/payload-db.ts`; CSS on Payload's own markup is fenced in `custom.css`. Runbook: [UPGRADING-PAYLOAD.md](UPGRADING-PAYLOAD.md). Payload 4 is in beta (npm `latest` is 3.94.0, which we run).

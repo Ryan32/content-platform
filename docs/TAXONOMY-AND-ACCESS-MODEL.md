@@ -1,5 +1,7 @@
 # Proposed AE taxonomy, AI editorial workflow, and access model
 
+> **Superseded for access (2026-11-18):** the decided access model, with WordPress evidence and the role mapping, is in [ACCESS-MODEL.md](ACCESS-MODEL.md). This document remains the earlier framework and taxonomy discussion.
+
 Prepared 2026-11-17 from the WordPress backup inspection. This is a concrete design proposal for review, not an approved business policy or implemented security model. Detailed source role/term inventories remain private under `data/wordpress-inventory/scan-2026-11-17-v2/`.
 
 ## 1. What the existing system tells us

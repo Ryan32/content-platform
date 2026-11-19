@@ -5,9 +5,12 @@ import { principalFromUser, staff } from '../domain/access'
 import { explain, jobLabel, STATE_LABEL } from '../processing/messages'
 import { approvedModels, paidAllowedByEnvironment } from '../processing/settings'
 import { TAGGING_MODELS } from '../globals/AutomationSettings'
+import { openFailures, supersededFailures } from '../processing/jobs'
+import { queuePool } from '../server/db'
 
 const OUTCOMES: Record<string, string> = { retried: 'Job queued again. The worker picks it up within a few seconds.',
-  job_not_retryable: 'That job is no longer failed, or belongs to an older processor version.', invalid_id: 'Unknown job.', retry_failed: 'Retry failed. Try again.' }
+  job_not_retryable: 'That job is no longer failed, or belongs to an older processor version.',
+  job_superseded: 'A later run of that step already succeeded for this item, so there is nothing to retry.', invalid_id: 'Unknown job.', retry_failed: 'Retry failed. Try again.' }
 const when = (value?: string | null) => value ? new Date(value).toLocaleString('en-US', { timeZone: 'America/Chicago' }) : ''
 
 /** Admin view at /admin/automation: what the background worker is doing, what failed and why, and retry. */
@@ -21,13 +24,14 @@ export default async function AutomationStatus({ initPageResult, params, searchP
 
   const since = new Date(Date.now() - 86400000).toISOString()
   const count = (where: object) => payload.count({ collection: 'processing-jobs', overrideAccess: true, where: where as never }).then(r => r.totalDocs)
+  const open = openFailures(await supersededFailures(queuePool()).catch(() => []))
   const [queued, running, failed, doneToday, paidToday, pendingReview, tags, failures, active, recent, settings] = await Promise.all([
-    count({ state: { equals: 'queued' } }), count({ state: { equals: 'running' } }), count({ state: { equals: 'failed' } }),
+    count({ state: { equals: 'queued' } }), count({ state: { equals: 'running' } }), count(open),
     count({ and: [{ state: { equals: 'succeeded' } }, { updatedAt: { greater_than: since } }] }),
     count({ and: [{ stage: { in: ['transcribe', 'classify'] } }, { createdAt: { greater_than: since } }] }),
     payload.count({ collection: 'suggestions', overrideAccess: true, where: { decision: { equals: 'pending' } } }).then(r => r.totalDocs),
     payload.count({ collection: 'taxonomy', overrideAccess: true }).then(r => r.totalDocs),
-    payload.find({ collection: 'processing-jobs', overrideAccess: true, depth: 1, limit: 50, sort: '-updatedAt', where: { state: { equals: 'failed' } } }),
+    payload.find({ collection: 'processing-jobs', overrideAccess: true, depth: 1, limit: 50, sort: '-updatedAt', where: open as never }),
     payload.find({ collection: 'processing-jobs', overrideAccess: true, depth: 1, limit: 20, sort: 'nextRunAt', where: { state: { in: ['queued', 'running'] } } }),
     payload.find({ collection: 'processing-jobs', overrideAccess: true, depth: 0, limit: 1, sort: '-updatedAt' }),
     payload.findGlobal({ slug: 'automation-settings', overrideAccess: true, depth: 0 }),

@@ -103,8 +103,26 @@ export class JobStore {
       data: { kind: job.input?.kind ?? null, source_version: job.source_version, attempts: job.attempts, error_code: known ? error.code : 'processing_failed' } }).catch(() => undefined)
   }
   async retry(id: number) {
+    // A retry re-runs the job's frozen input; once a later run of the same step succeeded, that would only repeat stale work.
+    if ((await this.pool.query(`SELECT 1 FROM processing_jobs f WHERE f.id=$1 AND ${SUPERSEDED}`, [id])).rowCount) throw new ProcessingError('job_superseded')
     const r = await this.pool.query(`UPDATE processing_jobs SET state='queued',attempts=0,error_code=NULL,next_run_at=now(),deadline_at=now()+interval '24 hours'
       WHERE id=$1 AND state='failed' AND processor_version=$2 RETURNING id`, [id, PROCESSOR])
     if (!r.rowCount) throw new ProcessingError('job_not_retryable')
   }
 }
+
+/**
+ * A failed job (alias f) is superseded when a later job of the same step for the same item and source version
+ * succeeded: any later analysis, or a later extraction of the same file or video. Such failures are history, not work.
+ */
+const SUPERSEDED = `f.state='failed' AND EXISTS (SELECT 1 FROM processing_jobs s WHERE s.content_id=f.content_id AND s.stage=f.stage
+  AND s.source_version=f.source_version AND s.state='succeeded' AND s.id>f.id AND (f.stage='classify' OR (coalesce(s.input->>'kind','')=coalesce(f.input->>'kind','')
+  AND coalesce(s.input->>'assetId','')=coalesce(f.input->>'assetId','') AND coalesce(s.input->>'videoId','')=coalesce(f.input->>'videoId',''))))`
+
+/** IDs of superseded failures, for hiding them from failure lists and counts. */
+export async function supersededFailures(pool: Pick<Pool, 'query'>): Promise<number[]> {
+  return (await pool.query(`SELECT f.id FROM processing_jobs f WHERE ${SUPERSEDED}`)).rows.map(row => Number(row.id))
+}
+/** Payload filter for failures that still need attention. */
+export const openFailures = (superseded: number[]) =>
+  superseded.length ? { and: [{ state: { equals: 'failed' } }, { id: { not_in: superseded } }] } : { state: { equals: 'failed' } }

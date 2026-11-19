@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { migratedDatabase, type TestDb } from './support/migrated-db'
 import { reconcile } from '../src/processing/reconcile'
 import { DEFAULT_SETTINGS } from '../src/processing/settings'
-import { JobStore } from '../src/processing/jobs'
+import { JobStore, PROCESSOR, supersededFailures } from '../src/processing/jobs'
 import { analyzeItem, currentRecord } from '../src/processing/analyze-runtime'
 import { embedChunks, syncChunks } from '../src/processing/chunks'
 import { hybridSearch } from '../src/server/search'
@@ -69,6 +69,24 @@ describe('REQ-UPGRADE-02: scheduler, job queue and analysis against the migrated
     expect(seen.passages.map((p: any) => [p.locator, p.assetId])).toEqual([['Whitepaper.pdf · Page 1', 21], ['Marketing-Kit_DL.pdf · Page 1', 22]])
     const video = await analyzeItem(db as never, { id: 91, content_id: 3, source_version: 'v3', input: videos.input } as never, (async () => ({ analysis: noAnalysis, truncated: false })) as never)
     expect(video.sources.map(s => s.label).sort()).toEqual(['Vimeo video', 'Vimeo: Session 2'])
+  })
+
+  it('treats failures replaced by a later success of the same step and source as history: hidden, not retryable', async () => {
+    const store = new JobStore(db as never)
+    const job = (id: number, content: number, version: string, stage: string, state: string, input: object) => db.query(
+      `INSERT INTO processing_jobs (id, idempotency_key, content_id, source_version, stage, state, input, processor_version, attempts)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1)`, [id, `k${id}`, content, version, stage, state, JSON.stringify(input), PROCESSOR])
+    // An analysis frozen before its files were ready, then a later one that succeeded.
+    await job(900, 2, 'v2', 'classify', 'failed', { kind: 'analyze', modelId: 'm', sourceJobIds: [], sourceDigest: '', taxonomy: [], carriers: [] })
+    await job(901, 2, 'v2', 'classify', 'succeeded', { kind: 'analyze', modelId: 'm', sourceJobIds: [1], sourceDigest: '1:succeeded', taxonomy: [], carriers: [] })
+    // A failed video next to a different video that succeeded later: still open.
+    await job(902, 3, 'v3', 'extract', 'failed', { kind: 'vimeo', videoId: '111' })
+    await job(903, 3, 'v3', 'extract', 'succeeded', { kind: 'vimeo', videoId: '222' })
+    expect(await supersededFailures(db as never)).toEqual([900])
+    await expect(store.retry(900)).rejects.toMatchObject({ code: 'job_superseded' })
+    await store.retry(902)
+    expect((await db.query('SELECT state FROM processing_jobs WHERE id=902')).rows[0].state).toBe('queued')
+    await db.query('DELETE FROM processing_jobs WHERE id >= 900')
   })
 })
 

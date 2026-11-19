@@ -46,7 +46,9 @@ $task = @{ Version = '2012-10-17'; Statement = @(
     @{ Sid = 'OcrScannedPdfs'; Effect = 'Allow'; Action = @('textract:StartDocumentTextDetection', 'textract:GetDocumentTextDetection'); Resource = '*' },
     # Large uploads (over 50 MB) staged by the browser under uploads/: read, fingerprint, move into content/, delete.
     @{ Sid = 'FinalizeLargeUploads'; Effect = 'Allow'; Action = @('s3:GetObject', 's3:DeleteObject'); Resource = "arn:aws:s3:::$bucket/uploads/*" },
-    @{ Sid = 'ListLargeUploads'; Effect = 'Allow'; Action = 's3:ListBucket'; Resource = "arn:aws:s3:::$bucket"; Condition = @{ StringLike = @{ 's3:prefix' = @('uploads/*') } } },
+    # Without ListBucket, S3 answers a read of a missing key with 403 instead of 404: the Vimeo staging cache check and
+    # the optional reference file need "not there yet" to be distinguishable from "denied".
+    @{ Sid = 'ListLargeUploads'; Effect = 'Allow'; Action = 's3:ListBucket'; Resource = "arn:aws:s3:::$bucket"; Condition = @{ StringLike = @{ 's3:prefix' = @('uploads/*', 'processing/*') } } },
     # Lossless evidence (raw provider outputs, model calls, full extractions): write once, read for reprocessing. Never expires.
     @{ Sid = 'Evidence'; Effect = 'Allow'; Action = @('s3:PutObject', 's3:GetObject'); Resource = "arn:aws:s3:::$bucket/evidence/*" },
     # Analytics outbox -> Firehose -> S3 Tables (Iceberg), read in place by Snowflake. See analytics-iceberg.ps1.

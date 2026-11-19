@@ -3,6 +3,8 @@ import { AdminPage } from '../AdminPage'
 import { Thumbnail } from '../Thumbnail'
 import { DUE_SOON_DAYS, REVIEW_WINDOWS } from '../../domain/review'
 import { Pill, day } from './shared'
+import { openFailures, supersededFailures } from '../../processing/jobs'
+import { queuePool } from '../../server/db'
 
 /** Manage home (design: AdminDashboard): what needs you today. Every number is a live count. */
 export default async function ManageHome(props: AdminViewServerProps) {
@@ -15,7 +17,7 @@ export default async function ManageHome(props: AdminViewServerProps) {
       count({ and: [{ state: { equals: 'published' } }, { reviewDueAt: { less_than_equal: now.toISOString() } }] }),
       count({ state: { equals: 'draft' } }),
       payload.count({ collection: 'suggestions', overrideAccess: true, where: { decision: { equals: 'pending' } } }).then(r => r.totalDocs),
-      payload.count({ collection: 'processing-jobs', overrideAccess: true, where: { state: { equals: 'failed' } } }).then(r => r.totalDocs),
+      payload.count({ collection: 'processing-jobs', overrideAccess: true, where: openFailures(await supersededFailures(queuePool()).catch(() => [])) as never }).then(r => r.totalDocs),
       count({ state: { equals: 'published' } }),
       count({ and: [{ state: { in: ['published', 'draft'] } }, { owner: { exists: false } }] }),
       payload.find({ collection: 'content', overrideAccess: true, depth: 0, limit: 5, sort: 'reviewDueAt', where: { and: [{ state: { equals: 'published' } }, { reviewDueAt: { less_than_equal: soon } }] } }),

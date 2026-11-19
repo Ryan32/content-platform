@@ -4,7 +4,7 @@ Usage: .\infra\aws\library\run-task.ps1 -Step bootstrap|migrate|smoke [-Profile 
 Runs in the private app subnets with no public IP. Secrets are injected by ECS from Secrets Manager.
 #>
 param(
-    [Parameter(Mandatory)] [ValidateSet('bootstrap', 'migrate', 'smoke', 'retire-initial-cms', 'provision-admin')] [string] $Step,
+    [Parameter(Mandatory)] [ValidateSet('bootstrap', 'migrate', 'smoke', 'retire-initial-cms', 'provision-admin', 'inspect')] [string] $Step,
     # Auth0 user_id for -Step provision-admin.
     [string] $AdminSubject,
     # Linux/amd64 manifest digests in aecp-dev-cms; defaults are the currently deployed release.
@@ -48,6 +48,10 @@ $steps = @{
         environment = @(@{ name = 'PLATFORM_ORIGIN'; value = 'https://library-dev.advisorsexcel.com' },
                         @{ name = 'AUTH0_ISSUER'; value = 'https://auth0-not-configured.invalid/' },
                         @{ name = 'AUTH0_AUDIENCE'; value = 'https://library-dev.advisorsexcel.com/mcp' }) }
+    # Read-only diagnostics as the runtime role.
+    inspect = @{ image = $runtimeImage; role = 'aecp-dev-library-web-execution'; sg = 'sg-0c6e301657f022b7c'; cpu = '256'; memory = '512'
+        secrets = @(@{ name = 'DB_PASSWORD'; valueFrom = "${secret}:aecp-dev-library-db-runtime-TKkby2" })
+        environment = @() }
 }
 $config = $steps[$Step]
 $script = [IO.File]::ReadAllText((Join-Path $PSScriptRoot "$Step.js"))

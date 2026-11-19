@@ -41,7 +41,10 @@ STRATEGY_TREES = {'diversified core', 'risk-efficient income', 'volatility manag
                   'tax-managed & alternative solutions', 'tax-managed and alternative solutions'}
 PROGRAM_WORDS = re.compile(r'coaching program|bootcamp|transformation|mastermind|academy|ridgeback|\bg2\b', re.I)
 LINE_OF = {'annuity': 'annuity', 'annuities': 'annuity', 'life insurance': 'life', 'life': 'life', 'medicare': 'medicare',
-           'ae wealth management': 'investments', 'aewm': 'investments'}
+           'ae wealth management': 'wealth', 'aewm': 'wealth'}
+# Must match LINES in apps/platform/src/domain/navigation.ts; the worker rejects the whole file otherwise.
+APP_LINES = {'annuity', 'life', 'wealth', 'medicare', 'hnw'}
+assert set(LINE_OF.values()) <= APP_LINES
 
 
 def slugify(value):

@@ -143,7 +143,9 @@ export default async function Detail({ params, searchParams }: { params: Promise
             : viewer === 'audio' || viewer === 'video' ? <FileMediaViewer src={src} kind={viewer} title={item.title} start={startAt} transcript={item.evidence.map(e => ({ id: e.id, locator: e.locator, text: e.text }))} />
             : viewer === 'pdf' ? <PdfViewer src={src} title={item.title} /> : null}</section>
         })}
-        {!item.vimeoId && !item.previewAssetId && !inline.length && downloads.length === 0 && item.body && <p className="subtle small-text">A preview isn&apos;t available with your access. The full text is below.</p>}
+        {!item.vimeoId && !item.previewAssetId && !inline.length && downloads.length === 0 && item.body && <p className="subtle small-text">{(item.files?.length ?? 0) > 0
+          ? <>A preview isn&apos;t available with your access. The full text is below.</>
+          : <>There&apos;s no file to preview for this item yet. The full text is below.</>}</p>}
         {item.body && !item.vimeoId && <section className="panel"><h2>Full text</h2><article className="reading">{item.body}</article></section>}
         {(item.articleImages?.length ?? 0) > 0 && <section className="panel"><h2>Images in this article</h2><div className="article-images">
           {item.articleImages!.map(imageId => <a key={imageId} href={`/files/${imageId}`} target="_blank" rel="noreferrer"><img src={`/files/${imageId}`} alt="" loading="lazy" /></a>)}</div></section>}

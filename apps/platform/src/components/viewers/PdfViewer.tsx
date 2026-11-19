@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import Icon from '../Icon'
+import { matchMarks, occurrences, type Mark, type Occurrence, type TextItem } from './pdf-find'
 
 type PdfDoc = { numPages: number; getPage(n: number): Promise<any>; destroy(): Promise<void> }
 
@@ -16,7 +17,8 @@ export default function PdfViewer({ src, title, initialPage = 1 }: { src: string
   const [placeholder, setPlaceholder] = useState<{ w: number; h: number } | null>(null)
   const [thumbs, setThumbs] = useState(false)
   const [find, setFind] = useState('')
-  const [hits, setHits] = useState<number[] | null>(null)
+  const [term, setTerm] = useState('')
+  const [hits, setHits] = useState<Occurrence[] | null>(null)
   const [hit, setHit] = useState(0)
   const scroller = useRef<HTMLDivElement>(null)
 
@@ -57,17 +59,21 @@ export default function PdfViewer({ src, title, initialPage = 1 }: { src: string
 
   async function search(event: React.FormEvent) {
     event.preventDefault()
-    const term = find.trim().toLowerCase()
-    if (!doc || !term) { setHits(null); return }
-    if (hits && hits.length) { const next = (hit + 1) % hits.length; setHit(next); scrollTo(hits[next]); return }
-    const found: number[] = []
+    const needle = find.trim().toLowerCase()
+    if (!doc || !needle) { setHits(null); setTerm(''); return }
+    if (hits && hits.length) { const next = (hit + 1) % hits.length; setHit(next); scrollTo(hits[next].page); return }
+    const found: Occurrence[] = []
     for (let n = 1; n <= doc.numPages; n++) {
-      const text = await (await doc.getPage(n)).getTextContent()
-      if (text.items.map((i: { str?: string }) => i.str ?? '').join(' ').toLowerCase().includes(term)) found.push(n)
+      const items = (await (await doc.getPage(n)).getTextContent()).items as TextItem[]
+      const onPage = occurrences(items, needle, n)
+      // A phrase split across text runs still finds its page, without a highlight box.
+      if (!onPage.length && items.map(i => i.str ?? '').join(' ').toLowerCase().includes(needle)) onPage.push({ page: n, item: -1, start: -1 })
+      found.push(...onPage)
     }
-    setHits(found); setHit(0)
-    if (found.length) scrollTo(found[0])
+    setTerm(needle); setHits(found); setHit(0)
+    if (found.length) scrollTo(found[0].page)
   }
+  const current = hits?.length ? hits[hit] : null
 
   if (state === 'error') return <div className="viewer-fallback"><Icon name="info" />This PDF couldn&apos;t be shown here. <a href={src} target="_blank" rel="noopener">Open it in a new tab</a>.</div>
   return <div className="viewer pdf-viewer" aria-label={`PDF: ${title}`}>
@@ -78,7 +84,7 @@ export default function PdfViewer({ src, title, initialPage = 1 }: { src: string
       <button type="button" className="btn-ghost small" onClick={() => doc && scrollTo(Math.min(doc.numPages, page + 1))} disabled={!doc || page >= (doc?.numPages ?? 1)} aria-label="Next page"><Icon name="chevronRight" /></button>
       <button type="button" className={`btn-ghost small${thumbs ? ' on' : ''}`} onClick={() => setThumbs(!thumbs)} aria-pressed={thumbs} aria-label="Page thumbnails"><Icon name="grid" /></button>
       <form className="viewer-find" onSubmit={search} role="search">
-        <Icon name="search" size={13} /><input value={find} onChange={e => { setFind(e.target.value); setHits(null) }} placeholder="Find in document" aria-label="Find in document" />
+        <Icon name="search" size={13} /><input value={find} onChange={e => { setFind(e.target.value); setHits(null); setTerm('') }} placeholder="Find in document" aria-label="Find in document" />
         {hits && <span className="small-text subtle">{hits.length ? `${hit + 1} of ${hits.length}` : 'No matches'}</span>}
       </form>
       <span className="viewer-spacer" />
@@ -92,17 +98,21 @@ export default function PdfViewer({ src, title, initialPage = 1 }: { src: string
       <PdfPage doc={doc} n={i + 1} scale={0.18} placeholder={placeholder ? { w: placeholder.w, h: placeholder.h } : null} thumb /><span>{i + 1}</span></button>)}</nav>}
     <div className="viewer-pages" ref={scroller} onScroll={onScroll}>
       {state === 'loading' && <p className="viewer-loading">Loading PDF…</p>}
-      {doc && Array.from({ length: doc.numPages }, (_, i) => <PdfPage key={i + 1} doc={doc} n={i + 1} scale={scale} placeholder={placeholder} />)}
+      {doc && Array.from({ length: doc.numPages }, (_, i) => <PdfPage key={i + 1} doc={doc} n={i + 1} scale={scale} placeholder={placeholder}
+        term={term} current={current?.page === i + 1 ? current : null} />)}
     </div>
     </div>
   </div>
 }
 
-function PdfPage({ doc, n, scale, placeholder, thumb = false }: { doc: PdfDoc; n: number; scale: number; placeholder: { w: number; h: number } | null; thumb?: boolean }) {
+function PdfPage({ doc, n, scale, placeholder, thumb = false, term = '', current = null }: { doc: PdfDoc; n: number; scale: number; placeholder: { w: number; h: number } | null; thumb?: boolean
+  term?: string; current?: Occurrence | null }) {
   const box = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
   const [visible, setVisible] = useState(n <= 2)
   const [size, setSize] = useState<{ w: number; h: number } | null>(null)
+  const [viewport, setViewport] = useState<{ transform: number[]; width: number; height: number; scale: number } | null>(null)
+  const [marks, setMarks] = useState<Mark[]>([])
 
   useEffect(() => {
     const el = box.current
@@ -127,13 +137,36 @@ function PdfPage({ doc, n, scale, placeholder, thumb = false }: { doc: PdfDoc; n
       c.width = Math.floor(viewport.width * ratio); c.height = Math.floor(viewport.height * ratio)
       c.style.width = `${Math.floor(viewport.width)}px`; c.style.height = `${Math.floor(viewport.height)}px`
       setSize({ w: Math.floor(viewport.width), h: Math.floor(viewport.height) })
+      if (!thumb) setViewport({ transform: viewport.transform, width: viewport.width, height: viewport.height, scale: viewport.scale })
       task = page.render({ canvas: c, viewport, transform: ratio !== 1 ? [ratio, 0, 0, ratio, 0, 0] : undefined })
       try { await task!.promise } catch { /* cancelled */ }
     })()
     return () => { cancelled = true; task?.cancel() }
   }, [doc, n, scale, visible])
 
+  useEffect(() => {
+    if (!viewport || !term) { setMarks([]); return }
+    let cancelled = false
+    ;(async () => {
+      const items = (await (await doc.getPage(n)).getTextContent()).items as TextItem[]
+      if (!cancelled) setMarks(matchMarks(items, term, viewport))
+    })()
+    return () => { cancelled = true }
+  }, [doc, n, term, viewport])
+
+  // Bring the current match into view once its box is known (the page itself is scrolled to by the viewer first).
+  useEffect(() => {
+    const mark = current && marks.find(m => m.item === current.item && m.start === current.start)
+    const page = box.current, scroller = page?.closest<HTMLElement>('.viewer-pages')
+    if (!mark || !page || !scroller) return
+    scroller.scrollTo({ top: page.offsetTop + mark.top * page.clientHeight - scroller.clientHeight / 3, behavior: 'smooth' })
+  }, [current, marks])
+
+  const pct = (v: number) => `${(v * 100).toFixed(3)}%`
   return <div className={thumb ? 'pdf-page thumb' : 'pdf-page'} data-page={thumb ? undefined : n} ref={box} style={size ? { width: size.w, minHeight: size.h } : placeholder ? { width: placeholder.w * scale, minHeight: placeholder.h * scale } : { minHeight: 600 }}>
     <canvas ref={canvas} aria-label={`Page ${n}`} />
+    {marks.length > 0 && <div className="pdf-marks" aria-hidden>{marks.map(m => <span key={`${m.item}:${m.start}`}
+      className={current && m.item === current.item && m.start === current.start ? 'pdf-mark current' : 'pdf-mark'}
+      style={{ left: pct(m.left), top: pct(m.top), width: pct(m.width), height: pct(m.height) }} />)}</div>}
   </div>
 }

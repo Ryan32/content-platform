@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { digest, sha256, type IntakePackage } from '../src/import/package'
-import { attachFiles, blobFile, type AttachDeps } from '../src/import/attach'
+import { attachExternal, attachFiles, blobFile, type AttachDeps } from '../src/import/attach'
 
 function fixture(): IntakePackage {
   const pdf = sha256('pdf bytes'), jpg = sha256('jpg bytes')
@@ -56,6 +56,19 @@ describe('import file attach', () => {
     const result = await attachFiles(p, m.deps)
     expect(result.counts).toEqual({ item_version_changed_skipped: 1, item_not_imported: 1 })
     expect(m.assets).toHaveLength(0)
+  })
+  it('attaches media fetched from Widen as playable files of the imported version, once, and only to its own package', async () => {
+    const p = fixture()
+    const m = memory({ [p.content[0].sourceKey]: p.content[0].sourceHash, [p.content[1].sourceKey]: 'different-version' })
+    const mp3 = sha256('podcast'), entry = (item: IntakePackage['content'][number], field: string) => ({ sourceKey: item.sourceKey, sourceHash: item.sourceHash,
+      field, reference: 'advisorsexcel.widen.net/content/x/mp3/Lead%20Gen.mp3', fileName: 'Lead%20Gen.mp3', sha256: mp3, bytes: 42_000_000, ext: 'mp3' })
+    const sidecar = { schema: 'ae-external-media/1', packageId: p.packageId, items: [entry(p.content[0], 'embed_code'), entry(p.content[0], 'video_embed'), entry(p.content[1], 'embed_code')] }
+    expect((await attachExternal(p, sidecar, m.deps)).counts).toEqual({ external_object_copied: 1, external_asset_created: 1, external_asset_existing: 1, item_version_changed_skipped: 1 })
+    expect(m.assets).toEqual([{ content: 11, objectKey: `content/11/${mp3}.mp3`, sha256: mp3, mimeType: 'audio/mpeg', version: p.content[0].sourceHash,
+      fileName: 'Lead Gen.mp3', role: 'download', bytes: 42_000_000 }])
+    expect((await attachExternal(p, sidecar, m.deps)).counts).toMatchObject({ external_asset_existing: 2 })
+    await expect(attachExternal(p, { ...sidecar, packageId: 'other' }, m.deps)).rejects.toMatchObject({ code: 'external_media_package_mismatch' })
+    await expect(attachExternal(p, { ...sidecar, items: [{ ...sidecar.items[0], sourceHash: 'forged' }] }, m.deps)).rejects.toMatchObject({ code: 'external_media_item_mismatch' })
   })
   it('makes the WordPress featured image the cover (not a source to read), and never replaces an editor cover', async () => {
     const p = fixture()

@@ -54,6 +54,13 @@ async function main() {
       const object = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: `imports/${packageId}/${name}` }))
       writeFileSync(`${dir}/${name}`, Buffer.from(await object.Body.transformToByteArray()), { mode: 0o600 })
     }
+    // Optional: media the pages embedded from Widen, fetched on the operator laptop (scripts/fetch_external_media.py).
+    try {
+      const object = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: `imports/${packageId}/external-media.json` }))
+      writeFileSync(`${dir}/external-media.json`, Buffer.from(await object.Body.transformToByteArray()), { mode: 0o600 })
+    } catch (error) {
+      if (error.name !== 'NoSuchKey' && error.$metadata?.httpStatusCode !== 404) throw error
+    }
     run('check', ['check', dir])
     run('preview', ['preview', dir, target, packageId])
     if (mode === 'apply') {

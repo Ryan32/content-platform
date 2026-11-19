@@ -30,10 +30,18 @@ try {
     destroy = () => payload.destroy()
     if (mode === 'attach') {
       assertImport(process.env.CONTENT_BUCKET, 'content_bucket_required')
-      const { attachFiles } = await import('./attach')
+      const { attachExternal, attachFiles } = await import('./attach')
       const { payloadAttachDeps } = await import('./attach-store')
-      const result = await attachFiles(p, payloadAttachDeps(payload, process.env.CONTENT_BUCKET))
+      const deps = payloadAttachDeps(payload, process.env.CONTENT_BUCKET)
+      const result = await attachFiles(p, deps)
       console.log(JSON.stringify({ status: 'attached', ...result }))
+      // Optional sidecar of media the page embedded from Widen (scripts/fetch_external_media.py).
+      const { readFile } = await import('node:fs/promises')
+      const sidecar = await readFile(`${directory}/external-media.json`, 'utf8').then(JSON.parse, (error: { code?: string }) => {
+        if (error.code === 'ENOENT') return null
+        throw error
+      })
+      if (sidecar) console.log(JSON.stringify({ status: 'attached_external', ...await attachExternal(p, sidecar, deps) }))
     } else {
       const { payloadStore } = await import('./payload-store')
       const result = await importPackage(p, payloadStore(payload), mode)

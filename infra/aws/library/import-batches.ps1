@@ -62,6 +62,20 @@ foreach ($f in @($manifest.files)) {
     $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path (Join-Path $BatchDir 'files') $f.file)).Hash.ToLowerInvariant()
     if ($actual -ne $f.sha256) { throw "files/$($f.file) does not match its fingerprint; recopy the batch folder" }
 }
+# Optional external-media.json per batch (scripts/fetch_external_media.py): its files must be present and intact too.
+foreach ($b in $batches) {
+    $sidecar = Join-Path (Join-Path $BatchDir $b.batch) 'external-media.json'
+    if (-not (Test-Path -LiteralPath $sidecar)) { continue }
+    $media = Get-Content -Raw -LiteralPath $sidecar | ConvertFrom-Json
+    if ($media.schema -ne 'ae-external-media/1' -or $media.packageId -ne $b.packageId) { throw "$($b.batch)/external-media.json does not belong to this batch" }
+    foreach ($m in @($media.items)) {
+        if (-not $m) { continue }
+        $name = "$($m.sha256).$($m.ext)"
+        if ($name -notmatch '^[0-9a-f]{64}\.[a-z0-9]{1,8}$') { throw "Bad file in $($b.batch)/external-media.json" }
+        $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path (Join-Path $BatchDir 'files') $name)).Hash.ToLowerInvariant()
+        if ($actual -ne $m.sha256) { throw "files/$name does not match external-media.json; rerun scripts/fetch_external_media.py" }
+    }
+}
 "Verified $($batches.Count) batch(es), $(($batches | Measure-Object records -Sum).Sum) records"
 
 # 2. Import task role: read-only on the imports/ prefix, nothing else.
@@ -93,6 +107,8 @@ try {
         foreach ($name in $files) {
             Invoke-Aws s3 cp (Join-Path (Join-Path $BatchDir $b.batch) $name) "s3://$bucket/imports/$($b.packageId)/$name" @aws --sse AES256 --only-show-errors | Out-Null
         }
+        $sidecar = Join-Path (Join-Path $BatchDir $b.batch) 'external-media.json'
+        if (Test-Path -LiteralPath $sidecar) { Invoke-Aws s3 cp $sidecar "s3://$bucket/imports/$($b.packageId)/external-media.json" @aws --sse AES256 --only-show-errors | Out-Null }
         "Uploaded $($b.batch) -> imports/$($b.packageId.Substring(0, 12))..."
     }
     if ($manifest.files -and -not $PreviewOnly) {

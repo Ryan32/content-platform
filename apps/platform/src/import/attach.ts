@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { assertImport, validatePackage } from './package'
 import { MAX_BYTES, MIME_TYPES, isImage } from '../processing/formats'
 
@@ -88,6 +89,46 @@ export async function attachFiles(input: unknown, deps: AttachDeps) {
         fileName: nameOn(blob.sha256, file), role, bytes: blob.bytes })
       count('asset_created')
     }
+  }
+  return { packageId: p.packageId, counts }
+}
+
+/** Media the WordPress page embedded from AE's Widen library, fetched by scripts/fetch_external_media.py. */
+export const externalMedia = z.object({
+  schema: z.literal('ae-external-media/1'), packageId: z.string().min(1),
+  items: z.array(z.object({ sourceKey: z.string().min(1), sourceHash: z.string().min(1), field: z.string().max(200), reference: z.string().max(2000),
+    fileName: z.string().min(1).max(200), sha256: z.string().regex(/^[a-f0-9]{64}$/), bytes: z.number().int().positive(),
+    ext: z.string().regex(/^[a-z0-9]{1,8}$/) }).strict()).max(5000),
+  skipped: z.array(z.unknown()).optional(),
+}).strict()
+
+/**
+ * Attaches fetched external media to the package's items, with the same rules as attachFiles: only the item version
+ * this package imported, immutable content keys, existing assets reused, unsupported or oversized files skipped.
+ * Audio and video become playable files (and are transcribed); pictures stay with the page.
+ */
+export async function attachExternal(input: unknown, sidecar: unknown, deps: AttachDeps) {
+  const p = validatePackage(input)
+  const media = externalMedia.parse(sidecar)
+  assertImport(media.packageId === p.packageId, 'external_media_package_mismatch')
+  const counts: Record<string, number> = {}
+  const count = (key: string) => { counts[key] = (counts[key] ?? 0) + 1 }
+  for (const entry of media.items) {
+    const item = p.content.find(c => c.sourceKey === entry.sourceKey)
+    assertImport(item && item.sourceHash === entry.sourceHash, 'external_media_item_mismatch')
+    const target = await deps.content(entry.sourceKey)
+    if (!target) { count('item_not_imported'); continue }
+    if (target.sourceHash !== item.sourceHash) { count('item_version_changed_skipped'); continue }
+    const mimeType = ATTACH_TYPES[entry.ext]
+    if (!mimeType) { count(`skipped_unsupported_${entry.ext}`); continue }
+    if (entry.bytes > MAX_BYTES[entry.ext]) { count(`skipped_too_large_${entry.ext}`); continue }
+    if (isImage(entry.ext) && entry.ext !== 'svg' && entry.bytes < MIN_IMAGE_BYTES) { count('skipped_icon'); continue }
+    if (await deps.asset(target.id, entry.sha256, item.sourceHash)) { count('external_asset_existing'); continue }
+    const file = `${entry.sha256}.${entry.ext}`, key = `content/${target.id}/${file}`
+    count(`external_object_${await deps.copy(file, key, entry.bytes)}`)
+    await deps.createAsset({ content: target.id, objectKey: key, sha256: entry.sha256, mimeType, version: item.sourceHash,
+      fileName: decodeName(entry.fileName), role: isImage(entry.ext) ? 'inline' : 'download', bytes: entry.bytes })
+    count('external_asset_created')
   }
   return { packageId: p.packageId, counts }
 }

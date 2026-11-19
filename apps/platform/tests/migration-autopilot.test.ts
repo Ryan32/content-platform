@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { PROFILE_SEED, AUDIENCE_SEED, profileForWordPressRoles } from '../src/domain/access-seed'
+import { PROFILE_SEED, AUDIENCE_SEED, NO_ROLES_PROFILE, profileForWordPressRoles } from '../src/domain/access-seed'
+import { allowed } from '../src/domain/access'
 import { autopilotDecision, snapshotRoles } from '../src/processing/autopilot'
 import { seedReference } from '../src/reference/seed'
 import type { AnalysisEnvelope } from '../src/processing/analysis'
@@ -16,12 +17,21 @@ describe('REQ-IMPORT-10: WordPress access maps to decided profiles, never by AI'
     expect(profileForWordPressRoles(['commission-schedules', 'io', 'life'])).toBe('All members')
   })
 
-  it('holds unknown, empty, mixed and open-decision cases for a person (fail closed)', () => {
-    expect(profileForWordPressRoles([])).toBeNull()
-    expect(profileForWordPressRoles(['guest', '__wpdm__'])).toBeNull()
+  it('holds unknown, mixed and open-decision cases for a person (fail closed)', () => {
     expect(profileForWordPressRoles(['aewm', 'full-only'])).toBeNull()
     expect(profileForWordPressRoles(['aexchange-thacker', 'elite-signature-status'])).toBeNull()
     expect(profileForWordPressRoles(['some-new-role'])).toBeNull()
+  })
+
+  it('labels packages without gating roles with a profile nobody can read until rules are added', () => {
+    expect(profileForWordPressRoles([])).toBe(NO_ROLES_PROFILE)
+    expect(profileForWordPressRoles(['guest', '__wpdm__', 'life'])).toBe(NO_ROLES_PROFILE)
+    const seed = PROFILE_SEED.find(p => p.name === NO_ROLES_PROFILE)!
+    const hidden = { id: 1, active: true, grants: seed.scopes.map(scope => ({ action: 'view' as const, scope, entitlements: [] })) }
+    const everyone = { id: 'p', active: true, roles: ['admin'], memberships: AUDIENCE_SEED.map(a => ({ scope: a.key, entitlements: [] })) }
+    expect(allowed(everyone, hidden, 'view')).toBe(false)
+    const opened = { ...hidden, grants: [{ action: 'view' as const, scope: 'plan:basic', entitlements: [] }] }
+    expect(allowed(everyone, opened, 'view')).toBe(true)
   })
 
   it('only names profiles and audiences that the seed creates', () => {

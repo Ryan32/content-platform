@@ -20,9 +20,10 @@ This document captures work completed in the originating Portal conversation. Ve
   | signature tiers | the lowest tier listed (Premier / Elite and above / Legends) |
   | rob-russell combinations | program profiles |
   | commission-schedules | All members |
-  | aewm + full-only, mixed, unknown, or no roles | none: held under "Needs an audience" |
+  | no roles, or only ignored roles | **No WordPress roles (hidden)**: a profile with no rules, so nobody can read these items even when published |
+  | aewm + full-only, mixed or unknown | none: held under "Needs an audience" |
 
-  In the pilot about 37 of 200 are held, 33 of them because they have no roles. **Open:** were packages with no roles open to all members?
+  In the pilot 33 of 200 have no roles and about 4 are held. Owner decision 2026-11-19: label the role-less packages now and decide later. To open them, add rules (for example the All members ones) to that one profile.
 - **Migration autopilot** (worker, every 20 s; setting *Migration autopilot* on Processing, default on). It acts only on pending combined AI analyses for `wordpress:` items imported by the migration:
   - it accepts the analysis with the defaults: keep team values, backfill empty fields, keep current tags (AI tags only if none), never create tags;
   - it sets the mapped profile if none is set and moves Intake to Draft;
@@ -32,7 +33,7 @@ This document captures work completed in the originating Portal conversation. Ve
 - **Account menu fix:** the reader account menu opened inside the scrolling sidebar, so it showed a sideways scrollbar and no menu. It now opens beside the button (below it on narrow screens).
 - Migration `20261119_051724_migration_autopilot` (one ADD COLUMN). The infra scripts expect it.
 - Validation:
-  - typecheck; 190 tests in 31 files (new `migration-autopilot`: role mapping, decision, seed idempotence); 30 Python tests; production build (11 indexed migrations);
+  - typecheck; 191 tests in 31 files (new `migration-autopilot`: role mapping, decision, seed idempotence); 30 Python tests; production build (11 indexed migrations);
   - images `aecp-dev-platform:autopilot` and `aecp-dev-platform-operations:autopilot` built;
   - local preview on PostgreSQL 16 + pgvector: Manage menu, Approve drafts with a real bulk publish, the account menu (fixed position, no sideways scroll).
   - Not tested: the autopilot against live Bedrock output on RDS; the seed with the real reference file.
@@ -190,7 +191,7 @@ This document captures work completed in the originating Portal conversation. Ve
    Then redeploy the worker on the current image so it receives the token. No image push is needed; the script prints `Vimeo token stored: True`:
 
    ```powershell
-   .\infra\aws\library\worker-service.ps1 -ImageDigest sha256:3df8a57f477a46d58e641e5ffdefbeb77a54b1537023d68c06e109e62772d6e4
+   .\infra\aws\library\worker-service.ps1 -ImageDigest <current operations digest: the -OperationsDigest default in run-task.ps1>
    ```
 3. **Live signed-in check** once DNS resolves: new item → upload a text PDF → extraction → AI tagging → Review → accept → cover image → audience → publish → reader grid.
 4. **Content decisions:** starter Tags & topics (AI tagging chooses only from these), audiences and access profiles, and the first editors and admins to invite.

@@ -28,6 +28,8 @@ export const AUDIENCE_SEED: AudienceSeed[] = [
 ]
 
 const staff = 'internal:employees'
+/** WordPress packages that had no gating roles. */
+export const NO_ROLES_PROFILE = 'No WordPress roles (hidden)'
 export const PROFILE_SEED: ProfileSeed[] = [
   { name: 'Employees only', scopes: [staff] },
   { name: 'All members', scopes: ['plan:basic', 'plan:full-active', staff] },
@@ -44,6 +46,9 @@ export const PROFILE_SEED: ProfileSeed[] = [
   { name: 'Program: Ridgeback', scopes: ['program:ridgeback', staff] },
   { name: 'Program: G2', scopes: ['program:g2', staff] },
   { name: 'Program: AEI', scopes: ['program:aei', staff] },
+  // Owner decision 2026-11-19: label, don't open. No rules, so its items are visible to no reader even when published;
+  // adding rules to this one profile later opens all of them at once.
+  { name: NO_ROLES_PROFILE, scopes: [] },
 ]
 /** Decided default: view, AI retrieval and download all on (ACCESS-MODEL 4.2). */
 export const PROFILE_ACTIONS = ['view', 'retrieve', 'download'] as const
@@ -58,12 +63,12 @@ const PROGRAM_PROFILES: [string[], string][] = [
 
 /**
  * The access profile a migrated item gets from its WordPress package roles ("any of" semantics), or null to hold it
- * for a person: no roles at all, unknown roles, the open "AEWM or Full-Active" case, and mixes of different kinds.
- * Never decided by AI.
+ * for a person: unknown roles, the open "AEWM or Full-Active" case, and mixes of different kinds. Packages with no
+ * gating roles get the closed NO_ROLES_PROFILE. Never decided by AI.
  */
 export function profileForWordPressRoles(raw: readonly string[]): string | null {
   const roles = [...new Set(raw.map(r => r.trim().toLowerCase()))].filter(r => r && !IGNORED.has(r))
-  if (!roles.length) return null
+  if (!roles.length) return NO_ROLES_PROFILE
   const has = (r: string) => roles.includes(r)
   // Commission schedules are baseline material for all members (decision 7).
   if (has('commission-schedules') && roles.every(r => r === 'commission-schedules' || r === 'subscriber' || r === 'full-only')) return 'All members'

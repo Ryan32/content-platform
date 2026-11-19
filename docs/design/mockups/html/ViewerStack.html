@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Viewer stack</title>
+
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#151c23}
+a{color:#7f9eff;text-decoration:none}a:hover{color:#a9bdff}
+.lift:hover{border-color:#343a42;background:#1f252d}
+.navlink:hover{color:#ffffff;background:#21272f}
+.rowh:hover{background:#1f252d}
+.sblink:hover{background:#292f37;color:#ffffff}
+@keyframes axlFloat{0%,100%{transform:translateY(0) rotate(-1.5deg)}50%{transform:translateY(-12px) rotate(1.5deg)}}
+@keyframes axlShadow{0%,100%{transform:scaleX(1);opacity:.9}50%{transform:scaleX(.72);opacity:.45}}
+.axl-float{animation:axlFloat 4.2s ease-in-out infinite;transform-origin:50% 80%}
+.axl-shadow{animation:axlShadow 4.2s ease-in-out infinite}
+@media (prefers-reduced-motion: reduce){.axl-float,.axl-shadow{animation:none}}
+input::placeholder,textarea::placeholder{color:#868c94}
+</style>
+</helmet>
+<div style="min-height: 1150px; display: flex; flex-direction: column; background: #151c23; color: #ffffff; font-family: 'Inter', -apple-system, 'Segoe UI', system-ui, sans-serif; font-size: 13px; line-height: 20px">
+
+<main style="box-sizing: border-box; width: 100%; max-width: 1360px; margin: 0 auto; padding: 48px 32px; display: flex; flex-direction: column; gap: 24px">
+  <div style="display: flex; flex-direction: column; gap: 8px; max-width: 900px"><span style="font-size: 11px; line-height: 14px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #868c94">Viewer stack</span>
+    <h1 style="margin: 0; font-size: 30px; line-height: 38px; font-weight: 700">One viewer for every format, built from proven open-source libraries</h1>
+    <p style="margin: 0; font-size: 15px; line-height: 22px; color: #a3a9b1">It builds on what the platform already has: PDF.js, the protected file route and Vimeo IDs. Office files are converted to PDF in the processing worker, so restricted content never leaves AWS.</p></div>
+  <section style="background: #1b2129; border: 1px solid #262c34; border-radius: 12px; overflow-x: auto"><table style="width: 100%; min-width: 900px; border-collapse: collapse"><thead><tr><th scope="col" style="padding: 10px 12px; text-align: left; font-size: 11px; line-height: 14px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #868c94">Format</th><th scope="col" style="padding: 10px 12px; text-align: left; font-size: 11px; line-height: 14px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #868c94">Library</th><th scope="col" style="padding: 10px 12px; text-align: left; font-size: 11px; line-height: 14px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #868c94">What readers get</th><th scope="col" style="padding: 10px 12px; text-align: left; font-size: 11px; line-height: 14px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #868c94">Access and storage</th></tr></thead><tbody><tr style="border-top: 1px solid #262c34"><td style="padding: 10px 12px; font-weight: 600; white-space: nowrap">PDF</td><td style="padding: 10px 12px">PDF.js (pdfjs-dist, already a dependency)</td><td style="padding: 10px 12px; color: #a3a9b1">Thumbnails, find in document, zoom, open at a cited page, highlight the cited text</td><td style="padding: 10px 12px; color: #a3a9b1">Pages render from a view-only copy, so the original file isn’t needed for viewing</td></tr><tr style="border-top: 1px solid #262c34"><td style="padding: 10px 12px; font-weight: 600; white-space: nowrap">Word &amp; PowerPoint</td><td style="padding: 10px 12px">Gotenberg (LibreOffice) in the processing worker → PDF, then PDF.js</td><td style="padding: 10px 12px; color: #a3a9b1">One viewer for every document type; slides get a slide view and presenter notes</td><td style="padding: 10px 12px; color: #a3a9b1">Converted when uploaded. Nothing is sent to an outside viewer service.</td></tr><tr style="border-top: 1px solid #262c34"><td style="padding: 10px 12px; font-weight: 600; white-space: nowrap">Excel / CSV</td><td style="padding: 10px 12px">SheetJS to read the file, with a read-only grid</td><td style="padding: 10px 12px; color: #a3a9b1">Sheet tabs, frozen headers, cell references</td><td style="padding: 10px 12px; color: #a3a9b1">Large workbooks show the first rows; the full file is a download</td></tr><tr style="border-top: 1px solid #262c34"><td style="padding: 10px 12px; font-weight: 600; white-space: nowrap">Video</td><td style="padding: 10px 12px">Vimeo Player SDK (@vimeo/player)</td><td style="padding: 10px 12px; color: #a3a9b1">Chapters, transcript that follows playback, jump to a time, links to a timestamp</td><td style="padding: 10px 12px; color: #a3a9b1">Private videos limited to the library’s domain; Vimeo keeps hosting and streaming</td></tr><tr style="border-top: 1px solid #262c34"><td style="padding: 10px 12px; font-weight: 600; white-space: nowrap">Audio</td><td style="padding: 10px 12px">wavesurfer.js</td><td style="padding: 10px 12px; color: #a3a9b1">Waveform, speed, skip, transcript</td><td style="padding: 10px 12px; color: #a3a9b1">Streams from protected storage</td></tr><tr style="border-top: 1px solid #262c34"><td style="padding: 10px 12px; font-weight: 600; white-space: nowrap">Images &amp; flyers</td><td style="padding: 10px 12px">Native image with a pan and zoom component</td><td style="padding: 10px 12px; color: #a3a9b1">Zoom, full screen, multiple designs</td><td style="padding: 10px 12px; color: #a3a9b1">Thumbnail made when uploaded</td></tr><tr style="border-top: 1px solid #262c34"><td style="padding: 10px 12px; font-weight: 600; white-space: nowrap">Articles</td><td style="padding: 10px 12px">Payload rich text rendered as a reading view</td><td style="padding: 10px 12px; color: #a3a9b1">Headings, links, citations</td><td style="padding: 10px 12px; color: #a3a9b1">No untrusted HTML</td></tr></tbody></table></section>
+  <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start">
+    <section style="flex: 2 1 520px; background: #1b2129; border: 1px solid #262c34; border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 8px"><h2 style="margin: 0; font-size: 11px; line-height: 14px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #868c94">How it works</h2><ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px"><li style="color: #a3a9b1">One viewer component (AssetViewer) picks the right viewer from the file type. Every format gets the same page header, side panel, Ask AXL, Save and Copy link.</li><li style="color: #a3a9b1">View and download are separate permissions. Viewing uses a generated copy (rendered pages, transcript or thumbnail). Download serves the original only when it’s allowed.</li><li style="color: #a3a9b1">Every viewer can open at an exact spot: a page, a slide, a cell or a timestamp. AXL citations and shared links rely on this.</li><li style="color: #a3a9b1">Readers who can view but not download see a light watermark with their name and the date on documents.</li><li style="color: #a3a9b1">The processing worker creates thumbnails, converted PDFs, transcripts and chapters as part of the AI pipeline. Readers never wait for a conversion.</li></ul></section>
+    <section style="flex: 1 1 320px; background: #1b2129; border: 1px solid #262c34; border-radius: 12px; padding: 16px 20px"><h2 style="margin: 0 0 6px; font-size: 11px; line-height: 14px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #868c94">If you need more later</h2><div style="display: flex; flex-direction: column; gap: 2px; padding: 10px 0; border-top: 1px solid #262c34"><span style="font-weight: 600">Nutrient Web SDK (formerly PSPDFKit)</span><span style="color: #a3a9b1">Annotation, redaction, watermarks and Office viewing in the browser. Commercial license.</span></div><div style="display: flex; flex-direction: column; gap: 2px; padding: 10px 0; border-top: 1px solid #262c34"><span style="font-weight: 600">Apryse WebViewer</span><span style="color: #a3a9b1">Similar set of features, including Office documents in the browser without conversion. Commercial license.</span></div><p style="margin: 8px 0 0; font-size: 12px; color: #868c94">Worth it if advisors need to mark up or redact documents in the browser. Confirm current licensing with the vendor.</p></section>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1150}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

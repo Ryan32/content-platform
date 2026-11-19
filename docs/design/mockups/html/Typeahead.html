@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AE Library — Search (Ctrl K)</title>
+
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#151c23}
+a{color:#7f9eff;text-decoration:none}a:hover{color:#a9bdff}
+.lift:hover{border-color:#343a42;background:#1f252d}
+.navlink:hover{color:#ffffff;background:#21272f}
+.rowh:hover{background:#1f252d}
+.sblink:hover{background:#292f37;color:#ffffff}
+@keyframes axlFloat{0%,100%{transform:translateY(0) rotate(-1.5deg)}50%{transform:translateY(-12px) rotate(1.5deg)}}
+@keyframes axlShadow{0%,100%{transform:scaleX(1);opacity:.9}50%{transform:scaleX(.72);opacity:.45}}
+.axl-float{animation:axlFloat 4.2s ease-in-out infinite;transform-origin:50% 80%}
+.axl-shadow{animation:axlShadow 4.2s ease-in-out infinite}
+@media (prefers-reduced-motion: reduce){.axl-float,.axl-shadow{animation:none}}
+input::placeholder,textarea::placeholder{color:#868c94}
+</style>
+</helmet>
+<div style="min-height: 900px; display: flex; flex-direction: column; background: #151c23; color: #ffffff; font-family: 'Inter', -apple-system, 'Segoe UI', system-ui, sans-serif; font-size: 13px; line-height: 20px">
+<!--shell--><div style="display: flex; flex-grow: 1; min-height: 0"><aside aria-label="Library menu" style="flex: 0 0 248px; width: 248px; box-sizing: border-box; padding: 16px 12px; background: #151c23; border-right: 1px solid #262c34; display: flex; flex-direction: column; align-items: stretch; gap: 2px">
+  <a href="Main.dc.html" style="display: flex; align-items: baseline; gap: 6px; padding: 6px 10px 18px; color: #ffffff"><span style="font-size: 22px; font-weight: 800; letter-spacing: -0.02em">ae</span><span style="font-size: 18px; font-weight: 500">library</span></a>
+  <nav style="display: flex; flex-direction: column; align-items: stretch; gap: 2px"><a class="sblink" href="Main.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; background: #292f37; color: #ffffff; font-weight: 600"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg><span style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Home</span></a><span style="padding: 14px 10px 4px; font-size: 11px; line-height: 14px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #868c94">Library</span><a class="sblink" href="Carriers.dc.html" style="display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; color: #a3a9b1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18"/><path d="M5 21V9l7-5 7 5v12"/><path d="M9 21v-6h6v6"/></svg><span style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Products &amp; Carriers</span></a><a class="sblink" href="#" style="display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; color: #a3a9b1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 14l2 2 4-4"/></svg><span style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Forms &amp; Operations</span></a><a class="sblink" href="Hub.dc.html" style="display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; color: #a3a9b1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg><span style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Marketing &amp; Seminars</span></a><a class="sblink" href="#" style="display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; color: #a3a9b1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg><span style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Planning &amp; Advanced Markets</span></a><a class="sblink" href="#" style="display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; color: #a3a9b1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0"/><path d="M16 4a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6.3"/></svg><span style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Coaching &amp; Training</span></a><a class="sblink" href="#" style="display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; color: #a3a9b1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Events</span></a></nav>
+  <div style="margin-top: auto; padding-top: 12px; display: flex; flex-direction: column; align-items: stretch; gap: 8px; border-top: 1px solid #262c34"><a class="sblink" href="#" style="display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; color: #a3a9b1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span style="flex: 1;  white-space: nowrap; overflow: hidden; text-overflow: ellipsis">AE apps</span><span style="font-size: 11px; color: #868c94">ChatAE, Portal…</span></a><button type="button" aria-label="Account menu" style="display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 10px; background: transparent; color: #ffffff; font: inherit; text-align: left"><span style="width: 32px; height: 32px; border-radius: 9999px; background: #33367a; color: #fefefe; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600">RF</span><span style="flex: 1; display: flex; flex-direction: column; line-height: 16px"><span style="font-weight: 600">Ryan Fickel</span><span style="font-size: 12px; color: #868c94">Saved items, Manage, Appearance</span></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#868c94" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+</aside><div style="flex: 1; min-width: 0; display: flex; flex-direction: column"><header style="display: flex; align-items: center; gap: 16px; min-height: 64px; padding: 0 24px; box-sizing: border-box; background: #1b2129; border-bottom: 1px solid #262c34"><form role="search" style="flex: 0 1 640px; margin: 0 auto; display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 6px 0 12px; box-sizing: border-box; border-radius: 9999px; background: #21272f; border: 1px solid #343a42">
+      <img src="../../assets/axl-mark.svg" alt="" style="width: 20px; height: 14px; display: block">
+      <label for="hq" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Search the Library or ask AXL</label>
+      <input id="hq" placeholder="Search the Library or ask AXL" style="flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: #ffffff; font: inherit">
+      <a href="Typeahead.dc.html" aria-label="Open search (Ctrl K)" style="font-size: 11px; color: #868c94; padding: 2px 6px; border: 1px solid #343a42; border-radius: 4px; white-space: nowrap">Ctrl K</a>
+    </form></header><div style="flex-grow: 1; position: relative; display: flex; flex-direction: column">
+  <div style="flex-grow: 1; position: relative; padding: 48px 24px; display: flex; flex-direction: column; align-items: center; gap: 12px; opacity: 0.35">
+  <img src="../../assets/axl-books.png" alt="" style="width: 150px; margin-top: 140px">
+  <span style="font-size: 30px; font-weight: 700">What can we help you find, Ryan?</span>
+</div>
+  <div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(10, 14, 18, 0.55)"></div>
+  <div role="dialog" aria-modal="true" aria-label="Search the Library" style="position: absolute; left: 50%; top: 56px; transform: translateX(-50%); width: 640px; max-width: calc(100% - 48px); background: #1b2129; border: 1px solid #343a42; border-radius: 16px; box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5); overflow: hidden; display: flex; flex-direction: column">
+  <div style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid #262c34">
+    <img src="../../assets/axl-mark.svg" alt="" style="width: 26px; height: 18px; display: block">
+    <label for="pq" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Search the Library or ask AXL</label>
+    <input id="pq" autofocus value="{{ query }}" onChange="{{ onQuery }}" onKeyDown="{{ onKey }}" placeholder="Search the Library or ask AXL" autocomplete="off" style="flex: 1; min-width: 0; height: 32px; border: 0; outline: 0; background: transparent; color: #ffffff; font: inherit; font-size: 17px">
+    <span style="font-size: 11px; color: #868c94; padding: 2px 6px; border: 1px solid #343a42; border-radius: 4px">Esc</span>
+  </div>
+  <div role="group" aria-label="Show only" style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px 16px; border-bottom: 1px solid #262c34">
+    <sc-for list="{{ chips }}" as="f" hint-placeholder-count="6">
+      <button type="button" aria-pressed="{{ f.pressed }}" onClick="{{ f.toggle }}" style="display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 9999px; border: 1px solid {{ f.border }}; background: {{ f.bg }}; color: {{ f.fg }}; font: inherit; font-size: 12px; font-weight: 500; cursor: pointer">{{ f.label }}<span style="font-size: 11px; opacity: 0.75">{{ f.count }}</span></button>
+    </sc-for>
+  </div>
+  <div role="listbox" style="max-height: 440px; overflow: auto; padding: 6px">
+    <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+      <sc-if value="{{ r.isHeader }}" hint-placeholder-val="{{ false }}">
+        <div style="font-size: 11px; line-height: 14px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #868c94; padding: 10px 10px 4px">{{ r.label }}</div>
+      </sc-if>
+      <sc-if value="{{ r.isItem }}" hint-placeholder-val="{{ true }}">
+        <a href="{{ r.href }}" role="option" aria-selected="{{ r.selected }}" onMouseEnter="{{ r.hover }}" style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; background: {{ r.bg }}; color: #ffffff">
+          <span style="flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; background: #21272f; display: flex; align-items: center; justify-content: center"><sc-if value="{{ r.is_carrier }}" hint-placeholder-val="{{ false }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a3a9b1" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18"/><path d="M5 21V9l7-5 7 5v12"/><path d="M9 21v-6h6v6"/></svg></sc-if><sc-if value="{{ r.is_doc }}" hint-placeholder-val="{{ false }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a3a9b1" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg></sc-if><sc-if value="{{ r.is_video }}" hint-placeholder-val="{{ false }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a3a9b1" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9l5 3-5 3z"/></svg></sc-if><sc-if value="{{ r.is_howto }}" hint-placeholder-val="{{ false }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a3a9b1" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M9 7h6M9 11h6"/></svg></sc-if><sc-if value="{{ r.is_page }}" hint-placeholder-val="{{ false }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a3a9b1" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg></sc-if></span>
+          <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 18px">
+            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ r.pre }}<mark style="background: transparent; color: #7f9eff; font-weight: 700">{{ r.hit }}</mark>{{ r.post }}</span>
+            <span style="font-size: 12px; color: #868c94">{{ r.meta }}</span>
+          </span>
+          <span style="font-size: 11px; color: #868c94">{{ r.hint }}</span>
+        </a>
+      </sc-if>
+    </sc-for>
+    <sc-if value="{{ noResults }}" hint-placeholder-val="{{ false }}">
+      <div style="padding: 18px 12px; color: #a3a9b1">{{ emptyMsg }}</div>
+    </sc-if>
+  </div>
+  <a href="Search.dc.html" style="display: flex; align-items: center; gap: 10px; margin: 0 6px 6px; padding: 10px 12px; border-radius: 10px; background: #252e40; color: #ffffff">
+    <img src="../../assets/axl-mark.svg" alt="" style="width: 20px; height: 14px">
+    <span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ askLabel }}</span>
+    <span style="font-size: 11px; color: #868c94; padding: 2px 6px; border: 1px solid #343a42; border-radius: 4px">Tab</span>
+  </a>
+  <div style="display: flex; flex-wrap: wrap; gap: 16px; padding: 10px 16px; border-top: 1px solid #262c34; font-size: 12px; color: #868c94">
+    <span>↑ ↓ move</span><span>↵ open</span><span>Tab ask AXL</span><span>Esc close</span><span>Filters stay on until you clear them</span>
+    <span style="margin-left: auto">Only shows what your licenses allow</span>
+  </div>
+</div>
+</div></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+  const DATA = [{"k": "carrier", "t": "Allianz", "m": "Carrier \u00b7 Annuity & Life \u00b7 19 resources", "w": "allianz carrier"}, {"k": "carrier", "t": "Athene", "m": "Carrier \u00b7 Annuity \u00b7 11 resources", "w": "athene carrier"}, {"k": "carrier", "t": "Security Benefit", "m": "Carrier \u00b7 Annuity \u00b7 SBG", "w": "security benefit sbg carrier"}, {"k": "carrier", "t": "Nationwide", "m": "Carrier \u00b7 Annuity & Life \u00b7 16 resources", "w": "nationwide carrier"}, {"k": "doc", "t": "Allianz Commission Schedule", "m": "Commission schedule \u00b7 Annuity \u00b7 most used", "w": "allianz commission schedule comp pay"}, {"k": "doc", "t": "Athene Commission Schedule", "m": "Commission schedule \u00b7 Annuity", "w": "athene commission schedule comp pay"}, {"k": "doc", "t": "SBG Commission Schedule", "m": "Commission schedule \u00b7 Security Benefit", "w": "sbg security benefit commission schedule comp"}, {"k": "doc", "t": "Allianz Sample Application", "m": "Sample application \u00b7 Annuity", "w": "allianz sample application app"}, {"k": "doc", "t": "Allianz Acceptable Forms of Payment", "m": "Carrier guideline \u00b7 Annuity", "w": "allianz acceptable forms payment check"}, {"k": "doc", "t": "Allianz Underwriting Guidelines 06/2024", "m": "Carrier guideline \u00b7 Life", "w": "allianz underwriting guidelines life"}, {"k": "doc", "t": "Suitability Quick Reference Matrix", "m": "Compliance \u00b7 most used item in the Library", "w": "suitability matrix compliance"}, {"k": "doc", "t": "AE Indexed Performance Report", "m": "Rates & performance \u00b7 Annuity", "w": "indexed performance report rates"}, {"k": "doc", "t": "Transfer Company List", "m": "Transfers \u00b7 Annuity", "w": "transfer company list"}, {"k": "doc", "t": "Account Transfer Verification Scripts", "m": "Transfers \u00b7 Script", "w": "account transfer verification scripts"}, {"k": "doc", "t": "AEWM Investment Advisory Services Agreement", "m": "Form \u00b7 AEWM", "w": "aewm investment advisory services agreement form"}, {"k": "doc", "t": "AEWM Compliance Policy Manual", "m": "Compliance \u00b7 AEWM", "w": "aewm compliance policy manual"}, {"k": "doc", "t": "Signature Guarantee Request Form", "m": "Form \u00b7 AEWM", "w": "signature guarantee request form"}, {"k": "doc", "t": "FireLight Resources", "m": "New business \u00b7 Annuity", "w": "firelight resources e-app"}, {"k": "doc", "t": "Sample Confirmation Call Script", "m": "Script \u00b7 Marketing & Seminars", "w": "sample confirmation call script appointment seminar no-show"}, {"k": "video", "t": "Power Surge Webinar: A No-Show for Your Visit?", "m": "Video \u00b7 Coaching & Training", "w": "power surge webinar no-show noshow cancellation"}, {"k": "video", "t": "Nick Stahl\u2019s Educational Workshop Open", "m": "Video \u00b7 Recorded Seminars", "w": "nick stahl educational workshop open seminar"}, {"k": "doc", "t": "Holiday Party \u2013 Event Invites", "m": "Invite \u00b7 Client-ready", "w": "holiday party event invites client"}, {"k": "howto", "t": "Resolve a NIGO on an annuity case", "m": "How-to \u00b7 Forms & Operations", "w": "resolve nigo annuity case held"}, {"k": "howto", "t": "Submit an Allianz annuity in FireLight", "m": "How-to \u00b7 Forms & Operations", "w": "submit allianz annuity firelight e-app"}, {"k": "howto", "t": "Upload documents to a case", "m": "How-to \u00b7 Forms & Operations", "w": "upload documents case"}, {"k": "howto", "t": "Log seminar attendance and no-shows with AE Sync", "m": "How-to \u00b7 Marketing & Seminars", "w": "log seminar attendance no-shows noshow ae sync"}, {"k": "page", "t": "Commission Schedules", "m": "Page \u00b7 Products & Carriers", "w": "commission schedules page comp"}, {"k": "page", "t": "Recorded Seminars", "m": "Page \u00b7 Marketing & Seminars", "w": "recorded seminars page"}, {"k": "page", "t": "Annuity Rate Watch", "m": "Page \u00b7 Products & Carriers", "w": "annuity rate watch arw rates"}, {"k": "page", "t": "HR Hub", "m": "Page \u00b7 Coaching & Training", "w": "hr hub hiring"}];
+  const st = this.state || {};
+  const q = (st.query === undefined ? 'allianz' : st.query);
+  const active = st.active || 0;
+  const words = q.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  const order = { carrier: 0, doc: 1, video: 2, howto: 3, page: 4 };
+  const labels = ['Carriers', 'Documents', 'Videos', 'How-to articles', 'Pages'];
+  const kinds = ['carrier', 'doc', 'video', 'howto', 'page'];
+  const chipNames = { all: 'All', carrier: 'Carriers', doc: 'Documents', video: 'Videos', howto: 'How-to', page: 'Pages' };
+  const on = st.on || [];
+  const recent = ['Suitability Quick Reference Matrix', 'Transfer Company List', 'Resolve a NIGO on an annuity case'];
+  let hits;
+  if (!words.length) {
+    hits = DATA.filter(d => recent.indexOf(d.t) >= 0).map(d => Object.assign({}, d, { grp: 'Recent', score: 0 }));
+  } else {
+    hits = DATA.map(d => {
+      const hay = (d.t + ' ' + d.w).toLowerCase();
+      if (!words.every(w => hay.indexOf(w) >= 0)) return null;
+      const t = d.t.toLowerCase();
+      let score = 0;
+      words.forEach(w => { if (t.startsWith(w)) score += 3; else if (t.indexOf(' ' + w) >= 0) score += 2; else if (t.indexOf(w) >= 0) score += 1; });
+      return Object.assign({}, d, { score, grp: labels[order[d.k]] });
+    }).filter(Boolean).sort((a, b) => b.score - a.score || order[a.k] - order[b.k]);
+  }
+  const all = hits;
+  if (on.length) hits = hits.filter(h => on.indexOf(h.k) >= 0);
+  hits = hits.slice(0, 9);
+  const PRI = '#7f9eff', BSTR = '#343a42', TX2 = '#a3a9b1', INK = '#151c24';
+  const chips = ['all'].concat(kinds).map(k => {
+    const pressed = k === 'all' ? on.length === 0 : on.indexOf(k) >= 0;
+    const n = k === 'all' ? all.length : all.filter(h => h.k === k).length;
+    return { label: chipNames[k], count: words.length ? String(n) : '', pressed: pressed ? 'true' : 'false',
+      bg: pressed ? PRI : 'transparent', fg: pressed ? INK : TX2, border: pressed ? PRI : BSTR,
+      toggle: () => { let next = k === 'all' ? [] : (on.indexOf(k) >= 0 ? on.filter(x => x !== k) : on.concat([k])); if (next.length === kinds.length) next = []; this.setState({ on: next, active: 0 }); } };
+  });
+  const top = hits.length && words.length ? hits[0] : null;
+  const groups = [];
+  if (top) groups.push(['Top hit', [top]]);
+  const rest = top ? hits.slice(1) : hits;
+  const names = words.length ? labels : ['Recent'];
+  names.forEach(n => { const g = rest.filter(h => h.grp === n); if (g.length) groups.push([n, g]); });
+  const rows = []; let idx = 0;
+  groups.forEach(([name, list]) => {
+    rows.push({ isHeader: true, isItem: false, label: name });
+    list.forEach(h => {
+      const i = idx++;
+      const w0 = words.length ? words[words.length - 1] : '';
+      const lt = h.t.toLowerCase(); let pos = w0 ? lt.indexOf(words[0]) : -1;
+      const hw = pos >= 0 ? words[0] : '';
+      const sel = i === active;
+      rows.push({ isHeader: false, isItem: true, href: h.k === 'carrier' ? 'Carriers.dc.html' : (h.k === 'howto' ? 'KB.dc.html' : 'Resource.dc.html'),
+        pre: pos >= 0 ? h.t.slice(0, pos) : h.t, hit: pos >= 0 ? h.t.slice(pos, pos + hw.length) : '', post: pos >= 0 ? h.t.slice(pos + hw.length) : '',
+        meta: h.m, selected: sel ? 'true' : 'false', bg: sel ? '#292f37' : 'transparent', hint: sel ? 'Enter ↵' : '',
+        is_carrier: h.k === 'carrier', is_doc: h.k === 'doc', is_video: h.k === 'video', is_howto: h.k === 'howto', is_page: h.k === 'page',
+        hover: () => this.setState({ active: i }) });
+    });
+  });
+  const count = idx;
+  return {
+    emptyMsg: on.length ? 'Nothing in the selected types. Turn a filter off, or ask AXL.' : 'No exact matches. AXL can still look for an answer.',
+    query: q, rows, chips, noResults: words.length > 0 && count === 0,
+    askLabel: words.length ? 'Ask AXL: “' + q + '”' : 'Ask AXL anything about your business',
+    onQuery: (e) => this.setState({ query: e.target.value, active: 0 }),
+    onKey: (e) => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); this.setState({ active: Math.min(active + 1, Math.max(count - 1, 0)) }); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); this.setState({ active: Math.max(active - 1, 0) }); }
+    }
+  };
+}
+}
+</script>
+</body>
+</html>

@@ -1,5 +1,7 @@
 # AE Library — design handoff
 
+**Implementing this?** Start with [`IMPLEMENTATION.md`](IMPLEMENTATION.md): every mockup screen, what is built at `f59acd9`, what is left, and the data model still needed. Screenshots are in [`mockups/screens/`](mockups/screens/).
+
 Status: **proposed design, ready to build in phases.** Checked against `main` at `85c9fe1` (pulled 2026-11-18). Part of it is already built; see “Reconciling with main” below.
 Source of truth for visuals: the Design canvas "AE Library — design" (https://claude.ai/artifact/WSPghuYiqQxgKwJrt7JENq, private to Ryan until shared). Every screen exists in dark; Home, Browse, Carrier, Section, Category and How-to also exist in light.
 

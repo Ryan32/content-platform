@@ -16,7 +16,8 @@ import sqlite3
 from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
-MATERIAL_TYPES = {'wpdmpro', 'post', 'page', 'ae_insider_article', 'training_tool', 'wealth_strategy', 'tribe_events'}
+# tribe_events excluded: events live in AE Portal and are not migrated (owner decision, 2026-11-18).
+MATERIAL_TYPES = {'wpdmpro', 'post', 'page', 'ae_insider_article', 'training_tool', 'wealth_strategy'}
 URL = re.compile(r'https?://[^\s<>"\x27\x00]+', re.I)
 VIMEO = re.compile(r'(?:player\.)?vimeo\.com/(?:video/|manage/videos/|channels/[^/]+/|groups/[^/]+/videos/)?(\d+)', re.I)
 FORMATS = {'.pdf': 'pdf', '.doc': 'word', '.docx': 'word', '.ppt': 'slides', '.pptx': 'slides',

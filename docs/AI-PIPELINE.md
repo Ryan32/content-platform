@@ -31,6 +31,14 @@ The full WordPress inventory (6,680 records) references 7,600 present files: 3,0
 
 Not processed: 1,628 external links (other sites; kept as references) and 710 files missing from the backup.
 
+## Pages with several files and videos (owner decision, 2026-11-18)
+
+WordPress worked page-first: a Download Manager package (4,294 records) is a landing page with a description and one or more files (189 have 2+). The library keeps that: **one page per package or post; files never get their own page.** Each file has a section on the page (`#file-<id>`) with its real name, type, size and its own AI-suggested description (reviewed in the same Review screen; empty descriptions backfilled, existing ones kept). Pictures used inside an article are marked `inline`: read by AI and shown under "Images in this article", never offered as downloads.
+
+Search covers page text, the reviewed text inside every file (full-text index on passages) and meaning. A hit inside a file links to the page opened at that passage and that file's section (`/resources/<id>?citation=…&file=<id>#file-<id>`), and the result says "Found in <file> · Page n". MCP `search_content` returns the same as `matchedIn` and `matchUrl`.
+
+Pages with several Vimeo videos keep all of them (main player plus "More videos"); each is transcribed and included in the page's analysis and search. **Events (`tribe_events`, 26 records) are not migrated**; events live in AE Portal and may be dropped from the library altogether.
+
 ## Decisions
 
 - **ADR-035 — import files enter the normal pipeline.** No import-only processing path. Bytes are verified at build, re-verified before upload, size-checked on copy, and attached only to items whose source version still matches the package. Reruns reuse objects and file records.
@@ -42,10 +50,12 @@ Not processed: 1,628 external links (other sites; kept as references) and 710 fi
 - **ADR-043 — one file-type registry** (`processing/formats.ts`) drives uploads, import, the job queue and the browser, with per-type size limits (Office/zip 200 MB, legacy 50 MB, PDF 500 MB, media 2 GB, images 20 MB).
 - **ADR-044 — pictures are read by AI vision**, normalized through the worker's canvas to ≤1568 px JPEG; a paid step under the AI tagging switch and the daily limit. Worker memory raised to 3 GB for 200 MB Office/zip files.
 - **ADR-045 — original source dates are separate fields**, never overwriting Payload's own timestamps; `listedAt` is the reader's sort date.
+- **ADR-046 — page-first files (hybrid).** One library item per WordPress package/post; each file is a named section with its own description and deep link, not a separate item. Keeps one set of access, review dates and approval per page. A file can later be split into its own item if it needs to stand alone.
+- **ADR-047 — citations know their file.** Passages carry the asset they came from, so search, citations and MCP can point to the exact file on the page.
 - **ADR-041 — OCR with Amazon Textract.** Asynchronous text detection on the item's private S3 object (500 MB / 3,000 pages), polled statelessly like Transcribe (idempotent per job key). Counts as a paid step under the Transcription switch and the daily paid-job limit. Results are marked `(OCR)` per page with a check-the-numbers warning.
 - **ADR-042 — uploads over 50 MB go browser → S3.** The app signs a one-hour PUT to `uploads/<item>/<uuid>.<ext>` with the exact size, type, encryption and uploader signed (audio/video ≤ 2 GB, PDF ≤ 500 MB). The worker streams and fingerprints every byte, copies it to the immutable `content/<item>/<sha256>.<ext>` key with the fingerprint recorded, registers it through Payload with the same rules as a direct upload, and deletes the staging object. Unsigned, oversized, fake-PDF or unattachable uploads are deleted; abandoned staging objects expire after 2 days (bucket lifecycle). Files up to 50 MB keep the existing direct path.
 
-Requirements: **REQ-INGEST-04** (every backup file type), **REQ-AI-03** (pictures), **REQ-IMPORT-08** (original dates, featured-image covers), **REQ-INGEST-03** (OCR), **REQ-ASSET-03** (large uploads), **REQ-IMPORT-07** (import files attach idempotently, version-pinned), **REQ-AI-02** (combined analysis, keep/backfill/propose review), **REQ-SEARCH-02** (hybrid ranking never widens access; degrades to keyword), **REQ-SEARCH-03** (index tracks current evidence and state). Tests: `import-attach`, `analysis`, `analysis-review`, `automation`, `vimeo-media`, `semantic-search`, `ocr-and-large-uploads`, `all-formats`.
+Requirements: **REQ-IMPORT-09** (one page per package, real file names, roles), **REQ-AI-04** (per-file descriptions), **REQ-SEARCH-04** (hits inside files open the page at that file), **REQ-INGEST-05** (every video on a page), **REQ-INGEST-04** (every backup file type), **REQ-AI-03** (pictures), **REQ-IMPORT-08** (original dates, featured-image covers), **REQ-INGEST-03** (OCR), **REQ-ASSET-03** (large uploads), **REQ-IMPORT-07** (import files attach idempotently, version-pinned), **REQ-AI-02** (combined analysis, keep/backfill/propose review), **REQ-SEARCH-02** (hybrid ranking never widens access; degrades to keyword), **REQ-SEARCH-03** (index tracks current evidence and state). Tests: `import-attach`, `analysis`, `analysis-review`, `automation`, `vimeo-media`, `semantic-search`, `ocr-and-large-uploads`, `all-formats`, `file-pages`.
 
 ## Deploy and live check (AWS laptop)
 

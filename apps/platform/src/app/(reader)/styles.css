@@ -494,3 +494,13 @@ ol.transcript.compact { max-height: 260px; border-top: 1px solid var(--border); 
   .resource-head { flex-direction: column } .resource-head-img { width: 100% }
 }
 @media print { .sidebar, .topbar, .kb-rail, .kb-side, .helpful, .copy-anchor { display: none !important } .workspace-main { margin: 0 !important } .kb-layout { display: block } }
+/* One section per file on a package page; the file matched by a search is highlighted. */
+.files-detailed li { align-items: flex-start; scroll-margin-top: 90px }
+.files-detailed li.is-match { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-soft) }
+.file-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1 }
+.file-body .file-name { font-weight: 600; overflow-wrap: anywhere }
+.file-description { font-size: 13px; line-height: 1.45 }
+.file-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px }
+.small-heading { font-size: 15px; margin: 0 0 10px }
+.article-images { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px }
+.article-images img { width: 100%; height: 110px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border) }

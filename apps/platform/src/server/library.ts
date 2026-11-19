@@ -5,7 +5,7 @@ import type { BrowseFilters, Carrier, Kit, LibraryRepository, Material, ReaderEx
 import { principalFromUser } from '../domain/access'
 import { hasSessionCookie, readSession } from '../auth/browser'
 import { verifyBearer } from '../auth/verify'
-import { hybridContentIds, rankedContentIds } from './search'
+import { hybridSearch, rankedContentIds } from './search'
 import { bedrockEmbedder, semanticSearchEnabled, type Embed } from '../processing/embeddings'
 
 // One Bedrock client per server process; created only when semantic search is switched on.
@@ -106,7 +106,8 @@ export async function authenticatedLibrary(headers: Headers, mode: 'browser' | '
       const ids = await profileIds(req, action)
       if (!ids.length) return { items: [], hasNextPage: false }
       const pool = (payload.db as { pool?: Parameters<typeof rankedContentIds>[0] } | undefined)?.pool
-      const ranked = query && pool ? await hybridContentIds(pool, query, queryEmbedder()) : null
+      const found = query && pool ? await hybridSearch(pool, query, queryEmbedder()) : null
+      const ranked = found?.ids ?? null
       if (ranked) {
         // Relevance order (keyword + meaning); the authorization filter below is unchanged, so ranking never widens access.
         if (!ranked.length) return { items: [], hasNextPage: false }
@@ -114,7 +115,9 @@ export async function authenticatedLibrary(headers: Headers, mode: 'browser' | '
           where: { and: [publishedWhere(ids), { id: { in: ranked } }, ...(format ? [{ format: { equals: format } }] : []), ...browse(filters)] } })
         const order = new Map(ranked.map((id, index) => [id, index]))
         const sorted = allowed.docs.sort((a, b) => order.get(a.id)! - order.get(b.id)!)
-        return { items: sorted.slice((page - 1) * 20, page * 20).map(map), hasNextPage: sorted.length > page * 20, total: sorted.length }
+        // Each hit links to its page, opened at the matching passage (and file, when the match is inside one).
+        const withMatch = (doc: any) => { const item = map(doc); const m = found?.matches.get(doc.id); return m ? { ...item, match: m } : item }
+        return { items: sorted.slice((page - 1) * 20, page * 20).map(withMatch), hasNextPage: sorted.length > page * 20, total: sorted.length }
       }
       const size = filters?.pageSize ?? 20
       if (filters?.sort === 'popular') {
@@ -131,7 +134,7 @@ export async function authenticatedLibrary(headers: Headers, mode: 'browser' | '
         ] } })
       return { items: result.docs.map(map), hasNextPage: result.hasNextPage, total: result.totalDocs }
     },
-    async get(id, action) {
+    async get(id, action, options) {
       const ids = await profileIds(req, action)
       if (!ids.length || !/^\d+$/.test(id)) return null
       const result = await payload.find({ collection: 'content', req, user, overrideAccess: false, depth: 0, limit: 1,
@@ -148,15 +151,25 @@ export async function authenticatedLibrary(headers: Headers, mode: 'browser' | '
         // The public content read intentionally hides sourceHash. Resolve it only
         // after the authorized view above; never return the raw source metadata.
         const metadata = await payload.findByID({ collection: 'content', id: doc.id, req, overrideAccess: true, depth: 0 })
-        const assets = await payload.find({ collection: 'assets', req, overrideAccess: true, depth: 0, limit: 100,
+        const assets = await payload.find({ collection: 'assets', req, overrideAccess: true, depth: 0, limit: 100, sort: 'createdAt',
           where: { and: [{ content: { equals: doc.id } }, { version: { equals: metadata.sourceHash } }] } })
+        // One page, many files: every downloadable file gets a named section; article pictures stay with the article.
+        const all = assets.docs as unknown as { id: number; mimeType: string; fileName?: string | null; role?: string | null; description?: string | null; bytes?: number | null }[]
+        const downloadsOnly = all.filter(a => (a.role ?? 'download') === 'download')
+        item.files = downloadsOnly.map(a => ({ id: a.id, name: a.fileName || 'File', mimeType: a.mimeType,
+          ...(a.bytes ? { bytes: Number(a.bytes) } : {}), ...(a.description ? { description: a.description } : {}) }))
+        item.moreVideos = ((meta.moreVideos ?? []) as { vimeoId?: string; title?: string | null }[])
+          .filter(v => v.vimeoId && /^\d+$/.test(v.vimeoId)).map(v => ({ vimeoId: v.vimeoId!, ...(v.title ? { title: v.title } : {}) }))
         if (process.env.CONTENT_BUCKET) {
           const downloadable = await profileIds(req, 'download')
           const policyId = typeof doc.accessProfile === 'number' ? doc.accessProfile : doc.accessProfile?.id
-          item.downloadAssetIds = downloadable.includes(policyId!) ? assets.docs.map(a => a.id) : []
-          // Until a separate derivative exists, embedded PDF is the original.
-          if (downloadable.includes(policyId!)) item.previewAssetId = assets.docs.find(a => a.mimeType === 'application/pdf')?.id
-          if (downloadable.includes(policyId!)) item.inlineAssets = assets.docs.filter(a => isInlineType(a.mimeType)).map(a => ({ id: a.id, mimeType: a.mimeType }))
+          const canDownload = downloadable.includes(policyId!)
+          item.downloadAssetIds = canDownload ? downloadsOnly.map(a => a.id) : []
+          // Until a separate derivative exists, embedded PDF is the original. A chosen file (from search) is previewed first.
+          const pdfs = downloadsOnly.filter(a => a.mimeType === 'application/pdf')
+          if (canDownload) item.previewAssetId = (pdfs.find(a => a.id === options?.file) ?? pdfs[0])?.id
+          if (canDownload) item.inlineAssets = downloadsOnly.filter(a => isInlineType(a.mimeType) && a.mimeType !== 'application/pdf').map(a => ({ id: a.id, mimeType: a.mimeType }))
+          if (canDownload) item.articleImages = all.filter(a => a.role === 'inline' && a.mimeType.startsWith('image/')).map(a => a.id).slice(0, 24)
         }
       }
       return item

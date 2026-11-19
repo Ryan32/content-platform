@@ -72,11 +72,11 @@ try {
           // Large uploads (over 50 MB) arrive in uploads/; fingerprint, move into place and register them.
           lastUploads = Date.now()
           const [{ finalizeUploads, s3FinalizeDeps }, { registerSource, UploadError }] = await Promise.all([import('./finalize-uploads'), import('../server/processing')])
-          const results = await finalizeUploads(s3FinalizeDeps(s3, process.env.CONTENT_BUCKET, async (contentId, object, extension) => {
+          const results = await finalizeUploads(s3FinalizeDeps(s3, process.env.CONTENT_BUCKET, async (contentId, object, extension, fileName, bytes) => {
             const payload = await payloadFor()
             const content = await payload.findByID({ collection: 'content', id: contentId, depth: 0, overrideAccess: true, disableErrors: true })
             if (!content) throw new UploadError(404, 'Library item not found.')
-            await registerSource(payload, content as never, object, extension)
+            await registerSource(payload, content as never, object, extension, fileName, bytes)
           }))
           if (results.length) console.log(JSON.stringify({ status: 'large_uploads', results: results.map(r => ({ status: r.status, code: r.code })) }))
         }

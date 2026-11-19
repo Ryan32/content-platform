@@ -44,13 +44,13 @@ export async function analyzeItem(db: Pool, job: Job, run = analyze): Promise<An
   if (rows.length !== input.sourceJobIds.length) throw new ProcessingError('source_jobs_changed')
 
   const passages: AnalysisEnvelope['passages'] = [], sources: AnalysisEnvelope['sources'] = []
-  const add = (label: string, list: { id: string; text: string; locator: string }[], n: number) => {
+  const add = (label: string, list: { id: string; text: string; locator: string }[], n: number, assetId?: number) => {
     let used = 0
     for (const p of list) {
       if (passages.length >= 4000) break
-      passages.push({ id: `s${n}-${p.id}`, text: p.text, locator: `${label} · ${p.locator}`.slice(0, 200) }); used++
+      passages.push({ id: `s${n}-${p.id}`, text: p.text, locator: `${label} · ${p.locator}`.slice(0, 200), ...(assetId ? { assetId } : {}) }); used++
     }
-    sources.push({ label, passages: used, status: used < list.length ? 'truncated' : 'used' })
+    sources.push({ id: `s${n}`, ...(assetId ? { assetId } : {}), label, passages: used, status: used < list.length ? 'truncated' : 'used' })
   }
   // Migrated or hand-written article text is a source too, unless it is itself an earlier accepted extraction.
   let n = 0
@@ -58,17 +58,30 @@ export async function analyzeItem(db: Pool, job: Job, run = analyze): Promise<An
     const text = new EvidenceBuilder('ae-article-text/1'); text.add(current.body, 'Article text')
     add('Article text', text.result.passages, ++n)
   }
+  // Sources are labelled by their real names so citations and Review say which file or video a passage came from.
+  const assetIds = rows.map(r => Number(r.input?.assetId)).filter(Number.isFinite)
+  const [names, videos] = await Promise.all([
+    assetIds.length ? db.query('SELECT id, file_name FROM assets WHERE id = ANY($1::int[]) AND content_id=$2', [assetIds, job.content_id]) : { rows: [] },
+    db.query(`SELECT vimeo_id, title FROM content_more_videos WHERE _parent_id=$1 ORDER BY _order`, [job.content_id]),
+  ])
+  const fileName = new Map(names.rows.map(r => [Number(r.id), r.file_name ? String(r.file_name) : '']))
+  const videoTitle = new Map(videos.rows.map((r, i) => [String(r.vimeo_id), r.title ? String(r.title) : `Video ${i + 2}`]))
   let files = 0
   for (const row of rows) {
-    const label = row.input?.kind === 'vimeo' ? 'Vimeo video' : row.stage === 'transcribe' ? `Audio/video file ${++files}`
+    const named = fileName.get(Number(row.input?.assetId))
+    const label = row.input?.kind === 'vimeo' ? (videoTitle.has(row.input.videoId) ? `Vimeo: ${videoTitle.get(row.input.videoId)}` : 'Vimeo video')
+      : named ? named.slice(0, 120)
+      : row.stage === 'transcribe' ? `Audio/video file ${++files}`
       : row.input?.kind === 'image' ? `Picture ${++files}`
       : `${SOURCE_LABEL[row.input?.format] ?? 'File'} ${++files}`
-    if (row.state !== 'succeeded') { sources.push({ label, passages: 0, status: 'failed' }); continue }
-    add(label, extractionSchema.parse(row.result).passages, ++n)
+    const assetId = Number.isFinite(Number(row.input?.assetId)) ? Number(row.input.assetId) : undefined
+    if (row.state !== 'succeeded') { sources.push({ ...(assetId ? { assetId } : {}), label, passages: 0, status: 'failed' }); continue }
+    add(label, extractionSchema.parse(row.result).passages, ++n, assetId)
   }
   if (!passages.length) throw new ProcessingError('nothing_to_analyze')
 
-  const { analysis, truncated } = await run({ current, passages, taxonomy: input.taxonomy, carriers: input.carriers }, input.modelId)
+  const fileSources = sources.filter(s => s.assetId && s.id && s.status !== 'failed').map(s => ({ id: s.id!, label: s.label }))
+  const { analysis, truncated } = await run({ current, passages, taxonomy: input.taxonomy, carriers: input.carriers, fileSources }, input.modelId)
   if (truncated) analysis.warnings.push('Long sources: the AI read a sample of each source, not every page. Check the source text below.')
   return analysisEnvelope.parse({
     analysisVersion: ANALYSIS_VERSION, ...(input.videoId ? { sourceVimeoId: input.videoId } : {}), sources, passages, current, analysis,

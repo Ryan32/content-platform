@@ -2,7 +2,7 @@ import { createLocalReq } from 'payload'
 import { editorContext } from '../../../../../server/editor'
 import { reviewInput, reviewPatch, proposalEnvelope, taxonomyUnchanged } from '../../../../../processing/review'
 import { randomUUID } from 'node:crypto'
-import { analysisPatch, newTagKey, readAnalysisForm } from '../../../../../processing/analysis-review'
+import { analysisPatch, fileDescriptionUpdates, newTagKey, readAnalysisForm } from '../../../../../processing/analysis-review'
 import { analysisEnvelope, ANALYSIS_VERSION } from '../../../../../processing/analysis'
 /** Returns to the review page, or to the Add content wizard when the decision was made there. */
 const location = (id: string, error?: string, returnTo?: string | null) => returnTo
@@ -61,6 +61,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       }
       const patch = analysisPatch(suggestion.proposal, content, suggestion.sourceVersion, v2.data, newTagIds)
       if (patch) await ctx.payload.update({ collection: 'content', id: contentId, data: patch as never, req, overrideAccess: true, context: { reviewedEvidence: true } })
+      if (patch) {
+        // Per-file descriptions: only this item's files of the reviewed source version.
+        const files = await ctx.payload.find({ collection: 'assets', req, overrideAccess: true, depth: 0, pagination: false,
+          where: { and: [{ content: { equals: contentId } }, { version: { equals: suggestion.sourceVersion } }] } })
+        const current = new Map(files.docs.map(f => [Number(f.id), (f as { description?: string | null }).description]))
+        for (const update of fileDescriptionUpdates(envelope, v2.data, current))
+          await ctx.payload.update({ collection: 'assets', id: update.assetId, data: { description: update.description } as never, req, overrideAccess: true })
+      }
       await ctx.payload.update({ collection: 'suggestions', id: Number(id), req, overrideAccess: true,
         data: { decision: v2.data.decision, reviewNote: v2.data.note, reviewedBy: ctx.user.id, reviewedAt: new Date().toISOString(), reviewAttempt } })
       await ctx.payload.db.commitTransaction(tx)

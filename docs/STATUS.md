@@ -4,6 +4,13 @@ This document captures work completed in the originating Portal conversation. Ve
 
 ## Active priority — core platform and general MCP
 
+### One page per package, named files, every video; events excluded — 2026-11-18
+
+- **Implemented and tested locally; not deployed.** Owner chose the hybrid: one page per WordPress package/post with a section per file (real file name, size, AI description reviewed in Review, preview/download by access, deep link). Search finds words inside files and links to the page opened at that file and passage; MCP returns `matchedIn`/`matchUrl`. Article pictures are `inline` (not downloads). Pages with several Vimeo videos keep and process all of them. Events (`tribe_events`) are excluded from migration. Uploads keep their file names (large uploads via signed metadata). See [AI-PIPELINE.md](AI-PIPELINE.md), ADR-046/047.
+- Migration `20261119_031820_file_names_and_videos` (Payload-generated: file name, role, description and size on files; file reference on passages; `content_more_videos`). `20261119_040000_semantic_index` now also creates the passage full-text index. `bucket-uploads.ps1` allows the file-name header.
+- `pilot-200-v3` batches are unchanged and still valid (identical package IDs: no pilot record is an event or has several videos).
+- Validation: typecheck; 166 tests in 28 files (new `file-pages` suite); Python importer tests; production build with 10 indexed migrations. A temporary real-PostgreSQL 17 + pgvector check (PGlite, not committed) ran the multi-video scheduling and ownership check, readiness waiting for every source, file-name labels, passage file references, in-file keyword search and semantic match to the right file. Not tested: the item page and Review screen in a browser, real Bedrock, RDS.
+
 ### Every file type, featured-image covers and original dates — 2026-11-18
 
 - **Implemented and tested locally; not deployed.** Covers every file type in the backup: images (AI vision), picture-only slides, zip packets, `.xlsm`, legacy `.doc/.xls/.ppt` (approximate text), Office files to 200 MB (the 742 MB deck and anything larger refused). WordPress featured images become covers; original WordPress dates are kept (`originalPublishedAt/UpdatedAt`, reader sort by `listedAt`). See the table and ADR-043–045 in [AI-PIPELINE.md](AI-PIPELINE.md).

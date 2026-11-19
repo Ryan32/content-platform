@@ -36,12 +36,15 @@ export const analysisSchema = z.strictObject({
   newTags: z.array(z.strictObject({ label: z.string().trim().min(2).max(80), dimension: z.enum(TAG_DIMENSIONS),
     definition: z.string().trim().min(1).max(400), evidenceIds: evidenceIds.min(1) })).max(8),
   takeaways: z.array(z.strictObject({ text: z.string().trim().min(1).max(300), evidenceIds: evidenceIds.min(1) })).max(6),
+  fileSummaries: z.array(z.strictObject({ sourceId: z.string().regex(/^s\d{1,3}$/), summary: z.string().trim().min(1).max(500), evidenceIds }))
+    .max(40).describe('For every file listed in fileSources: one or two sentences saying what that specific file is and when to use it.'),
   conflicts: z.array(z.strictObject({ field: z.string().max(40), note: z.string().trim().min(1).max(600), evidenceIds })).max(12),
   warnings: z.array(z.string().max(500)).max(20),
 })
 export type Analysis = z.infer<typeof analysisSchema>
 
-export const passageSchema = z.object({ id: z.string().min(1).max(160), text: z.string().min(1).max(20000), locator: z.string().min(1).max(200) }).strict()
+export const passageSchema = z.object({ id: z.string().min(1).max(160), text: z.string().min(1).max(20000), locator: z.string().min(1).max(200),
+  assetId: z.number().int().positive().optional() }).strict()
 export const currentRecordSchema = z.object({
   title: z.string(), description: z.string(), body: z.string(), kind: z.string().nullable(), section: z.string().nullable(),
   topics: z.array(z.string()), pages: z.array(z.string()), audience: z.string().nullable(), program: z.string().nullable(),
@@ -56,7 +59,8 @@ const carrier = z.object({ id: z.number().int().positive(), name: z.string() }).
 export const analysisEnvelope = z.object({
   analysisVersion: z.literal(ANALYSIS_VERSION),
   sourceVimeoId: z.string().regex(/^\d+$/).optional(),
-  sources: z.array(z.object({ label: z.string().max(200), passages: z.number().int().nonnegative(), status: z.enum(['used', 'failed', 'truncated']) }).strict()).max(60),
+  sources: z.array(z.object({ id: z.string().regex(/^s\d{1,3}$/).optional(), assetId: z.number().int().positive().optional(), label: z.string().max(200),
+    passages: z.number().int().nonnegative(), status: z.enum(['used', 'failed', 'truncated']) }).strict()).max(60),
   passages: z.array(passageSchema).min(1).max(4000),
   current: currentRecordSchema,
   analysis: analysisSchema,
@@ -66,15 +70,18 @@ export const analysisEnvelope = z.object({
 export type AnalysisEnvelope = z.infer<typeof analysisEnvelope>
 
 /** Rejects unknown evidence/term/carrier references; drops proposals that repeat the current value. */
-export function validateAnalysis(value: unknown, passageIds: ReadonlySet<string>, termIds: readonly number[], carrierIds: readonly number[]): Analysis {
+export function validateAnalysis(value: unknown, passageIds: ReadonlySet<string>, termIds: readonly number[], carrierIds: readonly number[], fileSourceIds?: ReadonlySet<string>): Analysis {
   const parsed = analysisSchema.safeParse(value)
   if (!parsed.success) throw new ProcessingError('invalid_proposal')
   const a = parsed.data
   const refs = [a.title, a.summary, a.kind, a.section, a.topics, a.pages, a.audience, a.program, a.licensing, a.lines, a.carriers,
-    ...a.tags, ...a.newTags, ...a.takeaways, ...a.conflicts].flatMap(x => x?.evidenceIds ?? [])
+    ...a.tags, ...a.newTags, ...a.takeaways, ...a.conflicts, ...a.fileSummaries].flatMap(x => x?.evidenceIds ?? [])
   const terms = new Set(termIds), carriers = new Set(carrierIds)
   if (refs.some(id => !passageIds.has(id)) || a.tags.some(t => !terms.has(t.termId)) || new Set(a.tags.map(t => t.termId)).size !== a.tags.length
     || (a.carriers?.ids ?? []).some(id => !carriers.has(id))) throw new ProcessingError('invalid_proposal_reference')
+  // Per-file descriptions may only name files of this item, once each.
+  if (fileSourceIds && (a.fileSummaries.some(f => !fileSourceIds.has(f.sourceId)) || new Set(a.fileSummaries.map(f => f.sourceId)).size !== a.fileSummaries.length))
+    throw new ProcessingError('invalid_proposal_reference')
   return a
 }
 
@@ -84,11 +91,14 @@ Propose descriptive metadata only, grounded in the supplied passages, citing pas
 The current record was migrated from WordPress and written by the library team. Respect it: propose a new title only if the current one is missing or clearly needs clean-up; otherwise return null for title. Always propose a summary.
 For every other field, propose the best value even when one exists; staff compare it with the current value.
 Use only the allowed option values, the supplied tag term IDs and the supplied carrier IDs. If an important descriptive tag is missing from the list, propose it under newTags (concise label, the dimension, a one-sentence definition of when to use it); never duplicate an existing tag.
+When fileSources lists more than one file, describe each file in fileSummaries (what it is, who it is for, how it differs from the others); for a single file, describe it too.
 Report in conflicts any place where the current record contradicts the content (for example a wrong section, an outdated date or product name), and in warnings anything you could not read or are unsure about.
 Never decide publication, access, approval, compliance status or retrieval eligibility.`
 
 export interface AnalysisInput {
   current: CurrentRecord; passages: z.infer<typeof passageSchema>[]; taxonomy: z.infer<typeof term>[]; carriers: z.infer<typeof carrier>[]
+  /** The item's files (not article text or videos), by source ID, for per-file descriptions. */
+  fileSources?: { id: string; label: string }[]
 }
 /** Bounded model payload: whole passages up to the budget, sampled across sources so one long PDF cannot crowd out the rest. */
 export function modelPassages(passages: AnalysisInput['passages'], budget = 180000) {
@@ -114,7 +124,7 @@ export async function analyze(input: AnalysisInput, modelId: string, client = ne
   const options = Object.fromEntries(Object.entries({ kind: CONTENT_KINDS, section: SECTION_OPTIONS, topics: TOPIC_OPTIONS, pages: PAGE_OPTIONS,
     audience: AUDIENCES, program: PROGRAMS, licensing: LICENSING, lines: LINES }).map(([k, list]) => [k, list.map(o => ({ value: o.value, label: o.label }))]))
   const payload = JSON.stringify({ currentRecord: { ...input.current, body: input.current.body.slice(0, 2000) }, allowedOptions: options,
-    tagTerms: input.taxonomy, carriers: input.carriers, passages: sample.passages })
+    tagTerms: input.taxonomy, carriers: input.carriers, fileSources: input.fileSources ?? [], passages: sample.passages.map(({ assetId: _, ...p }) => p) })
   if (Buffer.byteLength(payload) > 400000) throw new ProcessingError('classification_input_limit')
   const name = 'submit_analysis'
   const response = await client.send(new ConverseCommand({ modelId, system: [{ text: SYSTEM }],
@@ -124,6 +134,7 @@ export async function analyze(input: AnalysisInput, modelId: string, client = ne
   }))
   const uses = response.output?.message?.content?.filter(block => block.toolUse)
   if (response.stopReason !== 'tool_use' || uses?.length !== 1 || uses[0].toolUse?.name !== name) throw new ProcessingError('invalid_model_response')
-  const analysis = validateAnalysis(uses[0].toolUse.input, new Set(sample.passages.map(p => p.id)), input.taxonomy.map(t => t.id), input.carriers.map(c => c.id))
+  const analysis = validateAnalysis(uses[0].toolUse.input, new Set(sample.passages.map(p => p.id)), input.taxonomy.map(t => t.id), input.carriers.map(c => c.id),
+    new Set((input.fileSources ?? []).map(f => f.id)))
   return { analysis, truncated: sample.truncated }
 }

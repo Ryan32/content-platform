@@ -17,7 +17,7 @@ try {
     $existing = & aws s3api get-bucket-cors @aws --bucket $bucket --output json 2>$null
     $rules = @(if ($LASTEXITCODE -eq 0 -and $existing) { ($existing | ConvertFrom-Json).CORSRules | Where-Object { $_.ID -ne 'ae-library-uploads' } })
     $rules += [pscustomobject]@{ ID = 'ae-library-uploads'; AllowedMethods = @('PUT'); AllowedOrigins = @($Origin)
-        AllowedHeaders = @('content-type', 'x-amz-server-side-encryption', 'x-amz-meta-uploaded-by'); ExposeHeaders = @('ETag'); MaxAgeSeconds = 3000 }
+        AllowedHeaders = @('content-type', 'x-amz-server-side-encryption', 'x-amz-meta-uploaded-by', 'x-amz-meta-file-name'); ExposeHeaders = @('ETag'); MaxAgeSeconds = 3000 }
     [IO.File]::WriteAllText("$tmp\cors.json", (@{ CORSRules = $rules } | ConvertTo-Json -Depth 6))
     Invoke-Aws s3api put-bucket-cors @aws --bucket $bucket --cors-configuration "file://$tmp\cors.json" | Out-Null
     "CORS: PUT allowed from $Origin ($($rules.Count) rule(s) total)"

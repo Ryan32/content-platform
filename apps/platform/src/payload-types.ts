@@ -276,6 +276,19 @@ export interface Content {
    * The number from the Vimeo link. Captions are used when available; otherwise the audio is transcribed.
    */
   vimeoId?: string | null;
+  /**
+   * Additional videos that belong on this same page. Each is transcribed and included in AI analysis and search.
+   */
+  moreVideos?:
+    | {
+        vimeoId: string;
+        /**
+         * Optional; shown above the player.
+         */
+        title?: string | null;
+        id?: string | null;
+      }[]
+    | null;
   thumbnailVersion?: string | null;
   thumbnailKey?: string | null;
   thumbnailSource?: ('upload' | 'vimeo' | 'pdf' | 'unavailable') | null;
@@ -352,6 +365,7 @@ export interface Content {
         version: string;
         text: string;
         locator: string;
+        assetId?: number | null;
         id?: string | null;
       }[]
     | null;
@@ -520,6 +534,16 @@ export interface Asset {
   id: number;
   content: number | Content;
   mimeType: string;
+  /**
+   * The original file name, shown to readers and used in citations.
+   */
+  fileName?: string | null;
+  role?: ('download' | 'inline') | null;
+  /**
+   * One or two sentences about this file, shown in its section on the library item page. Suggested by AI and accepted in Review.
+   */
+  description?: string | null;
+  bytes?: number | null;
   objectKey: string;
   sha256: string;
   version: string;
@@ -955,6 +979,13 @@ export interface ContentSelect<T extends boolean = true> {
         id?: T;
       };
   vimeoId?: T;
+  moreVideos?:
+    | T
+    | {
+        vimeoId?: T;
+        title?: T;
+        id?: T;
+      };
   thumbnailVersion?: T;
   thumbnailKey?: T;
   thumbnailSource?: T;
@@ -984,6 +1015,7 @@ export interface ContentSelect<T extends boolean = true> {
         version?: T;
         text?: T;
         locator?: T;
+        assetId?: T;
         id?: T;
       };
   updatedAt?: T;
@@ -1034,6 +1066,10 @@ export interface TaxonomySelect<T extends boolean = true> {
 export interface AssetsSelect<T extends boolean = true> {
   content?: T;
   mimeType?: T;
+  fileName?: T;
+  role?: T;
+  description?: T;
+  bytes?: T;
   objectKey?: T;
   sha256?: T;
   version?: T;

@@ -168,6 +168,13 @@ export const Content: CollectionConfig = {
       fields: [{ name: 'text', type: 'text', required: true, label: 'Takeaway' }] },
     { name: 'vimeoId', type: 'text', label: 'Vimeo video ID', validate: (value: unknown) => !value || /^\d+$/.test(String(value)) || 'Use the number at the end of the Vimeo link, e.g. 123456789.',
       admin: { condition: data => ['video', 'audio'].includes(data?.format), description: 'The number from the Vimeo link. Captions are used when available; otherwise the audio is transcribed.' } },
+    // Records with several videos (e.g. a webinar series page): every video is transcribed and analyzed for this one item.
+    { name: 'moreVideos', type: 'array', label: 'More Vimeo videos', maxRows: 20, labels: { singular: 'Video', plural: 'Videos' },
+      admin: { condition: data => Boolean(data?.vimeoId), description: 'Additional videos that belong on this same page. Each is transcribed and included in AI analysis and search.' },
+      fields: [
+        { name: 'vimeoId', type: 'text', required: true, label: 'Vimeo video ID', validate: (value: unknown) => /^\d+$/.test(String(value ?? '')) || 'Use the number at the end of the Vimeo link.' },
+        { name: 'title', type: 'text', label: 'Title', admin: { description: 'Optional; shown above the player.' } },
+      ] },
     { name: 'processing', type: 'ui', label: 'Processing', admin: { components: { Field: '/components/ContentProcessing' } } },
     // Thumbnail storage key stays editor-only; the version (a content hash) is safe for readers and busts caches.
     { name: 'thumbnailVersion', type: 'text', label: 'Preview', access: { create: () => false, update: () => false },
@@ -219,6 +226,8 @@ export const Content: CollectionConfig = {
         admin: { readOnly: true, description: 'Installed from reviewed extraction. Used for citations in the reader and AI assistants.' }, fields: [
           { name: 'citationId', type: 'text', required: true }, { name: 'version', type: 'text', required: true },
           { name: 'text', type: 'textarea', required: true }, { name: 'locator', type: 'text', required: true },
+          // Which of the item's files the passage came from (none for article text and videos): search links to that file's section.
+          { name: 'assetId', type: 'number' },
         ] },
     ] },
   ],
@@ -264,11 +273,16 @@ export const Content: CollectionConfig = {
 
 export const Assets: CollectionConfig = {
   slug: 'assets', labels: { singular: 'File', plural: 'Files' }, access: { ...locked, create: deny, read: editor },
-  admin: { group: 'Library', useAsTitle: 'mimeType', defaultColumns: ['content', 'mimeType', 'createdAt'],
+  admin: { group: 'Library', useAsTitle: 'fileName', defaultColumns: ['fileName', 'content', 'role', 'createdAt'],
     description: 'Original files attached to library items, stored privately and never changed once uploaded. Upload files from a library item\'s Processing panel; this list is for reference.' },
   // Metadata only; raw storage keys never reach reader APIs. No public upload route.
   fields: [{ name: 'content', type: 'relationship', relationTo: 'content', required: true, label: 'Library item' },
     { name: 'mimeType', type: 'text', required: true, label: 'File type' },
+    { name: 'fileName', type: 'text', label: 'File name', admin: { readOnly: true, description: 'The original file name, shown to readers and used in citations.' } },
+    // Downloads are offered to readers with download access; inline images belong to the article text (read by AI, not offered as files).
+    { name: 'role', type: 'select', label: 'Role', defaultValue: 'download', options: [option('download', 'Download'), option('inline', 'Image in the article')] },
+    { name: 'description', type: 'textarea', label: 'Description', admin: { description: 'One or two sentences about this file, shown in its section on the library item page. Suggested by AI and accepted in Review.' } },
+    { name: 'bytes', type: 'number', label: 'Size (bytes)', admin: { readOnly: true } },
     { name: 'objectKey', type: 'text', required: true, label: 'Storage location', admin: { readOnly: true } },
     { name: 'sha256', type: 'text', required: true, label: 'Fingerprint (SHA-256)', admin: { readOnly: true } },
     { name: 'version', type: 'text', required: true, label: 'Source version', admin: { readOnly: true } }],

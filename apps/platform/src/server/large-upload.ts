@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import type { Payload } from 'payload'
 import { MAX_DOCUMENT_BYTES } from '../processing/storage'
 import { MAX_BYTES } from '../processing/formats'
-import { UPLOAD_TYPES, UploadError, formatFor, titleFromFileName, type ContentDoc } from './processing'
+import { UPLOAD_TYPES, UploadError, cleanFileName, formatFor, titleFromFileName, type ContentDoc } from './processing'
 
 /**
  * Files over 50 MB go from the browser straight to a private S3 staging key with a short-lived signed PUT (exact size,
@@ -34,12 +34,14 @@ export async function signLargeUpload(payload: Payload, userId: number | string,
   const content = await payload.findByID({ collection: 'content', id: contentId, depth: 0, overrideAccess: true, disableErrors: true }) as ContentDoc | null
   if (!content) throw new UploadError(404, 'Library item not found.')
   if (!['intake', 'draft'].includes(content.state)) throw new UploadError(409, 'Files can only be added while the item is in Intake or Draft.')
-  const headers = { 'Content-Type': UPLOAD_TYPES[extension], 'x-amz-server-side-encryption': 'AES256', 'x-amz-meta-uploaded-by': String(userId) }
+  // The original name travels as signed, URL-encoded metadata (S3 metadata must be ASCII).
+  const fileName = encodeURIComponent(cleanFileName(name) ?? `upload.${extension}`)
+  const headers = { 'Content-Type': UPLOAD_TYPES[extension], 'x-amz-server-side-encryption': 'AES256', 'x-amz-meta-uploaded-by': String(userId), 'x-amz-meta-file-name': fileName }
   const url = await getSignedUrl(client, new PutObjectCommand({ Bucket: bucket, Key: stagingKey(contentId, extension), ContentLength: size,
-    ContentType: headers['Content-Type'], ServerSideEncryption: 'AES256', Metadata: { 'uploaded-by': String(userId) } }),
+    ContentType: headers['Content-Type'], ServerSideEncryption: 'AES256', Metadata: { 'uploaded-by': String(userId), 'file-name': fileName } }),
   { expiresIn: 3600, signableHeaders: new Set(['content-type', 'content-length']),
     // Sent as headers by the browser (not hoisted into the query string) so S3 enforces them on the PUT.
-    unhoistableHeaders: new Set(['x-amz-server-side-encryption', 'x-amz-meta-uploaded-by']) })
+    unhoistableHeaders: new Set(['x-amz-server-side-encryption', 'x-amz-meta-uploaded-by', 'x-amz-meta-file-name']) })
   return { url, headers, contentId }
 }
 

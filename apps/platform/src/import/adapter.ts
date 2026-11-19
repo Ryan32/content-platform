@@ -47,6 +47,7 @@ export async function importPackage(input: unknown, store: ImportStore, mode: 'p
             ...(s.vimeoId ? { vimeoId: s.vimeoId } : {}), state: 'intake', accessProfile: null,
             ...(s.originalPublishedAt ? { originalPublishedAt: s.originalPublishedAt } : {}),
             ...(s.originalUpdatedAt ? { originalUpdatedAt: s.originalUpdatedAt } : {}),
+            ...(s.moreVideos?.length ? { moreVideos: s.moreVideos.map(v => ({ vimeoId: v.vimeoId })) } : {}),
             acceptedTags: [], evidenceVersion: 'unprocessed', passages: [],
           })
         }

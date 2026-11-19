@@ -20,10 +20,12 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
   );
   CREATE UNIQUE INDEX IF NOT EXISTS "passage_embeddings_unique" ON "passage_embeddings" ("content_id", "citation_id", "model");
   CREATE INDEX IF NOT EXISTS "passage_embeddings_content" ON "passage_embeddings" ("content_id", "evidence_version");
-  CREATE INDEX IF NOT EXISTS "passage_embeddings_hnsw" ON "passage_embeddings" USING hnsw ("embedding" vector_cosine_ops);`)
+  CREATE INDEX IF NOT EXISTS "passage_embeddings_hnsw" ON "passage_embeddings" USING hnsw ("embedding" vector_cosine_ops);
+  -- Keyword search inside reviewed file text (src/server/search.ts PASSAGE_DOCUMENT must match this expression).
+  CREATE INDEX IF NOT EXISTS "content_passages_fts" ON "content_passages" USING gin (to_tsvector('english', "text"));`)
 }
 
 export async function down({ db }: MigrateDownArgs): Promise<void> {
   // Disposable environments only. Leaves the extension installed.
-  await db.execute(sql`DROP TABLE IF EXISTS "passage_embeddings";`)
+  await db.execute(sql`DROP INDEX IF EXISTS "content_passages_fts"; DROP TABLE IF EXISTS "passage_embeddings";`)
 }

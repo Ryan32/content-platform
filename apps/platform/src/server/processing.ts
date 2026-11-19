@@ -6,6 +6,8 @@ import { explain, jobLabel, STATE_LABEL } from '../processing/messages'
 import { ITEM_FORMAT, MIME_TYPES, SUPPORTED_LABEL, extensionOf } from '../processing/formats'
 
 export const UPLOAD_TYPES: Record<string, string> = MIME_TYPES
+/** Display name for an uploaded file: no path, no control characters, bounded. */
+export const cleanFileName = (name?: string | null) => name ? name.split(/[\\/]/).pop()!.replace(/[\u0000-\u001f]/g, '').slice(0, 200) || undefined : undefined
 export class UploadError extends Error { constructor(public status: number, message: string) { super(message) } }
 
 export const formatFor = (fileName: string) => ITEM_FORMAT[extensionOf(fileName)]
@@ -46,14 +48,14 @@ export async function uploadSource(payload: Payload, contentId: number, file: Fi
   if (!file.size || file.size > MAX_DOCUMENT_BYTES) throw new UploadError(413, 'Files must be between 1 byte and 50 MB.')
   const bytes = new Uint8Array(await file.arrayBuffer())
   const object = await stageOriginal(client, process.env.CONTENT_BUCKET, contentId, bytes, extension)
-  return registerSource(payload, content, object, extension)
+  return registerSource(payload, content, object, extension, file.name, file.size)
 }
 
 /**
  * Registers a stored original (immutable `content/<id>/<sha256>.<ext>`) as the item's file. Manually created items take
  * its fingerprint as their source version; imported items keep theirs. Shared by direct and large (S3) uploads.
  */
-export async function registerSource(payload: Payload, content: ContentDoc, object: { key: string; hash: string }, extension: string) {
+export async function registerSource(payload: Payload, content: ContentDoc, object: { key: string; hash: string }, extension: string, fileName?: string, bytes?: number) {
   const contentId = content.id, hash = object.hash
   if (!['intake', 'draft'].includes(content.state)) throw new UploadError(409, 'Files can only be added while the item is in Intake or Draft. Ask an administrator to move it back to Draft.')
   if (!UPLOAD_TYPES[extension]) throw new UploadError(415, 'Unsupported file type.')
@@ -68,7 +70,8 @@ export async function registerSource(payload: Payload, content: ContentDoc, obje
   const existing = await payload.find({ collection: 'assets', overrideAccess: true, depth: 0, limit: 1,
     where: { and: [{ content: { equals: contentId } }, { sha256: { equals: hash } }, { version: { equals: version } }] } })
   const asset = existing.docs[0] ?? await payload.create({ collection: 'assets', overrideAccess: true, depth: 0,
-    data: { content: contentId, objectKey: object.key, sha256: hash, mimeType: UPLOAD_TYPES[extension], version } })
+    data: { content: contentId, objectKey: object.key, sha256: hash, mimeType: UPLOAD_TYPES[extension], version,
+      fileName: cleanFileName(fileName) ?? `${hash.slice(0, 12)}.${extension}`, role: 'download', ...(bytes ? { bytes } : {}) } })
   return { assetId: asset.id, replacedSource: manual }
 }
 

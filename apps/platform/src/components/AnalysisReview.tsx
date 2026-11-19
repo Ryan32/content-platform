@@ -2,7 +2,7 @@ import type { Payload } from 'payload'
 import { muted, panel } from './AdminPage'
 import { Thumbnail } from './Thumbnail'
 import { ANALYSIS_VERSION, type AnalysisEnvelope } from '../processing/analysis'
-import { backfillTags, currentValue, defaultChoice, REVIEW_FIELDS, suggestedValue, type ReviewField } from '../processing/analysis-review'
+import { backfillTags, currentValue, defaultChoice, defaultFileChoice, fileSuggestions, REVIEW_FIELDS, suggestedValue, type ReviewField } from '../processing/analysis-review'
 import { AUDIENCES, CONTENT_KINDS, LICENSING, LINES, PAGE_OPTIONS, PROGRAMS, SECTION_OPTIONS, TOPIC_OPTIONS, labelOf } from '../domain/navigation'
 
 const FIELD_LABEL: Record<ReviewField, string> = { title: 'Title', summary: 'Summary', kind: 'Type', section: 'Section', audience: 'Who it\'s for',
@@ -44,6 +44,9 @@ export async function AnalysisReview({ payload, user, doc, e, content, error, er
   const suggestedTags = new Map(a.tags.map(t => [t.termId, t]))
   const pending = doc.decision === 'pending' && !stale
   const rows = REVIEW_FIELDS.filter(f => suggestedValue(e, f) !== undefined || f === 'title' || f === 'summary')
+  const perFile = fileSuggestions(e)
+  const fileDocs = perFile.length ? (await payload.find({ collection: 'assets', overrideAccess: true, depth: 0, pagination: false,
+    where: { id: { in: perFile.map(f => f.assetId) } } })).docs as { id: number; fileName?: string | null; description?: string | null }[] : []
 
   return <>
     <p style={muted}><a href="/admin/review">← Review</a></p>
@@ -99,6 +102,21 @@ export async function AnalysisReview({ payload, user, doc, e, content, error, er
         {a.newTags.map((t, i) => <label key={i} style={{ display: 'block', margin: '4px 0' }}><input type="checkbox" name="newTags" value={i} defaultChecked={backfill} disabled={!pending} /> {t.label} <span className="ae-pill">{t.dimension}</span>
           <span style={muted}> — {t.definition}</span>{cite(t.evidenceIds)}</label>)}
         <p style={muted}>A checked new tag is created (or reused if one with the same name and category exists) and applied to this item.</p></>}
+
+      {perFile.length > 0 && <>
+        <h3>Files on this page</h3>
+        <p style={muted}>Each file gets its own section on the item page. Existing descriptions are kept unless you choose the suggestion; empty ones are pre-filled.</p>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}><tbody>{perFile.map(f => {
+          const doc = fileDocs.find(d => d.id === f.assetId), current = doc?.description ?? '', choice = defaultFileChoice(current)
+          return <tr key={f.assetId}>
+            <td style={{ ...cell, width: 200 }}><strong>{doc?.fileName ?? f.label}</strong></td>
+            <td style={{ ...cell, width: '30%' }}>{current || <span style={muted}>Empty</span>}</td>
+            <td style={cell}><textarea name={`fileText_${f.assetId}`} maxLength={500} rows={2} defaultValue={f.summary} style={input} disabled={!pending} />
+              <div style={{ ...muted, fontSize: 12 }}>{cite(f.evidenceIds)}</div></td>
+            <td style={{ ...cell, width: 150, whiteSpace: 'nowrap' }}>
+              <label style={{ display: 'block' }}><input type="radio" name={`fileUse_${f.assetId}`} value="current" defaultChecked={choice === 'current'} disabled={!pending} /> Keep current</label>
+              <label style={{ display: 'block' }}><input type="radio" name={`fileUse_${f.assetId}`} value="suggested" defaultChecked={choice === 'suggested'} disabled={!pending} /> Use suggestion</label></td>
+          </tr> })}</tbody></table></>}
 
       {pending ? <>
         <label style={{ display: 'block', margin: '12px 0' }}><strong>Note</strong><span style={muted}> — optional, kept with the decision</span>

@@ -19,12 +19,19 @@ export interface AttachDeps {
   /** Copies imports/files/<file> to the destination key unless it already exists; verifies size. */
   copy(file: string, key: string, bytes: number): Promise<'copied' | 'existing'>
   asset(contentId: number, sha256: string, version: string): Promise<number | null>
-  createAsset(data: { content: number; objectKey: string; sha256: string; mimeType: string; version: string }): Promise<number>
+  createAsset(data: { content: number; objectKey: string; sha256: string; mimeType: string; version: string; fileName: string; role: 'download' | 'inline'; bytes: number }): Promise<number>
   /** Sets the item's cover to an already-copied image unless an editor uploaded one. Returns whether it was set. */
   cover(contentId: number, key: string, version: string): Promise<boolean>
 }
 const COVER_TYPES = new Set(['jpg', 'jpeg', 'png', 'webp'])
 const MAX_COVER_BYTES = 5 * 1024 * 1024
+
+/** WordPress stores URL-encoded names (e.g. "Guide%20v2.pdf"); keep a clean, bounded display name. */
+export function decodeName(name: string) {
+  let decoded = name
+  try { decoded = decodeURIComponent(name) } catch { /* keep as stored */ }
+  return decoded.replace(/[\u0000-\u001f]/g, '').slice(0, 200) || 'file'
+}
 
 export function blobFile(blob: { sha256: string; localPaths: string[] }) {
   const match = /\.([A-Za-z0-9]{1,8})$/.exec(blob.localPaths[0] ?? '')
@@ -57,6 +64,12 @@ export async function attachFiles(input: unknown, deps: AttachDeps) {
         count(await deps.cover(target.id, key, blob.sha256.slice(0, 16)) ? 'cover_set' : 'cover_kept_editor_upload')
       }
     }
+    // The file's real name on this page: from the path this post used (the same bytes can carry other names elsewhere).
+    const snapshot = p.sourceSnapshots.find(s => s.sourceKey === item.sourceKey)!.snapshot
+    const nameOn = (sha: string, fallback: string) => {
+      const path = Object.entries(snapshot.verifiedFiles).find(([, f]) => f.sha256 === sha)?.[0] ?? fallback
+      return decodeName(path.split('/').pop() ?? fallback)
+    }
     for (const sha of new Set(edges.map(e => e.to))) {
       const blob = blobs.get(sha)
       assertImport(blob, 'missing_blob')
@@ -68,7 +81,11 @@ export async function attachFiles(input: unknown, deps: AttachDeps) {
       if (await deps.asset(target.id, blob.sha256, item.sourceHash)) { count('asset_existing'); continue }
       const key = `content/${target.id}/${file}`
       count(`object_${await deps.copy(file, key, blob.bytes)}`)
-      await deps.createAsset({ content: target.id, objectKey: key, sha256: blob.sha256, mimeType, version: item.sourceHash })
+      // Pictures used inside the article are part of the page, not downloads; files attached to the record are downloads.
+      const fields = edges.filter(e => e.to === sha).map(e => e.field)
+      const role = isImage(ext) && !fields.includes('__wpdm_files') ? 'inline' as const : 'download' as const
+      await deps.createAsset({ content: target.id, objectKey: key, sha256: blob.sha256, mimeType, version: item.sourceHash,
+        fileName: nameOn(blob.sha256, file), role, bytes: blob.bytes })
       count('asset_created')
     }
   }

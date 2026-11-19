@@ -8,7 +8,7 @@ const base: Analysis = { title: null, summary: { value: 'A guide to annuity inco
   kind: null, section: { value: 'products', reason: 'Product guide', evidenceIds: ['s1-e1'] }, topics: null, pages: null, audience: null, program: null,
   licensing: null, lines: { values: ['annuity'], reason: 'Annuity', evidenceIds: [] }, carriers: { ids: [8], reason: 'Named', evidenceIds: ['s2-e1'] },
   tags: [{ termId: 3, evidenceIds: ['s1-e1'], confidence: 0.8 }], newTags: [{ label: 'Income riders', dimension: 'topic', definition: 'Riders that guarantee income.', evidenceIds: ['s2-e1'] }],
-  takeaways: [{ text: 'Income starts at 60.', evidenceIds: ['s2-e1'] }], conflicts: [], warnings: [] }
+  takeaways: [{ text: 'Income starts at 60.', evidenceIds: ['s2-e1'] }], fileSummaries: [], conflicts: [], warnings: [] }
 
 describe('REQ-AI-01: combined item analysis', () => {
   it('accepts only known evidence, tag terms, carriers and option values', () => {
@@ -50,8 +50,8 @@ describe('REQ-AI-01: combined item analysis', () => {
       return { analysis: { ...base, carriers: null, tags: [], newTags: [], takeaways: [], lines: null }, truncated: false }
     })
     const envelope = await analyzeItem(db, job, run as never)
-    expect(envelope.sources).toEqual([{ label: 'Article text', passages: 1, status: 'used' }, { label: 'PDF 1', passages: 1, status: 'used' },
-      { label: 'Vimeo video', passages: 1, status: 'used' }, { label: 'Word document 2', passages: 0, status: 'failed' }])
+    expect(envelope.sources).toEqual([{ id: 's1', label: 'Article text', passages: 1, status: 'used' }, { id: 's2', label: 'PDF 1', passages: 1, status: 'used' },
+      { id: 's3', label: 'Vimeo video', passages: 1, status: 'used' }, { label: 'Word document 2', passages: 0, status: 'failed' }])
     expect(envelope.passages[2].locator).toBe('Vimeo video · 0s – 5s')
     expect(queries.filter(q => q.includes('processing_jobs')).every(q => q.includes('content_id=$2'))).toBe(true)
   })

@@ -42,11 +42,12 @@ export async function reconcile(db: Pool, store: JobStore, settings: AutomationS
   }
 
   if (settings.vimeoEnabled) {
-    const videos = await db.query(`SELECT c.id, c.source_hash, c.vimeo_id FROM content c
-      WHERE c.vimeo_id ~ '^[1-9][0-9]{0,19}$' AND c.source_hash IS NOT NULL AND c.state IN ('intake','draft')
+    // Every video on the item (main player and "More videos") is its own source.
+    const videos = await db.query(`SELECT c.id, c.source_hash, v.vimeo_id FROM content c CROSS JOIN LATERAL (SELECT c.vimeo_id AS vimeo_id UNION SELECT m.vimeo_id FROM content_more_videos m WHERE m._parent_id = c.id) v
+      WHERE v.vimeo_id ~ '^[1-9][0-9]{0,19}$' AND c.source_hash IS NOT NULL AND c.state IN ('intake','draft')
       AND NOT EXISTS (SELECT 1 FROM processing_jobs j WHERE j.content_id=c.id AND j.source_version=c.source_hash
-        AND j.input->>'kind'='vimeo' AND j.input->>'videoId'=c.vimeo_id)
-      ORDER BY c.id LIMIT $1`, [batch])
+        AND j.input->>'kind'='vimeo' AND j.input->>'videoId'=v.vimeo_id)
+      ORDER BY c.id, v.vimeo_id LIMIT $1`, [batch])
     for (const video of videos.rows) {
       await store.enqueue(video.id, video.source_hash, { kind: 'vimeo', videoId: video.vimeo_id })
       result.queued++
@@ -64,8 +65,9 @@ export async function reconcile(db: Pool, store: JobStore, settings: AutomationS
         AND NOT EXISTS (SELECT 1 FROM assets a WHERE a.content_id=c.id AND a.version=c.source_hash
           AND lower(substring(a.object_key from '\\.([A-Za-z0-9]+)$')) = ANY($2::text[])
           AND NOT EXISTS (SELECT 1 FROM processing_jobs j WHERE j.content_id=c.id AND j.source_version=c.source_hash AND (j.input->>'assetId')::int=a.id))
-        AND NOT ($3::boolean AND COALESCE(c.vimeo_id, '') ~ '^[1-9][0-9]{0,19}$' AND NOT EXISTS (SELECT 1 FROM processing_jobs j WHERE j.content_id=c.id
-          AND j.source_version=c.source_hash AND j.input->>'kind'='vimeo' AND j.input->>'videoId'=c.vimeo_id))
+        AND NOT ($3::boolean AND EXISTS (SELECT 1 FROM (SELECT c.vimeo_id AS vimeo_id UNION SELECT m.vimeo_id FROM content_more_videos m WHERE m._parent_id = c.id) v WHERE v.vimeo_id ~ '^[1-9][0-9]{0,19}$'
+          AND NOT EXISTS (SELECT 1 FROM processing_jobs j WHERE j.content_id=c.id AND j.source_version=c.source_hash
+            AND j.input->>'kind'='vimeo' AND j.input->>'videoId'=v.vimeo_id)))
         AND NOT EXISTS (SELECT 1 FROM suggestions s WHERE s.content_id=c.id AND s.source_version=c.source_hash AND s.decision='accepted')
         AND ((COALESCE(btrim(c.body),'')<>'' AND c.evidence_version='unprocessed') OR EXISTS (SELECT 1 FROM processing_jobs j
           WHERE j.content_id=c.id AND j.source_version=c.source_hash AND j.stage IN ('extract','transcribe') AND j.state='succeeded'))

@@ -33,7 +33,11 @@ export function runtimeProcessors(db: Pool): Processors {
   const current = async (job: Job) => {
     const { rows } = await db.query('SELECT source_hash,vimeo_id FROM content WHERE id=$1 AND source_hash=$2', [job.content_id, job.source_version])
     if (!rows[0]) throw new ProcessingError('source_version_mismatch')
-    if ('videoId' in job.input && job.input.videoId && rows[0].vimeo_id !== job.input.videoId) throw new ProcessingError('vimeo_source_changed')
+    if ('videoId' in job.input && job.input.videoId && rows[0].vimeo_id !== job.input.videoId) {
+      // Additional videos on the same item are valid sources too.
+      const more = await db.query('SELECT 1 FROM content_more_videos WHERE _parent_id=$1 AND vimeo_id=$2', [job.content_id, job.input.videoId])
+      if (!more.rowCount) throw new ProcessingError('vimeo_source_changed')
+    }
     return rows[0]
   }
   const asset = async (job: Job, id: number) => {
@@ -59,12 +63,14 @@ export function runtimeProcessors(db: Pool): Processors {
       if (input.kind === 'classify' || input.kind === 'analyze') throw new ProcessingError('wrong_job_stage')
       if (input.kind === 'vimeo') {
         if (!input.videoId) throw new ProcessingError('vimeo_snapshot_required')
-        if (!content.vimeo_id || !/^\d+$/.test(content.vimeo_id)) throw new ProcessingError('vimeo_id_required')
+        // current() has confirmed this video belongs to the item (main player or "More videos").
+        const videoId = input.videoId
+        if (!/^\d+$/.test(videoId)) throw new ProcessingError('vimeo_id_required')
         if (!process.env.VIMEO_ACCESS_TOKEN) throw new ProcessingError('vimeo_configuration_required')
-        const result = await getVimeoCaptions(content.vimeo_id, process.env.VIMEO_ACCESS_TOKEN)
+        const result = await getVimeoCaptions(videoId, process.env.VIMEO_ACCESS_TOKEN)
         if (result) return result
         await paid(db, 'transcription')
-        const inputKey = await stageVimeoMedia(content.vimeo_id, process.env.VIMEO_ACCESS_TOKEN, bucket(), job.idempotency_key)
+        const inputKey = await stageVimeoMedia(videoId, process.env.VIMEO_ACCESS_TOKEN, bucket(), job.idempotency_key)
         const speech = await transcribeMedia({ bucket: bucket(), inputKey, outputPrefix: 'processing/transcribe/', jobKey: job.idempotency_key, mediaFormat: 'mp4' })
         return speech.status === 'pending' ? null : speech.extraction
       }

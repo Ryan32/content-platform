@@ -17,12 +17,13 @@ import { AUDIENCES, LICENSING, LINES, PROGRAMS, TOPIC_OPTIONS, labelOf, sectionB
 import { REVIEW_WINDOWS } from '../../../../domain/review'
 import { locatorPage, locatorSeconds, viewerFor } from '../../../../domain/viewers'
 import type { Kit, Material } from '../../../../domain/library'
+import { FilesPanel } from '../../../../components/FilesPanel'
 export const dynamic = 'force-dynamic'
 
 const topicName = (value: string) => TOPIC_OPTIONS.find(o => o.value === value)?.label.split(' — ')[1]
 
 /** Resource and how-to article detail (designs: Resource, KB, ViewerPDF, ViewerVideo, ViewerOther). */
-export default async function Detail({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ citation?: string; t?: string }> }) {
+export default async function Detail({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ citation?: string; t?: string; file?: string }> }) {
   const { id } = await params
   const query = await searchParams
   const citation = query.citation
@@ -33,7 +34,9 @@ export default async function Detail({ params, searchParams }: { params: Promise
     {signedIn ? <><h1>Access not set up</h1><p>You&apos;re signed in, but this account doesn&apos;t have library access yet. Contact the library administrator.</p><Link className="btn-ghost" href="/">Back to library</Link></>
       : <><h1>Sign in to open this resource</h1><p>This resource is available to authorized Advisors Excel accounts.</p><a className="btn-primary" href={`/auth/login?returnTo=${encodeURIComponent(returnTo)}`}>Sign in</a></>}
   </section>
-  const item = await repository.get(id, 'view')
+  // ?file= comes from a search hit inside one of this page's files: preview and highlight that file.
+  const chosenFile = query.file && /^\d{1,10}$/.test(query.file) ? Number(query.file) : undefined
+  const item = await repository.get(id, 'view', chosenFile ? { file: chosenFile } : undefined)
   if (!item) notFound()
   await repository.recordView(id)
   const evidence = citation ? item.evidence.find(e => e.id === citation && e.version === item.version) : undefined
@@ -129,7 +132,10 @@ export default async function Detail({ params, searchParams }: { params: Promise
         {takeaways}
         {item.vimeoId && <section className="panel media"><VimeoViewer vimeoId={item.vimeoId} title={item.title} start={startAt} path={path}
           passages={item.evidence.map(e => ({ id: e.id, locator: e.locator, text: e.text }))} /></section>}
-        {item.previewAssetId && <section className="panel media"><PdfViewer src={`/files/${item.previewAssetId}`} title={item.title} initialPage={pdfPage} /></section>}
+        {(item.moreVideos ?? []).map((v, i) => <section key={v.vimeoId} className="panel media"><h2 className="small-heading">{v.title ?? `Video ${i + 2}`}</h2>
+          <VimeoViewer vimeoId={v.vimeoId} title={v.title ?? item.title} path={path} passages={[]} /></section>)}
+        {item.previewAssetId && <section className="panel media">{(item.files?.length ?? 0) > 1 && <h2 className="small-heading">{item.files!.find(f => f.id === item.previewAssetId)?.name}</h2>}
+          <PdfViewer key={item.previewAssetId} src={`/files/${item.previewAssetId}`} title={item.title} initialPage={pdfPage} /></section>}
         {inline.map(asset => {
           const viewer = viewerFor(asset.mimeType)
           const src = `/files/${asset.id}`
@@ -139,15 +145,14 @@ export default async function Detail({ params, searchParams }: { params: Promise
         })}
         {!item.vimeoId && !item.previewAssetId && !inline.length && downloads.length === 0 && item.body && <p className="subtle small-text">A preview isn&apos;t available with your access. The full text is below.</p>}
         {item.body && !item.vimeoId && <section className="panel"><h2>Full text</h2><article className="reading">{item.body}</article></section>}
+        {(item.articleImages?.length ?? 0) > 0 && <section className="panel"><h2>Images in this article</h2><div className="article-images">
+          {item.articleImages!.map(imageId => <a key={imageId} href={`/files/${imageId}`} target="_blank" rel="noreferrer"><img src={`/files/${imageId}`} alt="" loading="lazy" /></a>)}</div></section>}
       </div>
       <aside className="detail-side">
         {kitsPanel}
         {relatedPanel}
         {detailsPanel}
-        {downloads.length > 1 && <section className="panel"><h2>Files</h2><ul className="files">{downloads.map((assetId, i) => <li key={assetId}>
-          <span className="file-icon"><Icon name="file" /></span><span className="file-name">Original file {i + 1}</span>
-          <a className="btn-ghost small" href={`/files/${assetId}?download=1`}><Icon name="download" size={14} />Download</a></li>)}</ul></section>}
-        {downloads.length === 0 && <p className="small-text subtle side-note">Downloads aren&apos;t included with your access to this resource.</p>}
+        <FilesPanel files={item.files ?? []} downloadable={downloads} previewing={item.previewAssetId} highlighted={chosenFile} path={path} />
       </aside>
     </div>
   </>

@@ -14,6 +14,23 @@ export interface Material {
   details?: { owner?: string; lastReviewedAt?: string; reviewDueAt?: string; reviewWindow?: string }
   /** Originals the reader may view inline (PDF, image, audio, video, sheets). Download permission is required until view-only derivatives exist (ADR-026). */
   inlineAssets?: { id: number; mimeType: string }[]
+  /** The page's files (one section each). Names and descriptions are visible with view access; downloads need download access. */
+  files?: MaterialFile[]
+  /** Pictures from the article itself (not offered as downloads). */
+  articleImages?: number[]
+  /** Additional Vimeo videos on the same page. */
+  moreVideos?: { vimeoId: string; title?: string }[]
+  /** Search results: where the query matched (a passage, possibly inside one of the page's files). */
+  match?: { citationId: string; locator: string; assetId?: number }
+}
+export interface MaterialFile { id: number; name: string; mimeType: string; bytes?: number; description?: string }
+/** Reader link to a page, opened at the matched passage and file. Files never have their own page. */
+export function matchHref(item: Pick<Material, 'id' | 'match'>) {
+  const params = new URLSearchParams()
+  if (item.match?.citationId) params.set('citation', item.match.citationId)
+  if (item.match?.assetId) params.set('file', String(item.match.assetId))
+  const query = params.toString()
+  return `/resources/${encodeURIComponent(item.id)}${query ? `?${query}` : ''}${item.match?.assetId ? `#file-${item.match.assetId}` : ''}`
 }
 /** Narrows a listing to part of the Library menu. Values are the stored keys from domain/navigation. */
 export interface BrowseFilters {
@@ -36,20 +53,24 @@ export interface ReaderExtras {
 }
 export interface LibraryRepository {
   search(query: string, format: string | undefined, page: number, action: 'view' | 'retrieve', filters?: BrowseFilters): Promise<{ items: Material[]; hasNextPage: boolean; total?: number }>
-  get(id: string, action: 'view' | 'retrieve'): Promise<Material | null>
+  /** `file` selects which of the page's files to preview (e.g. arriving from a search hit inside it). */
+  get(id: string, action: 'view' | 'retrieve', options?: { file?: number }): Promise<Material | null>
 }
 
 export function createLibrary(repository: LibraryRepository, origin: string) {
-  const urlFor = (id: string, citation?: string) => {
+  const urlFor = (id: string, citation?: string, file?: number) => {
     const url = new URL(`/resources/${encodeURIComponent(id)}`, origin)
     if (citation) url.searchParams.set('citation', citation)
+    if (file) { url.searchParams.set('file', String(file)); url.hash = `file-${file}` }
     return url.toString()
   }
   return {
     async search(query: string, page = 1, format?: string) {
       const result = await repository.search(query, format, page, 'retrieve')
       return { ...result, items: result.items.map(item => ({ id: item.id, title: item.title,
-        description: item.description.slice(0, 500), format: item.format, version: item.version, url: urlFor(item.id) })) }
+        description: item.description.slice(0, 500), format: item.format, version: item.version, url: urlFor(item.id),
+        // Where it matched (a passage, maybe inside one of the page's files) and a link to the page opened there.
+        ...(item.match ? { matchedIn: item.match.locator, citationId: item.match.citationId, matchUrl: urlFor(item.id, item.match.citationId, item.match.assetId) } : {}) })) }
     },
     async read(id: string) {
       const item = await repository.get(id, 'retrieve')

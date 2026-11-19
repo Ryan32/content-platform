@@ -12,6 +12,7 @@ const seed = z.object({
   accessProfile: z.null(), acceptedTags: z.array(z.never()), evidenceVersion: z.literal('unprocessed'),
   passages: z.array(z.never()), vimeoId: z.string().regex(/^\d+$/).optional(),
   originalPublishedAt: z.iso.datetime().optional(), originalUpdatedAt: z.iso.datetime().optional(),
+  moreVideos: z.array(z.object({ vimeoId: z.string().regex(/^\d+$/) }).strict()).max(20).optional(),
 }).strict()
 const statuses = {
   asset: ['verified_local'], 'asset-reference': ['captured', 'external', 'missing', 'ambiguous', 'zero_bytes', 'unsafe_path', 'unresolved'],

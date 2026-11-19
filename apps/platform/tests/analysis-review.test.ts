@@ -3,7 +3,7 @@ import { ANALYSIS_VERSION, type AnalysisEnvelope } from '../src/processing/analy
 import { analysisPatch, defaultChoice, readAnalysisForm, newTagKey } from '../src/processing/analysis-review'
 
 function envelope(current: Partial<AnalysisEnvelope['current']> = {}): AnalysisEnvelope {
-  return { analysisVersion: ANALYSIS_VERSION, sources: [{ label: 'PDF 1', passages: 1, status: 'used' }],
+  return { analysisVersion: ANALYSIS_VERSION, sources: [{ id: 's1', assetId: 21, label: 'Guide.pdf', passages: 1, status: 'used' }],
     passages: [{ id: 's1-e1', text: 'Allianz annuity income guide.', locator: 'PDF 1 · Page 1' }],
     current: { title: 'Team title', description: 'Team summary', body: '', kind: 'resource', section: null, topics: [], pages: [], audience: 'advisor', program: null,
       licensing: [], lines: ['life'], carriers: [], tags: [], takeaways: [], migrated: true, sourceCategories: ['Annuities'], ...current },
@@ -12,7 +12,7 @@ function envelope(current: Partial<AnalysisEnvelope['current']> = {}): AnalysisE
       audience: { value: 'client', reason: '', evidenceIds: [] }, program: null, licensing: null, lines: { values: ['annuity'], reason: '', evidenceIds: [] },
       carriers: { ids: [8], reason: '', evidenceIds: ['s1-e1'] }, tags: [{ termId: 3, evidenceIds: ['s1-e1'], confidence: 0.9 }],
       newTags: [{ label: 'Income Riders', dimension: 'topic', definition: 'Guaranteed income riders.', evidenceIds: ['s1-e1'] }],
-      takeaways: [{ text: 'Income for life.', evidenceIds: ['s1-e1'] }], conflicts: [], warnings: [] },
+      takeaways: [{ text: 'Income for life.', evidenceIds: ['s1-e1'] }], fileSummaries: [{ sourceId: 's1', summary: 'Allianz income guide for advisors.', evidenceIds: ['s1-e1'] }], conflicts: [], warnings: [] },
     taxonomy: [{ id: 3, label: 'Annuities', definition: '', dimension: 'topic' }], taxonomyIds: [3], taxonomyVersion: 'x', carriers: [{ id: 8, name: 'Allianz' }] }
 }
 const content = { sourceHash: 'v1', updatedAt: 't1', vimeoId: null, state: 'intake', body: '' }

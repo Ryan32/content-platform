@@ -29,7 +29,8 @@ META_KEYS = ('_fl_builder_data', '_wp_attached_file', '_thumbnail_id', '__wpdm_f
              '_expiration-date', '_expiration-date-options', '_expiration-date-status',
              '_expiration-date-type', '_expiration-date-post-status', 'roles_allowed')
 BLOCKING_FLAGS = {'expired', 'not_yet_available', 'unparsed_expiration', 'unparsed_availability', 'past_due_scheduled_action'}
-MATERIAL_TYPES = {'wpdmpro', 'post', 'page', 'ae_insider_article', 'training_tool', 'wealth_strategy', 'tribe_events'}
+# tribe_events excluded: events live in AE Portal and are not migrated (owner decision, 2026-11-18).
+MATERIAL_TYPES = {'wpdmpro', 'post', 'page', 'ae_insider_article', 'training_tool', 'wealth_strategy'}
 PACKAGE_FILES = {'package.json', 'summary.json', 'dry-run.json'}
 RELATION_STATUSES = {
     'asset': {'verified_local'},
@@ -296,14 +297,17 @@ def build_package(selected, snapshots, attachments, verified, provenance, skippe
         primary = next((f for f in FORMATS if f in formats), 'document')
         video_ids = sorted({v['id'] for v in record.get('vimeo', [])}, key=int)
         if len(video_ids) > 1:
-            issues.add('multiple_vimeo_references')
+            issues.add('multiple_vimeo_references')  # informational: all are kept on the one item
         # These are INSERT proposals only, never a PATCH for existing content.
         seed = {'sourceKey': key, 'sourceHash': source_hash, 'title': title,
                 'description': plain(descriptions.get(description_field, '')),
                 'body': plain(post.get('post_content')), 'format': TARGET_FORMATS.get(primary, 'document'),
                 'state': 'intake', 'accessProfile': None, 'acceptedTags': [], 'evidenceVersion': 'unprocessed', 'passages': []}
-        if len(video_ids) == 1:
+        # One page, several videos: the first is the main player; the rest are kept on the same item.
+        if video_ids:
             seed['vimeoId'] = video_ids[0]
+        if len(video_ids) > 1:
+            seed['moreVideos'] = [{'vimeoId': v} for v in video_ids[1:21]]
         # Original dates: WordPress GMT columns only (no timezone guessing from local times).
         for column, name in (('post_date_gmt', 'originalPublishedAt'), ('post_modified_gmt', 'originalUpdatedAt')):
             value = str(post.get(column) or '')
@@ -346,7 +350,7 @@ def validate(package):
         seed = record['initialContent']
         allowed_fields = {'sourceKey', 'sourceHash', 'title', 'description', 'body', 'format', 'state',
                           'accessProfile', 'acceptedTags', 'evidenceVersion', 'passages', 'vimeoId',
-                          'originalPublishedAt', 'originalUpdatedAt'}
+                          'originalPublishedAt', 'originalUpdatedAt', 'moreVideos'}
         if set(seed) - allowed_fields:
             raise ValueError('unexpected_initial_content_field')
         if (seed.get('sourceKey') != key or seed.get('sourceHash') != record['sourceHash'] or

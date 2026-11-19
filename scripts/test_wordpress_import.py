@@ -61,7 +61,9 @@ class PackageMappingTests(unittest.TestCase):
         self.assertEqual(len(p['content']), 2)
         self.assertEqual(len([e for e in p['relationships'] if e['kind'] == 'asset']), 2)
         self.assertEqual(len(p['providerAssets']), 2)
-        self.assertNotIn('vimeoId', p['content'][1]['initialContent'])
+        # Several videos on one page: the first is the main player, the rest stay on the same item.
+        self.assertEqual(p['content'][1]['initialContent']['vimeoId'], '123')
+        self.assertEqual(p['content'][1]['initialContent']['moreVideos'], [{'vimeoId': '456'}])
         links = [e for e in p['relationships'] if e['kind'] == 'linked-package']
         self.assertEqual({e['status'] for e in links}, {'in_package', 'outside_package'})
 

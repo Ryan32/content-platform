@@ -8,7 +8,7 @@ const DATABASE = 'aecp_library'
 const USER = 'aecp_library_migration'
 const RUNTIME = 'aecp_library_runtime'
 // Keep in order with apps/platform/src/migrations/index.ts.
-const EXPECTED = ['20261118_030155_foundation', '20261118_041309_import_adapter', '20261118_091607_processing_review', '20261118_092849_review_receipt', '20261118_190233_admin_usability', '20261118_234658_review_windows_and_sections', '20261119_011841_library_pages', '20261119_030446_original_dates', '20261119_040000_semantic_index']
+const EXPECTED = ['20261118_030155_foundation', '20261118_041309_import_adapter', '20261118_091607_processing_review', '20261118_092849_review_receipt', '20261118_190233_admin_usability', '20261118_234658_review_windows_and_sections', '20261119_011841_library_pages', '20261119_030446_original_dates', '20261119_031820_file_names_and_videos', '20261119_040000_semantic_index']
 
 async function main() {
   const response = await fetch('https://truststore.pki.rds.amazonaws.com/us-east-1/us-east-1-bundle.pem', { signal: AbortSignal.timeout(15000) })

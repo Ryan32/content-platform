@@ -54,6 +54,7 @@ export const analysisReviewInput = z.object({
   title: z.string().trim().max(300), summary: z.string().trim().max(2000),
   use: z.partialRecord(z.enum(REVIEW_FIELDS), z.enum(['current', 'suggested'])),
   tags: z.array(z.number().int().positive()).max(80), newTags: z.array(z.number().int().min(0).max(7)).max(8),
+  files: z.array(z.object({ assetId: z.number().int().positive(), use: z.enum(['current', 'suggested']), text: z.string().trim().max(500) }).strict()).max(40),
 }).strict()
 export type AnalysisReviewInput = z.infer<typeof analysisReviewInput>
 
@@ -63,6 +64,32 @@ export function readAnalysisForm(form: URLSearchParams) {
     title: form.get('title') ?? '', summary: form.get('summary') ?? '',
     use: Object.fromEntries(REVIEW_FIELDS.filter(f => form.has(`use_${f}`)).map(f => [f, form.get(`use_${f}`)])),
     tags: form.getAll('tags').map(Number), newTags: form.getAll('newTags').map(Number),
+    files: [...form.keys()].filter(k => /^fileUse_\d+$/.test(k)).map(k => {
+      const assetId = Number(k.slice(8))
+      return { assetId, use: form.get(k), text: form.get(`fileText_${assetId}`) ?? '' }
+    }),
+  })
+}
+
+/** The AI's description for each file, by asset. */
+export function fileSuggestions(e: AnalysisEnvelope) {
+  const bySource = new Map(e.sources.filter(s => s.id && s.assetId).map(s => [s.id!, s]))
+  return e.analysis.fileSummaries.flatMap(f => { const s = bySource.get(f.sourceId); return s?.assetId ? [{ assetId: s.assetId, label: s.label, summary: f.summary, evidenceIds: f.evidenceIds }] : [] })
+}
+/** Same rule as other fields: keep an existing description, backfill an empty one. */
+export const defaultFileChoice = (current: string | null | undefined): 'current' | 'suggested' => current?.trim() ? 'current' : 'suggested'
+
+/** File description updates for an accepted analysis. Only files this analysis described; reviewer's wording wins. */
+export function fileDescriptionUpdates(e: AnalysisEnvelope, input: AnalysisReviewInput, current: Map<number, string | null | undefined>) {
+  if (input.decision !== 'accepted') return []
+  const chosen = new Map(input.files.map(f => [f.assetId, f]))
+  return fileSuggestions(e).flatMap(s => {
+    if (!current.has(s.assetId)) return []
+    const form = chosen.get(s.assetId)
+    const use = form?.use ?? defaultFileChoice(current.get(s.assetId))
+    if (use !== 'suggested') return []
+    const description = (form?.text || s.summary).trim()
+    return description && description !== current.get(s.assetId) ? [{ assetId: s.assetId, description }] : []
   })
 }
 
@@ -96,7 +123,8 @@ export function analysisPatch(value: unknown, content: { sourceHash?: string | n
   // Citations and search evidence come from every source; reading text is only backfilled, never replaced.
   const version = createHash('sha256').update(JSON.stringify({ sourceVersion, passages: e.passages })).digest('hex')
   patch.evidenceVersion = version
-  patch.passages = e.passages.map(p => ({ citationId: `${version.slice(0, 16)}-${p.id}`, version, text: p.text, locator: p.locator }))
+  patch.passages = e.passages.map(p => ({ citationId: `${version.slice(0, 16)}-${p.id}`, version, text: p.text, locator: p.locator, ...(p.assetId ? { assetId: p.assetId } : {}) }))
+  // Reading text is the article itself (or, for file-only pages, the files' text); never replaced once present.
   if (!content.body?.trim()) patch.body = e.passages.map(p => p.text).join('\n\n')
   if (content.state === 'intake') patch.state = 'draft'
   return patch

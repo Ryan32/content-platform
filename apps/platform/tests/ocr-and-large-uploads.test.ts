@@ -61,7 +61,8 @@ describe('REQ-ASSET-03: uploads over 50 MB go straight to private S3 staging', (
     const signedHeaders = url.searchParams.get('X-Amz-SignedHeaders')!
     for (const h of ['content-length', 'content-type', 'x-amz-server-side-encryption', 'x-amz-meta-uploaded-by']) expect(signedHeaders).toContain(h)
     expect(url.searchParams.get('X-Amz-Expires')).toBe('3600')
-    expect(signed.headers).toEqual({ 'Content-Type': 'video/mp4', 'x-amz-server-side-encryption': 'AES256', 'x-amz-meta-uploaded-by': '42' })
+    expect(signed.headers).toEqual({ 'Content-Type': 'video/mp4', 'x-amz-server-side-encryption': 'AES256', 'x-amz-meta-uploaded-by': '42', 'x-amz-meta-file-name': 'Webinar.mp4' })
+    expect(signedHeaders).toContain('x-amz-meta-file-name')
     payload.findByID.mockResolvedValueOnce({ id: 7, state: 'published' })
     await expect(signLargeUpload(payload as never, 42, 7, 'Webinar.mp4', 200 * 1024 ** 2, client)).rejects.toThrow('Intake or Draft')
   })

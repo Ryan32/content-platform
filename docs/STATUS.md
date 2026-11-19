@@ -91,6 +91,28 @@ This document captures work completed in the originating Portal conversation. Ve
 
 - **Proposed, not implemented.** Navigation v2, carrier pages, saved views for familiar WordPress pages, how-to articles as a content type, Manage (review windows and expiry), and asset viewers. Brief, seed data, tokens and AXL assets are in [`docs/design/`](design/README.md), reconciled against `85c9fe1`. Visual source: the "AE Library — design" canvas. Open decisions A–G are listed in the brief.
 
+### AI pipeline, OCR, semantic search and pilot import batch-001 — deployed to dev 2026-11-18 ~22:45 CST
+
+- **Release:** commit `fd5de2c` plus `d07597e` (embedding shipped as JSON text). Images `dev-platform-ai-pipeline` (amd64 `sha256:0bc36e81…`) and `dev-platform-ops-ai-pipeline` (amd64 `sha256:a9b0e28e…`), verified identical to the local builds.
+- **Database:** snapshot `aecp-dev-postgres-pre-ai-pipeline-20261118` taken first; the deploy stops if a snapshot fails (quota now 100/100 again).
+  - Bootstrap enabled `vector`.
+  - Migrations `original_dates`, `file_names_and_videos` and `search_and_evidence` applied (batch 6); the rerun was a no-op.
+- **Services:** smoke test passed. Worker `aecp-dev-library-worker:6` (1 vCPU / 3 GB) and web `aecp-dev-library-web:8` are healthy. `SEMANTIC_SEARCH=true`.
+- **Bucket:** `bucket-uploads.ps1` added browser-upload CORS for the library origin and a 2-day `uploads/` expiry; the existing `processing/` rule is kept.
+- **Bedrock and Textract:** Claude Haiku 5.5 and Titan Text Embeddings V2 are authorized and available; Textract is reachable. **Claude Sonnet 5.5's Marketplace agreement is NOT_AVAILABLE** — accept it in the Bedrock console before selecting Sonnet.
+- **Analytics lake (partial):** table bucket `aecp-dev-library-analytics`, namespace `library`, the 5 tables and role `aecp-dev-library-analytics-firehose` were created.
+  - **Firehose streams are not created:** Firehose reports the role cannot `glue:GetTable` even though IAM allows it. The account has **no Lake Formation administrator**, so Lake Formation grants on the S3 Tables catalog are impossible (`AccessDeniedException`).
+  - Needs an owner decision to designate an LF admin (an account-wide setting). Until then, analytics rows wait in `analytics_outbox`.
+- **Import:** batch-001 previewed, then applied.
+  - 25 restricted-intake items, 263 artifacts, 387 relationships. The rerun was a no-op.
+  - Files attached: 24 objects and assets; 25 WordPress featured images set as covers.
+  - All 405 pilot files (1.45 GiB) are in `imports/files/`; batches 002–008 are not applied yet.
+  - The worker began processing at once. After about 6 minutes: 75 jobs, 56 succeeded, 19 failed. **Failure reasons still to be read in `/admin/automation`.** Vimeo items wait for the token.
+- **Script fixes found during this deploy:**
+  - Windows PowerShell 5.1 aborts on ignored native errors under `Stop` (bucket, analytics and import scripts).
+  - S3 Tables `CreateTable` accepts only primitive types without field ids.
+  - `bootstrap.js` could not rerun on PostgreSQL 16 RDS: `ALTER ROLE … NOREPLICATION NOBYPASSRLS` needs a real superuser. It now refreshes only permitted attributes and verifies the rest, and it reports the failing step.
+  - The import role lacked `s3:ListBucket`, so attach saw 403 instead of 404 for not-yet-copied files.
 ### Library pages — deployed to dev 2026-11-18 ~20:15 CST
 
 - Commit `b19d288`, built on this laptop.

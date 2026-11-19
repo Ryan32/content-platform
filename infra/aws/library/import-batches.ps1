@@ -36,6 +36,8 @@ $webSecurityGroup = 'sg-0c6e301657f022b7c' # Same database access path as the we
 $taskRole = 'aecp-dev-library-import-task'
 $files = 'complete.json', 'package.json', 'summary.json', 'dry-run.json'
 function Invoke-Aws { $out = & aws @args; if ($LASTEXITCODE) { throw "aws $($args[0]) $($args[1]) failed" }; $out }
+# Probe that may legitimately fail (waiter timeout): Windows PowerShell turns native stderr into a terminating error under 'Stop'.
+function Invoke-AwsOptional { $ErrorActionPreference = 'Continue'; & aws @args 2>$null }
 
 # 1. Local verification: every batch is complete and unmodified since it was built.
 $manifestPath = Join-Path $BatchDir 'batches.json'
@@ -68,7 +70,9 @@ $trust = @{ Version = '2012-10-17'; Statement = @(@{ Effect = 'Allow'; Principal
 $policy = @{ Version = '2012-10-17'; Statement = @(
     @{ Sid = 'ReadImportPackages'; Effect = 'Allow'; Action = 's3:GetObject'; Resource = "arn:aws:s3:::$bucket/imports/*" },
     # Attach step: copy verified files into each item's immutable content/<id>/<sha256>.<ext> key.
-    @{ Sid = 'AttachFiles'; Effect = 'Allow'; Action = @('s3:GetObject', 's3:PutObject'); Resource = "arn:aws:s3:::$bucket/content/*" }) }
+    @{ Sid = 'AttachFiles'; Effect = 'Allow'; Action = @('s3:GetObject', 's3:PutObject'); Resource = "arn:aws:s3:::$bucket/content/*" },
+    # Without ListBucket, S3 answers HEAD on a missing key with 403 instead of 404, and attach could not tell "not copied yet" from "denied".
+    @{ Sid = 'CheckFileExists'; Effect = 'Allow'; Action = 's3:ListBucket'; Resource = "arn:aws:s3:::$bucket"; Condition = @{ StringLike = @{ 's3:prefix' = @('content/*', 'imports/*') } } }) }
 $tmp = Join-Path $env:TEMP 'aecp-import'; New-Item -ItemType Directory -Force $tmp | Out-Null
 try {
     [IO.File]::WriteAllText("$tmp\trust.json", ($trust | ConvertTo-Json -Depth 8))
@@ -132,7 +136,7 @@ $task = Invoke-Aws ecs run-task @aws --cluster $cluster --launch-type FARGATE --
 if (-not $task -or $task -eq 'None') { throw 'Task did not start' }
 "Started $task - waiting (about 1-2 min per batch)..."
 # The CLI waiter gives up after 10 minutes; keep waiting while the task is still running.
-do { & aws ecs wait tasks-stopped @aws --cluster $cluster --tasks $task 2>$null
+do { Invoke-AwsOptional ecs wait tasks-stopped @aws --cluster $cluster --tasks $task
      $status = Invoke-Aws ecs describe-tasks @aws --cluster $cluster --tasks $task --query 'tasks[0].lastStatus' --output text } while ($status -ne 'STOPPED')
 $result = Invoke-Aws ecs describe-tasks @aws --cluster $cluster --tasks $task --query "tasks[0].{stopped:stoppedReason,exit:containers[?name=='library'].exitCode|[0],reason:containers[?name=='library'].reason|[0]}" --output json | ConvertFrom-Json
 

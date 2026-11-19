@@ -181,6 +181,16 @@ export const Content: CollectionConfig = {
     { name: 'acceptedTags', type: 'relationship', relationTo: 'taxonomy', hasMany: true, label: 'Tags', admin: { description: 'Confirmed tags from Tags & topics.' } },
     { name: 'coverImage', type: 'ui', label: 'Cover image', admin: { position: 'sidebar', components: { Field: '/components/CoverImage' } } },
     { name: 'publishChecklist', type: 'ui', label: 'Ready to publish?', admin: { position: 'sidebar', components: { Field: '/components/PublishChecklist' } } },
+    // Original dates from the source system (WordPress), kept separately from Payload's own created/updated timestamps,
+    // which reflect when the item was imported and last edited here.
+    { type: 'collapsible', label: 'Original dates', admin: { position: 'sidebar', initCollapsed: true, condition: data => Boolean(data?.originalPublishedAt || data?.originalUpdatedAt) }, fields: [
+      { name: 'originalPublishedAt', type: 'date', label: 'Originally published', access: { create: admin, update: () => false },
+        admin: { readOnly: true, date: { pickerAppearance: 'dayAndTime' }, description: 'Publication date on the old resource site.' } },
+      { name: 'originalUpdatedAt', type: 'date', label: 'Last updated on the old site', access: { create: admin, update: () => false },
+        admin: { readOnly: true, date: { pickerAppearance: 'dayAndTime' } } },
+    ] },
+    { name: 'listedAt', type: 'date', index: true, label: 'Listed date', access: { create: admin, update: () => false },
+      admin: { hidden: true, description: 'Date readers see and sort by: the original publication date for migrated items, otherwise when it was added.' } },
     { name: 'state', type: 'select', label: 'Status', defaultValue: 'intake', required: true, access: { create: admin, update: admin },
       options: [option('intake', 'Intake — new, not reviewed'), option('draft', 'Draft — reviewed, not published'), option('published', 'Published — visible to its audience'), option('archived', 'Archived — hidden')],
       admin: { position: 'sidebar', description: 'Only administrators change status. Editing a published item returns it to draft for re-approval.' } },
@@ -229,6 +239,8 @@ export const Content: CollectionConfig = {
       if (originalDoc?.id !== undefined) throw new Error('Content duplication requires a separate reviewed source')
       data.evidenceVersion = 'unprocessed'
       data.passages = []
+      // Readers see migrated items at their original date, not the import date.
+      data.listedAt = data.originalPublishedAt ?? new Date().toISOString()
       if (data.state === 'published') data.state = 'draft'
       applyReviewSchedule(data, undefined, { renewal: false })
       return data

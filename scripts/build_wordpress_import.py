@@ -304,6 +304,13 @@ def build_package(selected, snapshots, attachments, verified, provenance, skippe
                 'state': 'intake', 'accessProfile': None, 'acceptedTags': [], 'evidenceVersion': 'unprocessed', 'passages': []}
         if len(video_ids) == 1:
             seed['vimeoId'] = video_ids[0]
+        # Original dates: WordPress GMT columns only (no timezone guessing from local times).
+        for column, name in (('post_date_gmt', 'originalPublishedAt'), ('post_modified_gmt', 'originalUpdatedAt')):
+            value = str(post.get(column) or '')
+            if re.fullmatch(r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}', value) and not value.startswith('0000'):
+                seed[name] = value.replace(' ', 'T') + 'Z'
+            else:
+                issues.add('original_date_missing')
         content.append({'sourceKey': key, 'sourceHash': source_hash, 'initialContent': seed,
                         'selectionReason': reason, 'descriptionSource': description_field,
                         'formats': sorted(formats), 'issues': sorted(issues),
@@ -338,7 +345,8 @@ def validate(package):
             raise ValueError('snapshot_hash_mismatch')
         seed = record['initialContent']
         allowed_fields = {'sourceKey', 'sourceHash', 'title', 'description', 'body', 'format', 'state',
-                          'accessProfile', 'acceptedTags', 'evidenceVersion', 'passages', 'vimeoId'}
+                          'accessProfile', 'acceptedTags', 'evidenceVersion', 'passages', 'vimeoId',
+                          'originalPublishedAt', 'originalUpdatedAt'}
         if set(seed) - allowed_fields:
             raise ValueError('unexpected_initial_content_field')
         if (seed.get('sourceKey') != key or seed.get('sourceHash') != record['sourceHash'] or

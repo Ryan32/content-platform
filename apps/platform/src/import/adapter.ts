@@ -45,6 +45,8 @@ export async function importPackage(input: unknown, store: ImportStore, mode: 'p
           target = await tx.insert('content', { sourceKey: item.sourceKey, sourceHash: item.sourceHash,
             title: s.title, description: s.description, body: s.body, format: s.format,
             ...(s.vimeoId ? { vimeoId: s.vimeoId } : {}), state: 'intake', accessProfile: null,
+            ...(s.originalPublishedAt ? { originalPublishedAt: s.originalPublishedAt } : {}),
+            ...(s.originalUpdatedAt ? { originalUpdatedAt: s.originalUpdatedAt } : {}),
             acceptedTags: [], evidenceVersion: 'unprocessed', passages: [],
           })
         }

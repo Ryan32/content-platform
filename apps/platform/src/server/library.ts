@@ -62,7 +62,7 @@ export async function authenticatedLibrary(headers: Headers, mode: 'browser' | '
   const req = await createLocalReq({ user }, payload)
   const map = (doc: any): Material => ({ id: String(doc.id), title: doc.title,
     description: doc.description ?? '', format: doc.format, version: doc.evidenceVersion,
-    body: doc.body ?? '', updatedAt: doc.updatedAt, ...(doc.thumbnailVersion ? { thumbnailVersion: doc.thumbnailVersion } : {}),
+    body: doc.body ?? '', updatedAt: doc.originalUpdatedAt ?? doc.updatedAt, ...(doc.originalPublishedAt ? { originalPublishedAt: doc.originalPublishedAt } : {}), ...(doc.thumbnailVersion ? { thumbnailVersion: doc.thumbnailVersion } : {}),
     kind: doc.kind ?? 'resource', ...(doc.section ? { section: doc.section } : {}), topics: doc.topics ?? [],
     audience: doc.audience ?? 'advisor', licensing: doc.licensing ?? [], lines: doc.lines ?? [], ...(doc.program ? { program: doc.program } : {}),
     carriers: (doc.carriers ?? []).map((c: any) => typeof c === 'object' ? c.id : c),
@@ -98,7 +98,7 @@ export async function authenticatedLibrary(headers: Headers, mode: 'browser' | '
   async function authorized(where: Where[], action: 'view' | 'retrieve' = 'view') {
     const ids = await profileIds(req, action)
     if (!ids.length) return []
-    return (await payload.find({ collection: 'content', req, user, overrideAccess: false, depth: 0, pagination: false, sort: '-updatedAt',
+    return (await payload.find({ collection: 'content', req, user, overrideAccess: false, depth: 0, pagination: false, sort: '-listedAt',
       where: { and: [publishedWhere(ids), ...where] } })).docs
   }
   return {
@@ -125,7 +125,7 @@ export async function authenticatedLibrary(headers: Headers, mode: 'browser' | '
         return { items: sorted.slice((page - 1) * size, page * size).map(map), hasNextPage: sorted.length > page * size, total: sorted.length }
       }
       const result = await payload.find({ collection: 'content', req, user, overrideAccess: false, depth: 0,
-        limit: size, page, sort: '-updatedAt', where: { and: [publishedWhere(ids),
+        limit: size, page, sort: '-listedAt', where: { and: [publishedWhere(ids),
           ...(query ? [{ or: [{ title: { contains: query } }, { description: { contains: query } }, { body: { contains: query } }] }] : []),
           ...(format ? [{ format: { equals: format } }] : []), ...browse(filters),
         ] } })

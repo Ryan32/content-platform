@@ -12,7 +12,7 @@ type Queryable = { query: (sql: string, values: unknown[]) => Promise<{ rows: { 
 export async function rankedContentIds(db: Queryable, query: string, limit = 500): Promise<number[] | null> {
   const { rows } = await db.query(`SELECT c.id FROM content c, websearch_to_tsquery('english', $1) q
     WHERE numnode(q) > 0 AND c.state = 'published' AND ${SEARCH_DOCUMENT} @@ q
-    ORDER BY ts_rank_cd(${SEARCH_DOCUMENT}, q, 32) DESC, c.updated_at DESC LIMIT $2`, [query, limit])
+    ORDER BY ts_rank_cd(${SEARCH_DOCUMENT}, q, 32) DESC, c.listed_at DESC NULLS LAST LIMIT $2`, [query, limit])
   if (rows.length) return rows.map(r => Number(r.id))
   // Stop-word-only queries (e.g. "the") produce an empty tsquery; let the caller fall back to substring matching.
   const { rows: check } = await db.query(`SELECT numnode(websearch_to_tsquery('english', $1)) AS id`, [query])

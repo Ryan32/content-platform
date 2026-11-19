@@ -5,6 +5,7 @@ import * as migration_20261118_092849_review_receipt from './20261118_092849_rev
 import * as migration_20261118_190233_admin_usability from './20261118_190233_admin_usability';
 import * as migration_20261118_234658_review_windows_and_sections from './20261118_234658_review_windows_and_sections';
 import * as migration_20261119_011841_library_pages from './20261119_011841_library_pages';
+import * as migration_20261119_030446_original_dates from './20261119_030446_original_dates';
 import * as migration_20261119_040000_semantic_index from './20261119_040000_semantic_index';
 
 export const migrations = [
@@ -41,7 +42,12 @@ export const migrations = [
   {
     up: migration_20261119_011841_library_pages.up,
     down: migration_20261119_011841_library_pages.down,
-    name: '20261119_011841_library_pages'
+    name: '20261119_011841_library_pages',
+  },
+  {
+    up: migration_20261119_030446_original_dates.up,
+    down: migration_20261119_030446_original_dates.down,
+    name: '20261119_030446_original_dates',
   },
   {
     up: migration_20261119_040000_semantic_index.up,

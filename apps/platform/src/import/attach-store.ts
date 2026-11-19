@@ -20,7 +20,7 @@ export function payloadAttachDeps(payload: Payload, bucket: string, s3 = new S3C
       return docs[0] ? { id: Number(docs[0].id), sourceHash: (docs[0] as { sourceHash?: string | null }).sourceHash ?? null } : null
     },
     async copy(file, key, bytes) {
-      assertImport(/^[a-f0-9]{64}\.[a-z0-9]{1,8}$/.test(file) && /^content\/\d+\/[a-f0-9]{64}\.[a-z0-9]{1,8}$/.test(key), 'invalid_attach_key')
+      assertImport(/^[a-f0-9]{64}\.[a-z0-9]{1,8}$/.test(file) && /^content\/\d+\/(?:thumb-)?[a-f0-9]{64}\.[a-z0-9]{1,8}$/.test(key), 'invalid_attach_key')
       const existing = await size(key)
       if (existing !== null) { assertImport(existing === bytes, 'existing_object_size_mismatch'); return 'existing' }
       const source = `imports/files/${file}`
@@ -35,6 +35,13 @@ export function payloadAttachDeps(payload: Payload, bucket: string, s3 = new S3C
       const { docs } = await payload.find({ collection: 'assets', overrideAccess: true, depth: 0, limit: 1,
         where: { and: [{ content: { equals: content } }, { sha256: { equals: sha256 } }, { version: { equals: version } }] } })
       return docs[0] ? Number(docs[0].id) : null
+    },
+    async cover(contentId, key, version) {
+      // Same columns an editor's cover upload sets (server/thumbnails.ts); never replaces an editor's own cover.
+      const pool = (payload.db as unknown as { pool: { query: (sql: string, params: unknown[]) => Promise<{ rowCount: number | null }> } }).pool
+      const result = await pool.query(`UPDATE content SET thumbnail_key=$2, thumbnail_version=$3, thumbnail_source='upload', thumbnail_for='upload'
+        WHERE id=$1 AND (thumbnail_source IS DISTINCT FROM 'upload' OR thumbnail_key=$2)`, [contentId, key, version])
+      return Boolean(result.rowCount)
     },
     async createAsset(data) {
       return Number((await payload.create({ collection: 'assets', overrideAccess: true, depth: 0, data })).id)

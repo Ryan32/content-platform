@@ -11,6 +11,7 @@ const seed = z.object({
   format: z.enum(['article', 'pdf', 'video', 'audio', 'slides', 'document']), state: z.literal('intake'),
   accessProfile: z.null(), acceptedTags: z.array(z.never()), evidenceVersion: z.literal('unprocessed'),
   passages: z.array(z.never()), vimeoId: z.string().regex(/^\d+$/).optional(),
+  originalPublishedAt: z.iso.datetime().optional(), originalUpdatedAt: z.iso.datetime().optional(),
 }).strict()
 const statuses = {
   asset: ['verified_local'], 'asset-reference': ['captured', 'external', 'missing', 'ambiguous', 'zero_bytes', 'unsafe_path', 'unresolved'],

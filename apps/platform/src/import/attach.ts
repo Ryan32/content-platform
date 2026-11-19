@@ -20,7 +20,11 @@ export interface AttachDeps {
   copy(file: string, key: string, bytes: number): Promise<'copied' | 'existing'>
   asset(contentId: number, sha256: string, version: string): Promise<number | null>
   createAsset(data: { content: number; objectKey: string; sha256: string; mimeType: string; version: string }): Promise<number>
+  /** Sets the item's cover to an already-copied image unless an editor uploaded one. Returns whether it was set. */
+  cover(contentId: number, key: string, version: string): Promise<boolean>
 }
+const COVER_TYPES = new Set(['jpg', 'jpeg', 'png', 'webp'])
+const MAX_COVER_BYTES = 5 * 1024 * 1024
 
 export function blobFile(blob: { sha256: string; localPaths: string[] }) {
   const match = /\.([A-Za-z0-9]{1,8})$/.exec(blob.localPaths[0] ?? '')
@@ -34,11 +38,25 @@ export async function attachFiles(input: unknown, deps: AttachDeps) {
   const count = (key: string) => { counts[key] = (counts[key] ?? 0) + 1 }
   const blobs = new Map(p.blobs.map(b => [b.id, b]))
   for (const item of p.content) {
-    const edges = p.relationships.filter(e => e.from === item.sourceKey && e.kind === 'asset')
-    if (!edges.length) continue
+    const all = p.relationships.filter(e => e.from === item.sourceKey && e.kind === 'asset')
+    if (!all.length) continue
+    // The WordPress featured image becomes the cover; it is a source to read only if the post also uses it elsewhere.
+    const featured = all.find(e => e.field === 'featured_image')
+    const edges = all.filter(e => e.field !== 'featured_image' || all.some(o => o.to === e.to && o.field !== 'featured_image'))
     const target = await deps.content(item.sourceKey)
     if (!target) { count('item_not_imported'); continue }
     if (target.sourceHash !== item.sourceHash) { count('item_version_changed_skipped'); continue }
+    if (featured) {
+      const blob = blobs.get(featured.to)
+      assertImport(blob, 'missing_blob')
+      const { ext, file } = blobFile(blob)
+      if (!COVER_TYPES.has(ext) || blob.bytes > MAX_COVER_BYTES) count('cover_skipped_type_or_size')
+      else {
+        const key = `content/${target.id}/thumb-${blob.sha256}.${ext === 'jpeg' ? 'jpg' : ext}`
+        await deps.copy(file, key, blob.bytes)
+        count(await deps.cover(target.id, key, blob.sha256.slice(0, 16)) ? 'cover_set' : 'cover_kept_editor_upload')
+      }
+    }
     for (const sha of new Set(edges.map(e => e.to))) {
       const blob = blobs.get(sha)
       assertImport(blob, 'missing_blob')

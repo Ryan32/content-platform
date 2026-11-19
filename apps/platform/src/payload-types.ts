@@ -289,6 +289,15 @@ export interface Content {
    */
   acceptedTags?: (number | Taxonomy)[] | null;
   /**
+   * Publication date on the old resource site.
+   */
+  originalPublishedAt?: string | null;
+  originalUpdatedAt?: string | null;
+  /**
+   * Date readers see and sort by: the original publication date for migrated items, otherwise when it was added.
+   */
+  listedAt?: string | null;
+  /**
    * Only administrators change status. Editing a published item returns it to draft for re-approval.
    */
   state: 'intake' | 'draft' | 'published' | 'archived';
@@ -952,6 +961,9 @@ export interface ContentSelect<T extends boolean = true> {
   thumbnailFor?: T;
   body?: T;
   acceptedTags?: T;
+  originalPublishedAt?: T;
+  originalUpdatedAt?: T;
+  listedAt?: T;
   state?: T;
   accessProfile?: T;
   availableAt?: T;

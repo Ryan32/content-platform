@@ -58,6 +58,7 @@ export default async function Detail({ params, searchParams }: { params: Promise
     ...(item.lines?.length ? [['Line of business', item.lines.map(l => labelOf(LINES, l)).join(', ')] as [string, string]] : []),
     ...(item.program ? [['Program', labelOf(PROGRAMS, item.program)] as [string, string]] : []),
     ['Format', howto ? 'How-to article' : formatLabel(item.format)],
+    ...(item.originalPublishedAt ? [['Published', formatDate(item.originalPublishedAt)] as [string, string]] : []),
     ['Updated', formatDate(item.updatedAt)],
     ...(d.owner ? [['Owner', d.owner] as [string, string]] : []),
     ...(d.lastReviewedAt ? [['Last reviewed', formatDate(d.lastReviewedAt)] as [string, string]] : []),

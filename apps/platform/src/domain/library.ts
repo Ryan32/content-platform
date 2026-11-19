@@ -3,7 +3,10 @@ export interface Evidence {
 }
 export interface Material {
   id: string; title: string; description: string; format: string; version: string;
+  /** Date shown to readers: the source system's last update for migrated items, otherwise the last edit here. */
   body: string; updatedAt: string; evidence: Evidence[]
+  /** Original publication date on the old site (migrated items only). */
+  originalPublishedAt?: string
   vimeoId?: string; previewAssetId?: number; downloadAssetIds?: number[]; thumbnailVersion?: string
   kind?: string; section?: string; topics?: string[]
   audience?: string; licensing?: string[]; lines?: string[]; program?: string; carriers?: number[]; takeaways?: string[]

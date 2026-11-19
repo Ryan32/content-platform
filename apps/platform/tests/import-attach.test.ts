@@ -24,6 +24,7 @@ function fixture(): IntakePackage {
 }
 
 function memory(versions: Record<string, string | null>) {
+  const covers: { id: number; key: string; version: string }[] = [], editorCovers = new Set<number>()
   const objects = new Set<string>(), assets: { content: number; sha256: string; version: string; objectKey: string; mimeType: string }[] = []
   const ids: Record<string, number> = { 'wordpress:dbr:post:1': 11, 'wordpress:dbr:post:2': 12 }
   const deps: AttachDeps = {
@@ -31,8 +32,9 @@ function memory(versions: Record<string, string | null>) {
     copy: async (_file, key) => { if (objects.has(key)) return 'existing'; objects.add(key); return 'copied' },
     asset: async (c, s, v) => assets.findIndex(a => a.content === c && a.sha256 === s && a.version === v) + 1 || null,
     createAsset: async data => { assets.push(data); return assets.length },
+    cover: async (id, key, version) => { if (editorCovers.has(id)) return false; covers.push({ id, key, version }); return true },
   }
-  return { deps, objects, assets }
+  return { deps, objects, assets, covers, editorCovers }
 }
 
 describe('import file attach', () => {
@@ -55,6 +57,20 @@ describe('import file attach', () => {
     expect(result.counts).toEqual({ item_version_changed_skipped: 1, item_not_imported: 1 })
     expect(m.assets).toHaveLength(0)
   })
+  it('makes the WordPress featured image the cover (not a source to read), and never replaces an editor cover', async () => {
+    const p = fixture()
+    const photo = { id: `sha256:${'d'.repeat(64)}`, sha256: 'd'.repeat(64), bytes: 76540, localPaths: ['wp-content/uploads/2026/08/Featured.JPG'], delivery: 'not_uploaded' as const }
+    p.blobs.push(photo)
+    for (const item of p.content) { const edge = { from: item.sourceKey, to: photo.id, kind: 'asset' as const, field: 'featured_image', status: 'verified_local' }; p.relationships.push({ ...edge, id: digest(edge) }) }
+    const { packageId: _, ...rest } = p; p.packageId = digest(rest)
+    const m = memory({ [p.content[0].sourceKey]: p.content[0].sourceHash, [p.content[1].sourceKey]: p.content[1].sourceHash })
+    m.editorCovers.add(12)
+    const result = await attachFiles(p, m.deps)
+    expect(m.covers).toEqual([{ id: 11, key: `content/11/thumb-${'d'.repeat(64)}.jpg`, version: 'd'.repeat(16) }])
+    expect(result.counts).toMatchObject({ cover_set: 1, cover_kept_editor_upload: 1 })
+    expect(m.assets.some(a => a.sha256 === 'd'.repeat(64))).toBe(false)
+  })
+
   it('names files by hash with a safe lowercase extension', () => {
     expect(blobFile({ sha256: 'a'.repeat(64), localPaths: ['x/Report.PDF'] })).toEqual({ ext: 'pdf', file: `${'a'.repeat(64)}.pdf` })
     expect(blobFile({ sha256: 'b'.repeat(64), localPaths: ['x/noext'] }).ext).toBe('bin')

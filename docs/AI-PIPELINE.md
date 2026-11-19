@@ -12,6 +12,25 @@ Applies equally to WordPress imports and to material staff add (single upload, B
 4. **Field-by-field review** (`/admin/review/<id>`). Per the owner's rule: keep what the team wrote, backfill what's missing, propose clean-up. Title and summary default to the current value; empty fields (and WordPress import defaults nobody chose) default to the AI value; everything else shows current vs. suggested and applies only if the reviewer picks it. Current tags stay; AI tags and new-tag proposals are pre-checked only when the item has no tags. Accepting installs all source text as citations, fills reading text only if the item has none, and moves Intake to Draft. It never publishes, grants access, or deletes.
 5. **Semantic index.** The worker embeds each reviewed citation passage of Draft and Published items (Amazon Titan Text Embeddings V2, 1024-d) into `passage_embeddings` (pgvector, HNSW), and prunes rows for superseded evidence. Reader search and MCP `search_content` fuse keyword and semantic rankings. Only published items with current evidence can match, and the existing authorization filter is applied afterwards, unchanged. If Bedrock is slow or unavailable, search silently falls back to keyword-only.
 
+## Every file type in the backup
+
+The full WordPress inventory (6,680 records) references 7,600 present files: 3,033 PDF, 4,243 images, 144 docx, 105 pptx, 60 xlsx, 8 zip, 3 mp4, 2 doc, 1 xls, 1 xlsm. All are handled:
+
+| Type | How it is read |
+| --- | --- |
+| PDF | Text layer; Textract OCR for scanned/partly scanned pages and PDFs over 50 MB (to 500 MB). |
+| docx, pptx, xlsx, xlsm | Text, slides, sheets. Up to 200 MB; larger files are refused (the one 742 MB deck is excluded by owner decision). Picture-only slides (under 25 characters of text) have their images read by AI vision (max 25 per deck). |
+| doc, xls, ppt | Old binary formats: readable text recovered approximately, with a warning. |
+| zip | Every supported file inside is read and labelled `packet › file · page`; pictures inside go to AI vision. No nested zips. |
+| jpg, jpeg, png, webp, gif | AI vision (the approved Claude model): description plus transcribed text, as citable passages. Images under 8 KB (icons) are not imported; pictures the model judges decorative add nothing. |
+| svg | Title, description and visible text read directly (free); scripts ignored. |
+| mp3/mp4/wav/m4a/flac/ogg/webm | Amazon Transcribe (to 2 GB). |
+| Vimeo | Captions, else MP4 streamed and transcribed. |
+
+**WordPress featured images** become the item's cover (same storage and fields as an editor-uploaded cover; never replaces one) and are not processed as a source unless the post also uses them elsewhere. **Original dates**: WordPress GMT publication and modification times are stored as `originalPublishedAt` / `originalUpdatedAt`; readers see "Published" and "Updated" from them, and lists sort by `listedAt` (original publication date for migrated items, otherwise when added), so a migration does not flood "New in the Library". Migration `20261119_030446_original_dates` adds the columns and backfills `listedAt` for existing items.
+
+Not processed: 1,628 external links (other sites; kept as references) and 710 files missing from the backup.
+
 ## Decisions
 
 - **ADR-035 — import files enter the normal pipeline.** No import-only processing path. Bytes are verified at build, re-verified before upload, size-checked on copy, and attached only to items whose source version still matches the package. Reruns reuse objects and file records.
@@ -20,10 +39,13 @@ Applies equally to WordPress imports and to material staff add (single upload, B
 - **ADR-038 — pgvector in the existing RDS database; no separate vector or RAG product.** One table, hand-written migration `20261119_040000_semantic_index`. The extension is created by the bootstrap task (master role). Eligibility is decided by the content row at query time, so publication, expiry, archive and access changes apply immediately; deleting an item cascades.
 - **ADR-039 — Titan Text Embeddings V2 for search.** Low cost and in-region; `EMBEDDING_MODEL_ID` can change it (must remain 1024-d). Switched on by `SEMANTIC_SEARCH=true`. The web role may invoke only this model.
 - **ADR-040 — large Vimeo renditions stream to S3.** Multipart upload with per-part SHA-256 checksums and abort on failure; Transcribe's 2 GB limit replaces the 50 MB buffer limit for this path.
+- **ADR-043 — one file-type registry** (`processing/formats.ts`) drives uploads, import, the job queue and the browser, with per-type size limits (Office/zip 200 MB, legacy 50 MB, PDF 500 MB, media 2 GB, images 20 MB).
+- **ADR-044 — pictures are read by AI vision**, normalized through the worker's canvas to ≤1568 px JPEG; a paid step under the AI tagging switch and the daily limit. Worker memory raised to 3 GB for 200 MB Office/zip files.
+- **ADR-045 — original source dates are separate fields**, never overwriting Payload's own timestamps; `listedAt` is the reader's sort date.
 - **ADR-041 — OCR with Amazon Textract.** Asynchronous text detection on the item's private S3 object (500 MB / 3,000 pages), polled statelessly like Transcribe (idempotent per job key). Counts as a paid step under the Transcription switch and the daily paid-job limit. Results are marked `(OCR)` per page with a check-the-numbers warning.
 - **ADR-042 — uploads over 50 MB go browser → S3.** The app signs a one-hour PUT to `uploads/<item>/<uuid>.<ext>` with the exact size, type, encryption and uploader signed (audio/video ≤ 2 GB, PDF ≤ 500 MB). The worker streams and fingerprints every byte, copies it to the immutable `content/<item>/<sha256>.<ext>` key with the fingerprint recorded, registers it through Payload with the same rules as a direct upload, and deletes the staging object. Unsigned, oversized, fake-PDF or unattachable uploads are deleted; abandoned staging objects expire after 2 days (bucket lifecycle). Files up to 50 MB keep the existing direct path.
 
-Requirements: **REQ-INGEST-03** (OCR), **REQ-ASSET-03** (large uploads), **REQ-IMPORT-07** (import files attach idempotently, version-pinned), **REQ-AI-02** (combined analysis, keep/backfill/propose review), **REQ-SEARCH-02** (hybrid ranking never widens access; degrades to keyword), **REQ-SEARCH-03** (index tracks current evidence and state). Tests: `import-attach`, `analysis`, `analysis-review`, `automation`, `vimeo-media`, `semantic-search`, `ocr-and-large-uploads`.
+Requirements: **REQ-INGEST-04** (every backup file type), **REQ-AI-03** (pictures), **REQ-IMPORT-08** (original dates, featured-image covers), **REQ-INGEST-03** (OCR), **REQ-ASSET-03** (large uploads), **REQ-IMPORT-07** (import files attach idempotently, version-pinned), **REQ-AI-02** (combined analysis, keep/backfill/propose review), **REQ-SEARCH-02** (hybrid ranking never widens access; degrades to keyword), **REQ-SEARCH-03** (index tracks current evidence and state). Tests: `import-attach`, `analysis`, `analysis-review`, `automation`, `vimeo-media`, `semantic-search`, `ocr-and-large-uploads`, `all-formats`.
 
 ## Deploy and live check (AWS laptop)
 
@@ -37,11 +59,11 @@ Pull `main`, then:
 6. `worker-service.ps1 -ImageDigest <ops>` (adds Textract, Titan embedding, `uploads/` finalize and multipart-abort permissions, `PAYLOAD_SECRET`, `SEMANTIC_SEARCH=true`) and `web-service.ps1 -ImageDigest <web>` (adds the Titan query permission, signing PUTs into `uploads/`, `SEMANTIC_SEARCH=true`), then `run-task.ps1 -Step smoke`.
 7. Store the Vimeo token in `aecp-dev-library-vimeo-token`, then rerun `worker-service.ps1` so the worker receives it.
 8. Confirm Textract is available and in Bedrock that Claude Haiku/Sonnet 5.5 and Titan Text Embeddings V2 are invocable in us-east-1.
-9. Import: `import-batches.ps1 -BatchDir <copied pilot-200-files> -OperationsDigest <ops> -PreviewOnly -Only batch-001`, then without `-PreviewOnly`.
+9. Import: `import-batches.ps1 -BatchDir <copied pilot-200-v3> -OperationsDigest <ops> -PreviewOnly -Only batch-001`, then without `-PreviewOnly`.
 10. Live check, one of each: a PDF item, a scanned PDF, a Vimeo item, an article-only item, a manual upload, and an audio/video upload over 50 MB (watch the progress, then "preparing", then transcription). Watch `/admin/automation`; then in `/admin/review` confirm sources, keep/backfill defaults, conflicts, new tags; accept; publish one with an access profile; search for it by a phrase that is not in its title, and confirm an unauthorized user cannot find it.
 
 Cost controls: paid steps (Transcribe, Claude analysis) count against **Daily paid-job limit** in Automation settings (default 200/day); embeddings are not counted but cost roughly cents per thousand passages. Pause automation there at any time.
 
 ## Not covered yet
 
-Legacy `.doc/.ppt/.xls`; Word/PowerPoint/Excel over 50 MB; OCR of images inside Office files; image understanding (WordPress featured images as covers is still pending); original WordPress dates; a staged-change merge UI for re-imported WordPress sources; a reviewed-evidence passage-level answer view in MCP.
+Office files over 200 MB (refused by design); external links; files missing from the backup; the full 6,680-record migration (only the 200-record pilot is batched so far); a staged-change merge UI for re-imported WordPress sources; a reviewed-evidence passage-level answer view in MCP.

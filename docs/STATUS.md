@@ -4,6 +4,14 @@ This document captures work completed in the originating Portal conversation. Ve
 
 ## Active priority — core platform and general MCP
 
+### AI processing for everything, field-by-field review, semantic search — 2026-11-18
+
+- **Implemented and tested locally; not deployed.** Commits `a77c2a4`, `f5c189e`, `d98069f`, `12acb94`. Full description, ADR-035–040 and the deploy/live-check runbook: [AI-PIPELINE.md](AI-PIPELINE.md).
+- Imports attach their verified files so they are extracted/transcribed like uploads; each item then gets **one combined Claude analysis** of all its sources plus its current record; **Review** shows current vs. suggested per field (keep team values, backfill empty fields, propose clean-up; AI may propose new tags for approval); accepted passages are embedded into **pgvector** and search/MCP rank by keyword + meaning without widening access. Vimeo videos without captions now transcribe up to 2 GB.
+- Batches rebuilt with files: `data/wordpress-import/batches/pilot-200-files/` (same 8 package IDs; 320 files, 1.55 GB: 147 PDF, 14 docx, 11 pptx, 7 xlsx, 139 images and 2 `.doc` not processed). No local audio/video in the 200 pilot records.
+- Validation: typecheck; 143 tests in 25 files; production build (8 indexed migrations). A temporary real-PostgreSQL 17 + pgvector check (PGlite, not committed) ran the scheduler, record loader, migration, indexer and semantic query, and caught two bugs now fixed (NULL Vimeo IDs blocked analysis; untyped insert parameters). Not tested: Bedrock/Transcribe/Vimeo calls, RDS, the review page in a browser, the decision route against Payload, AWS scripts.
+- Next: AWS laptop follows the AI-PIPELINE runbook (new images → snapshot → bootstrap → migrate → worker/web → Vimeo token → import → live check of one PDF, Vimeo, article and upload).
+
 ### WordPress test migration: batch build + one-command run — 2026-11-18
 
 - **Built and validated locally, not run on AWS.** `python scripts/build_wordpress_import.py batch --output data/wordpress-import/batches/<new-name>` splits every eligible pilot record into restricted-intake packages of up to 25 (the adapter ceiling) and writes `batches.json`. Real run: `data/wordpress-import/batches/pilot-200/` = 8 batches, 200 records, 214–371 relationships each; all 8 passed the app's `import:package check`. Transfer copy: `pilot-200.zip` (0.8 MB, ignored).

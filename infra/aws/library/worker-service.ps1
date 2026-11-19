@@ -42,7 +42,8 @@ $task = @{ Version = '2012-10-17'; Statement = @(
     # Large Vimeo renditions stream to processing/vimeo/ by multipart upload; failed uploads are aborted.
     @{ Sid = 'AbortStagedMedia'; Effect = 'Allow'; Action = 's3:AbortMultipartUpload'; Resource = "arn:aws:s3:::$bucket/processing/*" },
     @{ Sid = 'Transcribe'; Effect = 'Allow'; Action = @('transcribe:StartTranscriptionJob', 'transcribe:GetTranscriptionJob'); Resource = '*' },
-    @{ Sid = 'ApprovedTaggingModels'; Effect = 'Allow'; Action = @('bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'); Resource = @($modelResources) }) }
+    @{ Sid = 'ApprovedTaggingModels'; Effect = 'Allow'; Action = @('bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'); Resource = @($modelResources) },
+    @{ Sid = 'SemanticIndex'; Effect = 'Allow'; Action = 'bedrock:InvokeModel'; Resource = "arn:aws:bedrock:${region}::foundation-model/amazon.titan-embed-text-v2:0" }) }
 
 $tmp = Join-Path $env:TEMP 'aecp-worker-iam'; New-Item -ItemType Directory -Force $tmp | Out-Null
 try {
@@ -73,7 +74,9 @@ $definition = @{
             @{ name = 'AWS_REGION'; value = $region },
             # Dev ceiling chosen by the owner: paid steps allowed; Automation settings and the daily limit still apply.
             @{ name = 'ALLOW_PAID_PROCESSING'; value = 'true' },
-            @{ name = 'BEDROCK_MODEL_IDS'; value = ($models -join ',') })
+            @{ name = 'BEDROCK_MODEL_IDS'; value = ($models -join ',') },
+            # Embeds reviewed passages for semantic search (Titan Text Embeddings V2).
+            @{ name = 'SEMANTIC_SEARCH'; value = 'true' })
         secrets = @(@{ name = 'DB_PASSWORD'; valueFrom = "${secret}:aecp-dev-library-db-runtime-TKkby2" }) + $(if ($vimeoReady) { @(@{ name = 'VIMEO_ACCESS_TOKEN'; valueFrom = $vimeoSecret }) } else { @() })
         logConfiguration = @{ logDriver = 'awslogs'; options = @{ 'awslogs-group' = $logGroup; 'awslogs-region' = $region; 'awslogs-stream-prefix' = 'worker' } }
     })

@@ -8,7 +8,7 @@ export function createContentMcp(repository: LibraryRepository, origin: string, 
   const annotations = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
   const respond = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] })
   if (scopes.includes('content:search')) server.registerTool('search_content', {
-    description: 'Find authorized AE library material by title, description, or text. Returns stable reader links. Currently keyword search, not semantic ranking.',
+    description: 'Find authorized AE library material by keywords and (where semantic search is enabled) meaning, across titles, summaries and reviewed source text (documents, transcripts, articles). Returns stable reader links.',
     inputSchema: { query: z.string().max(200), page: z.number().int().min(1).max(100).default(1),
       format: z.enum(['article', 'pdf', 'video', 'audio', 'slides', 'document']).optional() }, annotations,
   }, async ({ query, page, format }) => respond(await library.search(query, page, format)))

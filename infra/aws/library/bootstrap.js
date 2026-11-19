@@ -39,6 +39,8 @@ async function main() {
       'REVOKE ALL ON SCHEMA public FROM PUBLIC',
       `GRANT USAGE, CREATE ON SCHEMA public TO ${MIGRATION}`,
       `GRANT USAGE ON SCHEMA public TO ${RUNTIME}`,
+      // Semantic search (migration 20261119_040000_semantic_index). Requires rds_superuser; idempotent.
+      'CREATE EXTENSION IF NOT EXISTS vector',
     ]) await target.query(query)
   } finally { await target.end() }
   console.log('Verified TLS and bootstrapped isolated library database and roles')

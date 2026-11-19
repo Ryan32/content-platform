@@ -5,7 +5,12 @@ import type { BrowseFilters, Carrier, Kit, LibraryRepository, Material, ReaderEx
 import { principalFromUser } from '../domain/access'
 import { hasSessionCookie, readSession } from '../auth/browser'
 import { verifyBearer } from '../auth/verify'
-import { rankedContentIds } from './search'
+import { hybridContentIds, rankedContentIds } from './search'
+import { bedrockEmbedder, semanticSearchEnabled, type Embed } from '../processing/embeddings'
+
+// One Bedrock client per server process; created only when semantic search is switched on.
+let embedder: Embed | undefined
+const queryEmbedder = () => semanticSearchEnabled() ? (embedder ??= bedrockEmbedder()) : undefined
 import { isInlineType } from '../domain/viewers'
 
 export type ReaderLibrary = LibraryRepository & ReaderExtras
@@ -101,9 +106,9 @@ export async function authenticatedLibrary(headers: Headers, mode: 'browser' | '
       const ids = await profileIds(req, action)
       if (!ids.length) return { items: [], hasNextPage: false }
       const pool = (payload.db as { pool?: Parameters<typeof rankedContentIds>[0] } | undefined)?.pool
-      const ranked = query && pool ? await rankedContentIds(pool, query) : null
+      const ranked = query && pool ? await hybridContentIds(pool, query, queryEmbedder()) : null
       if (ranked) {
-        // Relevance order from PostgreSQL; the authorization filter below is unchanged, so ranking never widens access.
+        // Relevance order (keyword + meaning); the authorization filter below is unchanged, so ranking never widens access.
         if (!ranked.length) return { items: [], hasNextPage: false }
         const allowed = await payload.find({ collection: 'content', req, user, overrideAccess: false, depth: 0, pagination: false,
           where: { and: [publishedWhere(ids), { id: { in: ranked } }, ...(format ? [{ format: { equals: format } }] : []), ...browse(filters)] } })

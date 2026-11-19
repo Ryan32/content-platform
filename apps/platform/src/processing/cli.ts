@@ -30,7 +30,9 @@ try {
     let stopping = false
     for (const signal of ['SIGTERM', 'SIGINT'] as const) process.on(signal, () => { stopping = true })
     const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
-    let lastScan = 0, lastThumbs = 0, lastSummary = ''
+    let lastScan = 0, lastThumbs = 0, lastIndex = 0, lastSummary = ''
+    const { bedrockEmbedder, semanticSearchEnabled, syncEmbeddings } = await import('./embeddings')
+    const indexing = semanticSearchEnabled() && process.env.ALLOW_PAID_PROCESSING === 'true' ? bedrockEmbedder() : null
     const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3')
     const { readOriginal } = await import('./storage')
     const [{ syncThumbnails, vimeoThumbnail }, { renderPdfThumbnail }] = await Promise.all([import('./thumbnails'), import('./pdf-thumbnail')])
@@ -57,6 +59,13 @@ try {
           lastThumbs = Date.now()
           const made = await syncThumbnails(pool, thumbnailDeps)
           if (made.length) console.log(JSON.stringify({ status: 'thumbnails', results: made }))
+        }
+        if (indexing && Date.now() - lastIndex > 15000) {
+          // Semantic search index for reviewed passages; prunes superseded evidence. Bounded per pass.
+          lastIndex = Date.now()
+          const indexed = await syncEmbeddings(pool, indexing)
+          if (indexed.embedded || indexed.pruned) console.log(JSON.stringify({ status: 'indexed', ...indexed }))
+          if (indexed.embedded) lastIndex = 0
         }
         const outcome = await workOnce(store, processors)
         if (outcome.status === 'idle') await sleep(5000)

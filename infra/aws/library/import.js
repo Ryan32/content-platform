@@ -11,7 +11,7 @@ const { mkdirSync, writeFileSync } = require('node:fs')
 const DATABASE = 'aecp_library'
 const USER = 'aecp_library_runtime'
 const FILES = ['complete.json', 'package.json', 'summary.json', 'dry-run.json']
-const LATEST = '20261119_011841_library_pages' // Keep in step with migrate.js EXPECTED.
+const LATEST = '20261119_040000_semantic_index' // Keep in step with migrate.js EXPECTED.
 
 async function main() {
   const { IMPORT_BUCKET: bucket, IMPORT_MODE: mode } = process.env

@@ -18,7 +18,7 @@ async function main() {
   await pg.connect()
   try {
     const { rows: [state] } = await pg.query(`SELECT current_user AS role, ssl, has_schema_privilege(current_user, 'public', 'CREATE') AS ddl,
-      EXISTS(SELECT 1 FROM payload_migrations WHERE name='20261119_011841_library_pages') AS processing_schema,
+      EXISTS(SELECT 1 FROM payload_migrations WHERE name='20261119_040000_semantic_index') AS processing_schema,
       (SELECT count(*)::int FROM payload_migrations) AS migrations FROM pg_stat_ssl WHERE pid = pg_backend_pid()`)
     if (state?.role !== USER || !state.ssl || state.ddl || !state.processing_schema) throw Error('Unexpected runtime database state')
     console.log('Verified runtime TLS, migrated schema, and no schema CREATE privilege')

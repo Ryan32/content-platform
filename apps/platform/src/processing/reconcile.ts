@@ -59,7 +59,7 @@ export async function reconcile(db: Pool, store: JobStore, settings: AutomationS
         AND NOT EXISTS (SELECT 1 FROM assets a WHERE a.content_id=c.id AND a.version=c.source_hash
           AND lower(substring(a.object_key from '\\.([A-Za-z0-9]+)$')) = ANY($2::text[])
           AND NOT EXISTS (SELECT 1 FROM processing_jobs j WHERE j.content_id=c.id AND j.source_version=c.source_hash AND (j.input->>'assetId')::int=a.id))
-        AND NOT ($3::boolean AND c.vimeo_id ~ '^[1-9][0-9]{0,19}$' AND NOT EXISTS (SELECT 1 FROM processing_jobs j WHERE j.content_id=c.id
+        AND NOT ($3::boolean AND COALESCE(c.vimeo_id, '') ~ '^[1-9][0-9]{0,19}$' AND NOT EXISTS (SELECT 1 FROM processing_jobs j WHERE j.content_id=c.id
           AND j.source_version=c.source_hash AND j.input->>'kind'='vimeo' AND j.input->>'videoId'=c.vimeo_id))
         AND NOT EXISTS (SELECT 1 FROM suggestions s WHERE s.content_id=c.id AND s.source_version=c.source_hash AND s.decision='accepted')
         AND ((COALESCE(btrim(c.body),'')<>'' AND c.evidence_version='unprocessed') OR EXISTS (SELECT 1 FROM processing_jobs j

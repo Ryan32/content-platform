@@ -41,7 +41,7 @@ This document captures work completed in the originating Portal conversation. Ve
 - Images: `dev-platform-library-pages` (index `sha256:bea8b737…`, amd64 `sha256:50e45ce3…`) and `dev-platform-ops-library-pages` (index `sha256:b5c1ae6b…`, amd64 `sha256:cc2ae81b…`). Verified identical to the local builds.
 - **Snapshot quota:** the account is at its RDS limit of 100 manual snapshots, mostly other systems' snapshots dating from 2014. The pre-migration snapshot failed with `SnapshotQuotaExceeded`, and the migration still ran because the snapshot result was not checked. The risk was low: the migration is additive, and `pre-sections-20261118` was about an hour old with no real content added since.
   - With the owner's approval, deleted our own `aecp-dev-postgres-pre-cms-retire-20261117`, then took `aecp-dev-postgres-post-library-pages-20261118`.
-  - Usage is now 100/100 again. Before the next migration, free a slot (for example, the older `pre-admin-ux` snapshot). From now on, deploy steps must stop when a snapshot fails.
+  - Then deleted `aecp-dev-postgres-pre-admin-ux-20261118` (owner request), leaving 99/100 with one slot free for the next pre-migration snapshot. Remaining dev snapshots: `pre-sections-20261118` and `post-library-pages-20261118`. From now on, deploy steps must stop when a snapshot fails.
 - Migration `20261119_011841_library_pages` applied (batch 5); the rerun was a no-op.
 - Smoke test passed. Web `aecp-dev-library-web:7` is healthy; worker `aecp-dev-library-worker:5` started and reconciled.
 - Live checks via the real hostname: health, Home, `/sections/planning`, `/search`, `/axl-mark.svg`, and admin login all 200. Anonymous `/admin/manage` shows the sign-in page only. Anonymous suggest returns navigation pages only.

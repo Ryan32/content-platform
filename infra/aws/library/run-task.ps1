@@ -8,8 +8,8 @@ param(
     # Auth0 user_id for -Step provision-admin.
     [string] $AdminSubject,
     # Linux/amd64 manifest digests in aecp-dev-cms; defaults are the currently deployed release.
-    [ValidatePattern('^sha256:[0-9a-f]{64}$')] [string] $OperationsDigest = 'sha256:a9b0e28e4378c311a37646c859522c01356604f23b6bebf80d2ec9e6e8b816f8',
-    [ValidatePattern('^sha256:[0-9a-f]{64}$')] [string] $RuntimeDigest = 'sha256:0bc36e818f9a3a24463459d52f315294618fdab2e189242973e26db6ef949b57',
+    [ValidatePattern('^sha256:[0-9a-f]{64}$')] [string] $OperationsDigest = 'sha256:21239865f7ffd25939a7df5144dfcc7439df7629c4a6de6b4602acbf4e4c7240',
+    [ValidatePattern('^sha256:[0-9a-f]{64}$')] [string] $RuntimeDigest = 'sha256:daf57f812a1059d8ea56d71ee14145ae54b5f359d37190806f05826abd876ace',
     [string] $Profile = 'ae-dev-mfa'
 )
 $ErrorActionPreference = 'Stop'

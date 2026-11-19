@@ -64,6 +64,13 @@ describe('REQ-UPGRADE-01: schema contract with the migrated database', () => {
     expect([...new Set(unknown)]).toEqual([])
   })
 
+  it('the deploy scripts expect exactly the migrations the app ships, in order', () => {
+    const shipped = [...readFileSync(path.resolve(__dirname, '../src/migrations/index.ts'), 'utf8').matchAll(/name: '([^']+)'/g)].map(m => m[1])
+    const infra = (file: string) => readFileSync(path.resolve(__dirname, '../../../infra/aws/library', file), 'utf8')
+    expect(JSON.parse(infra('migrate.js').match(/const EXPECTED = (\[[^\]]+\])/)![1].replace(/'/g, '"'))).toEqual(shipped)
+    for (const file of ['import.js', 'smoke.js', 'web.js', 'worker.js']) expect(infra(file)).toContain(`'${shipped.at(-1)}'`)
+  })
+
   it('keeps every style rule on Payload admin markup inside the fenced overrides block', () => {
     const css = readFileSync(path.resolve(__dirname, '../src/app/(payload)/custom.css'), 'utf8')
     const after = css.split('PAYLOAD CHROME OVERRIDES: END')[1] ?? ''

@@ -437,7 +437,7 @@ def load_complete(output):
     return validate(read_json(output / 'package.json'))
 
 
-def build(scan, source, output, limit, target=None):
+def build(scan, source, output, limit, target=None, ids=None):
     data = (ROOT / 'data').resolve()
     scan, source, output = scan.resolve(), source.resolve(), output.resolve()
     if not output.is_relative_to(data) or any(output.is_relative_to(p) or p.is_relative_to(output) for p in (scan, source)):
@@ -454,7 +454,15 @@ def build(scan, source, output, limit, target=None):
     pilot = read_lines(scan / 'pilot-manifest.jsonl')
     controls = read_lines(scan / 'negative-controls.jsonl')
     all_rows = keyed(pilot + controls, 'source_id')
-    selected = select_records(pilot, limit)
+    if ids is None:
+        selected, selection = select_records(pilot, limit), {'algorithm': 'format-and-edge-coverage-v3', 'limit': limit}
+    else:
+        # Explicit batch: exactly these eligible records, in stable source-ID order.
+        wanted = set(ids)
+        selected = [(r, 'explicit-batch') for r in sorted(pilot, key=lambda r: int(r['source_id'])) if r['source_id'] in wanted and eligible(r)]
+        if len(selected) != len(wanted) or len(selected) > limit:
+            raise ValueError('batch_records_not_all_eligible')
+        selection = {'algorithm': 'explicit-batch-v1', 'limit': limit}
     if not selected:
         raise ValueError('no_eligible_pilot_records')
     selected_ids = {r['source_id'] for r, _ in selected}
@@ -466,7 +474,7 @@ def build(scan, source, output, limit, target=None):
     verified = verify_files([r for r, _ in selected], source, read_json(scan / 'pilot-file-hashes.json'))
     attachments = keyed(read_lines(scan / 'attachment-manifest.jsonl'), 'source_id')
     provenance = {'sourceSystem': 'wordpress', 'sourceSite': 'dbr', 'sourceDumpSha256': report['dump_sha256'],
-                  'inputHashes': hashes_before, 'selection': {'algorithm': 'format-and-edge-coverage-v3', 'limit': limit},
+                  'inputHashes': hashes_before, 'selection': selection,
                   'sourceTimes': 'Preserved verbatim; local/GMT values are not inferred or rewritten.'}
     package = build_package(selected, raw, attachments, verified, provenance, skipped)
     inventory_after = (scan / 'inventory.sqlite').stat()
@@ -480,6 +488,75 @@ def build(scan, source, output, limit, target=None):
     return summary
 
 
+BATCH_SIZE_MAX = 25  # Payload adapter ceiling per atomic package (records).
+EDGE_MAX = 5000      # Payload adapter ceiling per atomic package (relationships).
+
+
+def blob_file_name(blob):
+    """<sha256>.<ext> from the blob's first source path; unknown/odd extensions become .bin."""
+    suffix = PurePosixPath(blob['localPaths'][0]).suffix.lower() if blob.get('localPaths') else ''
+    return blob['sha256'] + (suffix if re.fullmatch(r'\.[a-z0-9]{1,8}', suffix) else '.bin')
+
+
+def export_blobs(package, source, files_dir, exported):
+    """Copy each verified blob once into files_dir, re-hashing while copying. Never modifies the backup."""
+    files_dir.mkdir(exist_ok=True)
+    for blob in package['blobs']:
+        name = blob_file_name(blob)
+        if name in exported:
+            continue
+        target = files_dir / name
+        if not target.exists():
+            path = confined_file(source, blob['localPaths'][0])
+            partial = files_dir / (name + '.partial')
+            digest_ = hashlib.sha256()
+            with path.open('rb') as reader, partial.open('xb') as writer:
+                for chunk in iter(lambda: reader.read(1024 * 1024), b''):
+                    digest_.update(chunk)
+                    writer.write(chunk)
+            if digest_.hexdigest() != blob['sha256'] or partial.stat().st_size != blob['bytes']:
+                partial.unlink()
+                raise ValueError('exported_file_hash_mismatch')
+            partial.rename(target)
+        elif target.stat().st_size != blob['bytes']:
+            raise ValueError('existing_export_size_mismatch')
+        exported[name] = {'file': name, 'sha256': blob['sha256'], 'bytes': blob['bytes']}
+
+
+def batch(scan, source, output, size, max_batches=None, with_files=True):
+    """Split every eligible pilot record into consecutive packages of at most `size`, plus batches.json."""
+    data = (ROOT / 'data').resolve()
+    output = output.resolve()
+    if not output.is_relative_to(data):
+        raise ValueError('output_must_be_separate_ignored_data_directory')
+    if output.exists():
+        raise ValueError('output_already_exists')
+    if not 1 <= size <= BATCH_SIZE_MAX:
+        raise ValueError('batch_size_must_be_1_to_25')
+    pilot = read_lines(scan.resolve() / 'pilot-manifest.jsonl')
+    ids = [r['source_id'] for r in sorted(pilot, key=lambda r: int(r['source_id'])) if eligible(r)]
+    chunks = [ids[i:i + size] for i in range(0, len(ids), size)][:max_batches]
+    if not chunks:
+        raise ValueError('no_eligible_pilot_records')
+    output.mkdir(parents=True)
+    batches, exported = [], {}
+    for n, chunk in enumerate(chunks, 1):
+        name = f'batch-{n:03d}'
+        summary = build(scan, source, output / name, size, ids=chunk)
+        edges = sum(summary['relationshipsByKind'].values())
+        if summary['records'] > BATCH_SIZE_MAX or edges > EDGE_MAX:
+            raise ValueError('batch_exceeds_adapter_limits')
+        if with_files:
+            export_blobs(load_complete(output / name), source.resolve(), output / 'files', exported)
+        batches.append({'batch': name, 'packageId': summary['packageId'], 'records': summary['records'], 'relationships': edges})
+        print(json.dumps({'built': name, 'records': summary['records'], 'relationships': edges}), flush=True)
+    manifest = {'schema': 'ae-wordpress-batches/1', 'batches': batches,
+                'records': sum(b['records'] for b in batches), 'eligibleRecords': len(ids),
+                'files': sorted(exported.values(), key=lambda f: f['file'])}
+    (output / 'batches.json').write_text(json.dumps(manifest, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+    return manifest
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='command', required=True)
@@ -489,12 +566,22 @@ def main():
     create.add_argument('--output', type=Path, required=True)
     create.add_argument('--limit', type=int, default=12)
     create.add_argument('--target-state', type=Path)
+    many = sub.add_parser('batch')
+    many.add_argument('--scan', type=Path, default=ROOT / 'data/wordpress-inventory/scan-2026-11-17-v2')
+    many.add_argument('--source', type=Path, default=ROOT / 'data/dbr-backup')
+    many.add_argument('--output', type=Path, required=True)
+    many.add_argument('--size', type=int, default=BATCH_SIZE_MAX)
+    many.add_argument('--max-batches', type=int)
+    many.add_argument('--no-files', action='store_true', help='Skip exporting verified file bytes for upload.')
     verify = sub.add_parser('validate')
     verify.add_argument('--package', type=Path, required=True)
     args = parser.parse_args()
     try:
         if args.command == 'validate':
             result = summarize(load_complete(args.package))
+        elif args.command == 'batch':
+            result = batch(args.scan, args.source, args.output, args.size, args.max_batches, not args.no_files)
+            result = {k: v for k, v in result.items() if k != 'files'} | {'files': len(result['files']), 'fileBytes': sum(f['bytes'] for f in result['files'])}
         else:
             result = build(args.scan, args.source, args.output, args.limit,
                            read_json(args.target_state) if args.target_state else None)

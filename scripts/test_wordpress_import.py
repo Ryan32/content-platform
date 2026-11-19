@@ -245,6 +245,15 @@ class EndToEndTests(unittest.TestCase):
                     imp.build(scan, source, data / 'out1', 12)
                 with self.assertRaisesRegex(ValueError, 'separate_ignored'):
                     imp.build(scan, source, source / 'bad', 12)
+                # Batch mode: consecutive eligible packages plus a manifest; ineligible IDs never slip in.
+                manifest = imp.batch(scan, source, data / 'batches', 25)
+                self.assertEqual([b['batch'] for b in manifest['batches']], ['batch-001'])
+                self.assertEqual(manifest['batches'][0]['packageId'], imp.load_complete(data / 'batches' / 'batch-001')['packageId'])
+                self.assertEqual(json.loads((data / 'batches' / 'batches.json').read_text())['records'], 1)
+                with self.assertRaisesRegex(ValueError, 'batch_records_not_all_eligible'):
+                    imp.build(scan, source, data / 'out3', 25, ids=['2'])
+                with self.assertRaisesRegex(ValueError, 'batch_size_must_be_1_to_25'):
+                    imp.batch(scan, source, data / 'batches2', 26)
             p = imp.load_complete(data / 'out1')
             self.assertEqual(len(p['sourceSnapshots'][0]['snapshot']['raw']['metadata']), 2)
             self.assertNotIn('SYNTHETIC-SECRET', json.dumps(p))

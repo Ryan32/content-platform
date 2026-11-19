@@ -6,13 +6,13 @@ import { importPackage } from './adapter'
 let destroy: (() => Promise<void>) | undefined
 try {
   const [mode, directory, expectedTarget, expectedPackageId, ...extra] = process.argv.slice(2)
-  assertImport(['check', 'preview', 'apply'].includes(mode) && directory && !extra.length, 'usage_check_preview_or_apply_package_directory_target_package_id')
+  assertImport(['check', 'preview', 'apply', 'attach'].includes(mode) && directory && !extra.length, 'usage_check_preview_or_apply_package_directory_target_package_id')
   const p = await loadPackage(directory)
   if (mode === 'check') {
     assertImport(!expectedTarget && !expectedPackageId, 'unexpected_check_arguments')
     console.log(JSON.stringify({ status: 'validated', packageId: p.packageId, records: p.content.length, relationships: p.relationships.length }))
   } else {
-    assertImport(mode === 'preview' || mode === 'apply', 'invalid_mode')
+    assertImport(mode === 'preview' || mode === 'apply' || mode === 'attach', 'invalid_mode')
     assertImport(process.env.IMPORT_ENVIRONMENT === 'development', 'development_environment_required')
     assertImport(process.env.DATABASE_URI && process.env.PAYLOAD_SECRET, 'database_configuration_required')
     const db = new URL(process.env.DATABASE_URI)
@@ -28,10 +28,18 @@ try {
     resolved.logger = { options: { level: 'silent' } } as typeof resolved.logger
     const payload = await getPayload({ config: resolved })
     destroy = () => payload.destroy()
-    const { payloadStore } = await import('./payload-store')
-    const result = await importPackage(p, payloadStore(payload), mode)
-    console.log(JSON.stringify({ status: mode === 'apply' ? 'committed' : 'preview',
-      packageId: result.packageId, alreadyCompleted: result.alreadyCompleted, counts: result.counts }))
+    if (mode === 'attach') {
+      assertImport(process.env.CONTENT_BUCKET, 'content_bucket_required')
+      const { attachFiles } = await import('./attach')
+      const { payloadAttachDeps } = await import('./attach-store')
+      const result = await attachFiles(p, payloadAttachDeps(payload, process.env.CONTENT_BUCKET))
+      console.log(JSON.stringify({ status: 'attached', ...result }))
+    } else {
+      const { payloadStore } = await import('./payload-store')
+      const result = await importPackage(p, payloadStore(payload), mode)
+      console.log(JSON.stringify({ status: mode === 'apply' ? 'committed' : 'preview',
+        packageId: result.packageId, alreadyCompleted: result.alreadyCompleted, counts: result.counts }))
+    }
   }
 } catch (error) {
   console.error(JSON.stringify({ status: 'failed', code: error instanceof ImportError ? error.code : 'import_failed',

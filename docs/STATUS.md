@@ -4,6 +4,13 @@ This document captures work completed in the originating Portal conversation. Ve
 
 ## Active priority — core platform and general MCP
 
+### WordPress test migration: batch build + one-command run — 2026-11-18
+
+- **Built and validated locally, not run on AWS.** `python scripts/build_wordpress_import.py batch --output data/wordpress-import/batches/<new-name>` splits every eligible pilot record into restricted-intake packages of up to 25 (the adapter ceiling) and writes `batches.json`. Real run: `data/wordpress-import/batches/pilot-200/` = 8 batches, 200 records, 214–371 relationships each; all 8 passed the app's `import:package check`. Transfer copy: `pilot-200.zip` (0.8 MB, ignored).
+- AWS laptop: `.\infra\aws\library\import-batches.ps1 -BatchDir <folder> -OperationsDigest sha256:<new operations image> [-PreviewOnly] [-Only batch-001]`. It re-verifies checksums, creates/updates `aecp-dev-library-import-task` (S3 `GetObject` on `imports/*` only), uploads each package to `imports/<packageId>/`, and runs one ECS task (`import.js`, runtime DB role, web execution role) that does check → preview → apply → rerun per batch and stops at the first failure. Safe to rerun.
+- Still not carried: original WordPress dates, featured-image covers, file bytes (attachments are metadata only). The v2 scan predates the `featured_image` field. Items arrive as Intake with no access profile. Python importer tests: 19 pass (batch mode added to an existing test).
+- Next: run `-PreviewOnly -Only batch-001`, then apply all; reconcile 200 Intake items and confirm anonymous/unauthorized denial.
+
 ### Library pages from the design — 2026-11-18
 
 - **Implemented, not deployed.** Builds every reader and Manage screen in `docs/design/mockups` except slides/spreadsheet previews (need Gotenberg) and AXL answers (P5). Screen-by-screen status: [`docs/design/IMPLEMENTATION.md`](design/IMPLEMENTATION.md).

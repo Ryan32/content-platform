@@ -348,13 +348,22 @@ export const Kits: CollectionConfig = {
   slug: 'kits', labels: { singular: 'Kit', plural: 'Ready-made kits' },
   access: { read: editor, create: editor, update: editor, delete: admin },
   admin: { group: 'Library', useAsTitle: 'title', defaultColumns: ['title', 'section', 'published'],
-    description: 'Bundles of everything for one job (for example "Host a retirement income seminar"). Readers only see the items in a kit they are allowed to open.' },
+    description: 'A ready-made kit is a hand-picked set of existing library items that together cover one job, listed in the order someone would use them. '
+      + 'Example: "Host a retirement income seminar" with the invitation, slides, presenter script, checklist and follow-up email. '
+      + 'Readers find kits on section pages and on the pages of the items inside them. A kit is not a folder and never grants access: '
+      + 'each reader only sees the items in it they can already open. To put several files on one page, add them to a single library item instead.' },
   fields: [
-    { name: 'title', type: 'text', required: true, label: 'Title' },
-    { name: 'description', type: 'textarea', label: 'What it\'s for' },
-    { name: 'section', type: 'select', label: 'Section', options: SECTION_OPTIONS, index: true },
-    { name: 'items', type: 'relationship', relationTo: 'content', hasMany: true, label: 'Items, in order' },
-    { name: 'published', type: 'checkbox', defaultValue: false, label: 'Show to readers', admin: { position: 'sidebar' } },
+    { name: 'title', type: 'text', required: true, label: 'Title',
+      admin: { placeholder: 'Host a retirement income seminar', description: 'Name the job the kit helps with, the way an advisor would say it. Readers see this as the kit’s heading.' } },
+    { name: 'description', type: 'textarea', label: 'What it’s for',
+      admin: { description: 'One or two sentences on when to use the kit and who it is for. Shown under the title on the kit and section pages.' } },
+    { name: 'section', type: 'select', label: 'Section', options: SECTION_OPTIONS, index: true,
+      admin: { description: 'The library section whose page shows this kit in its "Ready-made kits" row. Leave empty to show it only on the pages of its items.' } },
+    { name: 'items', type: 'relationship', relationTo: 'content', hasMany: true, label: 'Items, in order',
+      admin: { description: 'Choose existing library items in the order someone would use them; drag to reorder. Each item keeps its own audience: '
+        + 'readers without access to an item simply do not see it in the kit, so check the kit still makes sense for its intended audience.' } },
+    { name: 'published', type: 'checkbox', defaultValue: false, label: 'Show to readers',
+      admin: { position: 'sidebar', description: 'Off: only editors can see the kit (a draft). On: it appears on its section page and on its items’ pages. Only published items inside it are shown.' } },
   ],
 }
 

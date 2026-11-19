@@ -2,7 +2,10 @@ import type { Pool } from 'pg'
 import { S3Client } from '@aws-sdk/client-s3'
 import { extractDocument } from './extract'
 import { getVimeoCaptions, classify, transcribeMedia } from './providers'
-import { readOriginal, contentKey } from './storage'
+import { readOriginal, contentKey, storedObject, verifyOriginal, MAX_DOCUMENT_BYTES } from './storage'
+import { MAX_OCR_BYTES, ocrPdf } from './ocr'
+import { MAX_MEDIA_BYTES } from './vimeo-media'
+import type { PdfStats } from './extract'
 import { ProcessingError, type Job } from './jobs'
 import { extractionSchema } from './review'
 import type { Processors } from './engine'
@@ -57,10 +60,33 @@ export function runtimeProcessors(db: Pool): Processors {
         return speech.status === 'pending' ? null : speech.extraction
       }
       const file = await asset(job, input.assetId)
-      if (input.kind === 'document') return extractDocument(await readOriginal(new S3Client({}), bucket(), file.object_key, file.sha256), input.format)
+      const s3 = new S3Client({})
+      if (input.kind === 'document' && input.format === 'pdf') {
+        const ocr = async () => {
+          await paid(db, 'transcription')
+          const result = await ocrPdf({ bucket: bucket(), key: file.object_key, jobKey: job.idempotency_key })
+          return result.status === 'pending' ? null : result.extraction
+        }
+        // Large PDFs skip the in-memory text layer and go straight to OCR (which also reads typed text).
+        const { size } = await storedObject(s3, bucket(), file.object_key)
+        if (size > MAX_DOCUMENT_BYTES) { await verifyOriginal(s3, bucket(), file.object_key, file.sha256, MAX_OCR_BYTES); return ocr() }
+        const stats: PdfStats = { pages: 0, emptyPages: 0 }
+        let native
+        try { native = await extractDocument(await readOriginal(s3, bucket(), file.object_key, file.sha256), 'pdf', stats) } catch (error) {
+          if (error instanceof ProcessingError && error.code === 'pdf_requires_ocr') return ocr()
+          throw error
+        }
+        if (!stats.emptyPages) return native
+        // Some pages are scans: OCR the whole document when allowed; otherwise keep the typed text with its warning.
+        try { return await ocr() } catch (error) {
+          if (error instanceof ProcessingError && ['paid_processing_disabled', 'transcription_turned_off', 'daily_paid_limit_reached'].includes(error.code)) return native
+          throw error
+        }
+      }
+      if (input.kind === 'document') return extractDocument(await readOriginal(s3, bucket(), file.object_key, file.sha256), input.format)
       await paid(db, 'transcription')
-      // Stage originals under immutable hashed keys. Reverify bytes before paid processing.
-      await readOriginal(new S3Client({}), bucket(), file.object_key, file.sha256)
+      // Stage originals under immutable hashed keys. Reverify before paid processing (up to Transcribe's 2 GB).
+      await verifyOriginal(s3, bucket(), file.object_key, file.sha256, MAX_MEDIA_BYTES)
       const result = await transcribeMedia({ bucket: bucket(), inputKey: file.object_key, outputPrefix: 'processing/transcribe/', jobKey: job.idempotency_key })
       return result.status === 'pending' ? null : result.extraction
     }),

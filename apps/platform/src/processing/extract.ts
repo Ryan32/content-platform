@@ -171,7 +171,9 @@ function captions(raw: string, output: EvidenceBuilder) {
   }
 }
 
-async function pdf(bytes: Uint8Array, output: EvidenceBuilder) {
+/** Filled for PDFs: how many pages have no native text layer (OCR candidates). */
+export interface PdfStats { pages: number; emptyPages: number }
+async function pdf(bytes: Uint8Array, output: EvidenceBuilder, stats?: PdfStats) {
   if (!Buffer.from(bytes.subarray(0, 1024)).includes('%PDF-')) throw new ProcessingError('invalid_pdf')
   const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs')
   const task = getDocument({ data: Uint8Array.from(bytes), stopAtErrors: true, useWorkerFetch: false,
@@ -199,16 +201,17 @@ async function pdf(bytes: Uint8Array, output: EvidenceBuilder) {
       output.add(pageText, 'Page ' + i)
       page.cleanup()
     }
+    if (stats) { stats.pages = doc.numPages; stats.emptyPages = empty }
     if (empty === doc.numPages) throw new ProcessingError('pdf_requires_ocr')
     if (empty) output.result.warnings.push(empty + ' page(s) lack native text and may require OCR.')
   } finally { await task.destroy() }
 }
 
-export async function extractDocument(bytes: Uint8Array, format: DocumentFormat): Promise<Extraction> {
+export async function extractDocument(bytes: Uint8Array, format: DocumentFormat, stats?: PdfStats): Promise<Extraction> {
   if (!bytes.length || bytes.length > 50 * MiB) throw new ProcessingError('input_size_limit')
   const output = new EvidenceBuilder('ae-' + format + '/1')
   try {
-    if (format === 'pdf') await pdf(bytes, output)
+    if (format === 'pdf') await pdf(bytes, output, stats)
     else if (format === 'vtt' || format === 'txt') {
       if (bytes.length > 4 * MiB) throw new ProcessingError('input_size_limit')
       const raw = decoder.decode(bytes)

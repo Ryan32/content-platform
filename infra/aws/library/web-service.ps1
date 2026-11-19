@@ -22,10 +22,14 @@ function Invoke-Aws { $out = & aws @args; if ($LASTEXITCODE) { throw "aws $($arg
 
 # Semantic search: the web app embeds each search query (Titan Text Embeddings V2). Only that model, nothing else.
 $embedPolicy = @{ Version = '2012-10-17'; Statement = @(@{ Sid = 'EmbedSearchQueries'; Effect = 'Allow'; Action = 'bedrock:InvokeModel'
-    Resource = 'arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v2:0' }) }
+    Resource = 'arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v2:0' },
+    # Large uploads: sign browser PUTs into uploads/ (staging only) and show pending ones on the item's Processing panel.
+    @{ Sid = 'SignLargeUploads'; Effect = 'Allow'; Action = 's3:PutObject'; Resource = 'arn:aws:s3:::aecp-dev-381003255014-us-east-1/uploads/*' },
+    @{ Sid = 'ListLargeUploads'; Effect = 'Allow'; Action = 's3:ListBucket'; Resource = 'arn:aws:s3:::aecp-dev-381003255014-us-east-1'
+       Condition = @{ StringLike = @{ 's3:prefix' = @('uploads/*') } } }) }
 $embedFile = Join-Path $env:TEMP 'aecp-web-embed.json'
 [IO.File]::WriteAllText($embedFile, ($embedPolicy | ConvertTo-Json -Depth 6))
-try { Invoke-Aws iam put-role-policy --profile $Profile --role-name aecp-dev-library-web-task --policy-name DevLibrarySemanticQuery --policy-document "file://$embedFile" | Out-Null }
+try { Invoke-Aws iam put-role-policy --profile $Profile --role-name aecp-dev-library-web-task --policy-name DevLibrarySearchAndUploads --policy-document "file://$embedFile" | Out-Null }
 finally { Remove-Item -LiteralPath $embedFile -ErrorAction SilentlyContinue }
 
 $targetGroup = Invoke-Aws elbv2 describe-target-groups @aws --names aecp-dev-library-tg --query 'TargetGroups[0].TargetGroupArn' --output text

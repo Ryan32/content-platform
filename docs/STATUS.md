@@ -4,6 +4,12 @@ This document captures work completed in the originating Portal conversation. Ve
 
 ## Active priority — core platform and general MCP
 
+### OCR and large uploads — 2026-11-18
+
+- **Implemented and tested locally; not deployed.** Scanned (or partly scanned) PDFs and PDFs over 50 MB are read by Amazon Textract OCR. Audio/video up to 2 GB and PDFs up to 500 MB upload from the browser straight to private S3 (signed PUT with progress) on the Processing panel, Add content and Bulk add; the worker fingerprints, moves and registers them, then processing continues as usual. ADR-041/042 in [AI-PIPELINE.md](AI-PIPELINE.md).
+- New dependencies (pinned like the other AWS SDK packages): `@aws-sdk/client-textract` and `@aws-sdk/s3-request-presigner` 3.1171.0. New script `infra/aws/library/bucket-uploads.ps1` (CORS + staging expiry). Worker now needs `PAYLOAD_SECRET` (added to `worker-service.ps1`).
+- Validation: typecheck; 149 tests in 26 files (6 new: Textract polling/pages/idempotency, OCR input refusal, large-file limits, signed PUT enforcing size/type/encryption/uploader, finalizer happy path and rejections); production build. Not tested: real Textract/S3/browser PUT/CORS, the worker's PDF OCR branching end to end.
+
 ### AI processing for everything, field-by-field review, semantic search — 2026-11-18
 
 - **Implemented and tested locally; not deployed.** Commits `a77c2a4`, `f5c189e`, `d98069f`, `12acb94`. Full description, ADR-035–040 and the deploy/live-check runbook: [AI-PIPELINE.md](AI-PIPELINE.md).

@@ -35,7 +35,8 @@ export function approvedModels() {
 
 export async function paidJobsLastDay(db: Pool | PoolClient) {
   const { rows } = await db.query(`SELECT count(*)::int AS n FROM processing_jobs WHERE created_at > now() - interval '24 hours'
-    AND (stage IN ('transcribe','classify') OR (input->>'kind'='vimeo' AND result->>'processorVersion'='ae-transcribe/1'))`)
+    AND (stage IN ('transcribe','classify') OR (input->>'kind'='vimeo' AND result->>'processorVersion'='ae-transcribe/1')
+      OR result->>'processorVersion'='ae-textract/1')`)
   return rows[0].n as number
 }
 

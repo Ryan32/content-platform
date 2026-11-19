@@ -1,4 +1,4 @@
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { createHash } from 'node:crypto'
 import { ProcessingError } from './jobs'
 
@@ -28,4 +28,21 @@ export async function stageOriginal(client: S3Client, bucket: string, content: n
   })
   await readOriginal(client, bucket, key, hash)
   return { key, hash }
+}
+
+/** Size and recorded fingerprint of a stored original, without reading it (large media and PDFs). */
+export async function storedObject(client: S3Client, bucket: string, key: string) {
+  const head = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: contentKey(key) }))
+  return { size: head.ContentLength ?? 0, sha256: head.Metadata?.sha256 ?? null }
+}
+/**
+ * Verifies an original before paid processing. Small files are re-hashed; large ones (streamed in by the upload
+ * finalizer, which hashed every byte and recorded it) must carry the matching recorded fingerprint and fit the limit.
+ */
+export async function verifyOriginal(client: S3Client, bucket: string, key: string, expectedHash: string, limit: number) {
+  const stored = await storedObject(client, bucket, key)
+  if (!stored.size || stored.size > limit) throw new ProcessingError('input_size_limit')
+  if (stored.size <= MAX_DOCUMENT_BYTES) { await readOriginal(client, bucket, key, expectedHash); return stored }
+  if (stored.sha256 !== expectedHash) throw new ProcessingError('source_hash_mismatch')
+  return stored
 }

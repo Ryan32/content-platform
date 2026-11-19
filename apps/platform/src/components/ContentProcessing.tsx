@@ -1,9 +1,10 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDocumentInfo, useFormFields } from '@payloadcms/ui'
+import { sendFile, UPLOAD_HINT } from './upload-client'
 
 type Status = {
-  state: string; vimeoId: string | null
+  state: string; vimeoId: string | null; pendingUploads?: number
   automation: { paused: boolean; documents: boolean; vimeo: boolean; transcription: boolean; tagging: boolean } | null
   files: { id: number; type: string; current: boolean; uploadedAt: string }[]
   jobs: { id: number; step: string; state: string; stateLabel: string; current: boolean; reason: string; updatedAt: string }[]
@@ -21,6 +22,7 @@ export default function ContentProcessing() {
   const [status, setStatus] = useState<Status | null>(null)
   const [message, setMessage] = useState<{ kind: 'error' | 'ok'; text: string } | null>(null)
   const [busy, setBusy] = useState(false)
+  const [progress, setProgress] = useState<number | null>(null)
   const [chosen, setChosen] = useState('')
   const input = useRef<HTMLInputElement>(null)
 
@@ -30,7 +32,7 @@ export default function ContentProcessing() {
     if (response.ok) setStatus(await response.json())
   }, [id])
   useEffect(() => { void load() }, [load])
-  const active = status?.jobs.some(j => j.current && ['queued', 'running'].includes(j.state))
+  const active = status?.jobs.some(j => j.current && ['queued', 'running'].includes(j.state)) || Boolean(status?.pendingUploads)
   useEffect(() => {
     if (!id) return
     const timer = setInterval(() => { void load() }, active ? 5000 : 20000)
@@ -43,18 +45,14 @@ export default function ContentProcessing() {
     const file = input.current?.files?.[0]
     if (!file) { setMessage({ kind: 'error', text: 'Choose a file first.' }); return }
     setBusy(true); setMessage(null)
-    const body = new FormData(); body.append('file', file)
     try {
-      const response = await fetch(`/library-api/content/${id}/files`, { method: 'POST', body, credentials: 'same-origin' })
-      const result = await response.json().catch(() => ({}))
-      if (!response.ok) setMessage({ kind: 'error', text: result.error ?? 'Upload failed.' })
-      else {
-        setMessage({ kind: 'ok', text: 'Uploaded. Processing will start within a few seconds. Reload the page to see updated source details.' })
-        if (input.current) input.current.value = ''
-        setChosen('')
-      }
-    } catch { setMessage({ kind: 'error', text: 'Upload failed. Check your connection and try again.' }) }
-    setBusy(false); void load()
+      const result = await sendFile(file, { contentId: Number(id), onProgress: setProgress })
+      setMessage({ kind: 'ok', text: result.large ? 'Uploaded. The file is being prepared (about a minute for large files); processing starts automatically.'
+        : 'Uploaded. Processing will start within a few seconds. Reload the page to see updated source details.' })
+      if (input.current) input.current.value = ''
+      setChosen('')
+    } catch (error) { setMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Upload failed. Check your connection and try again.' }) }
+    setBusy(false); setProgress(null); void load()
   }
 
   const current = status?.jobs.filter(j => j.current) ?? []
@@ -65,7 +63,7 @@ export default function ContentProcessing() {
   const pill = (state: string) => `ae-pill${state === 'failed' ? ' ae-pill--fail' : state === 'succeeded' ? ' ae-pill--ok' : state === 'running' ? ' ae-pill--info' : ''}`
   return <div className="ae-card" style={{ margin: '8px 0 24px' }}>
     <div className="ae-card-title">Processing</div>
-    <p className="ae-muted" style={{ margin: 0 }}>Upload the original file (PDF, Word, PowerPoint, Excel, captions, text, or audio/video up to 50 MB){vimeoField ? ', or rely on the Vimeo ID above' : ''}. The system extracts the text, transcribes audio if needed, and suggests a summary and tags. Suggestions wait in Review; nothing is published automatically.</p>
+    <p className="ae-muted" style={{ margin: 0 }}>Upload the original file (PDF, Word, PowerPoint, Excel, captions, text, audio or video. {UPLOAD_HINT}){vimeoField ? ', or rely on the Vimeo ID above' : ''}. The system extracts the text, transcribes audio if needed, and suggests a summary and tags. Suggestions wait in Review; nothing is published automatically.</p>
     {off && off.length > 0 && <p className="ae-notice ae-notice--warn">Note: {off.join(', ')} (Automation settings).</p>}
     {status && !['intake', 'draft'].includes(status.state)
       ? <p className="ae-muted">Files can be added while the item is in Intake or Draft.</p>
@@ -74,12 +72,13 @@ export default function ContentProcessing() {
           onChange={event => setChosen(event.target.files?.[0]?.name ?? '')} />
         <span className="ae-btn ae-btn--secondary ae-btn--small">Choose file</span>
         <span className="ae-file-name">{chosen || 'No file chosen'}</span>
-        <button type="button" className="ae-btn ae-btn--primary ae-btn--small" onClick={event => { event.preventDefault(); void upload() }} disabled={busy || !chosen}>{busy ? 'Uploading…' : 'Upload and process'}</button>
+        <button type="button" className="ae-btn ae-btn--primary ae-btn--small" onClick={event => { event.preventDefault(); void upload() }} disabled={busy || !chosen}>{busy ? (progress !== null ? `Uploading ${Math.round(progress * 100)}%` : 'Uploading…') : 'Upload and process'}</button>
       </label>}
     {message && <p role={message.kind === 'error' ? 'alert' : 'status'} className={`ae-notice ae-notice--${message.kind === 'error' ? 'fail' : 'ok'}`}>{message.text}</p>}
 
     {status && <>
       <div className="ae-label">Files</div>
+      {Boolean(status.pendingUploads) && <p className="ae-notice">Large upload received; preparing the file for processing…</p>}
       {status.files.length ? <ul className="ae-rows">{status.files.map(f => <li key={f.id}><span>{typeName(f.type)}{f.current ? '' : <span className="ae-muted"> (replaced)</span>}</span>
         <span className="ae-muted">{when(f.uploadedAt)}</span></li>)}</ul>
         : <p className="ae-muted">No files yet.</p>}
@@ -88,8 +87,8 @@ export default function ContentProcessing() {
         <span className={pill(j.state)}>{j.stateLabel}</span></li>)}</ul>
         : <p className="ae-muted">{status.files.some(f => f.current) || status.vimeoId ? 'Waiting for the background worker to pick this up…' : 'Nothing to process yet.'}</p>}
       <div className="ae-label">AI suggestions</div>
-      {pending.length ? <a className="ae-btn ae-btn--secondary ae-btn--small" href={`/admin/review/${pending[0].id}`}>Review the suggested summary and tags →</a>
-        : <p className="ae-muted">{status.suggestions.some(s => s.current) ? 'All suggestions for this version have been reviewed.' : 'None yet. They appear here after text extraction and AI tagging finish.'}</p>}
+      {pending.length ? <a className="ae-btn ae-btn--secondary ae-btn--small" href={`/admin/review/${pending[0].id}`}>Review the AI analysis →</a>
+        : <p className="ae-muted">{status.suggestions.some(s => s.current) ? 'All suggestions for this version have been reviewed.' : 'None yet. It appears here once every file, video and text for this item has been read and analyzed.'}</p>}
     </>}
   </div>
 }

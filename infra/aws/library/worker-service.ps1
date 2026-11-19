@@ -33,7 +33,7 @@ $execution = @{ Version = '2012-10-17'; Statement = @(
     @{ Effect = 'Allow'; Action = 'ecr:GetAuthorizationToken'; Resource = '*' },
     @{ Effect = 'Allow'; Action = @('ecr:BatchCheckLayerAvailability', 'ecr:GetDownloadUrlForLayer', 'ecr:BatchGetImage'); Resource = "arn:aws:ecr:${region}:${account}:repository/aecp-dev-cms" },
     @{ Effect = 'Allow'; Action = @('logs:CreateLogStream', 'logs:PutLogEvents'); Resource = "arn:aws:logs:${region}:${account}:log-group:${logGroup}:*" },
-    @{ Effect = 'Allow'; Action = 'secretsmanager:GetSecretValue'; Resource = @("${secret}:aecp-dev-library-db-runtime-TKkby2", $vimeoSecret) }) }
+    @{ Effect = 'Allow'; Action = 'secretsmanager:GetSecretValue'; Resource = @("${secret}:aecp-dev-library-db-runtime-TKkby2", "${secret}:aecp-dev-library-payload-secret-JHvUB0", $vimeoSecret) }) }
 # Inference profiles route to foundation models in several US regions; both resources are required.
 $modelResources = foreach ($m in $models) { "arn:aws:bedrock:${region}:${account}:inference-profile/$m"; "arn:aws:bedrock:*::foundation-model/$($m.Substring(3))" }
 $task = @{ Version = '2012-10-17'; Statement = @(
@@ -43,6 +43,10 @@ $task = @{ Version = '2012-10-17'; Statement = @(
     @{ Sid = 'AbortStagedMedia'; Effect = 'Allow'; Action = 's3:AbortMultipartUpload'; Resource = "arn:aws:s3:::$bucket/processing/*" },
     @{ Sid = 'Transcribe'; Effect = 'Allow'; Action = @('transcribe:StartTranscriptionJob', 'transcribe:GetTranscriptionJob'); Resource = '*' },
     @{ Sid = 'ApprovedTaggingModels'; Effect = 'Allow'; Action = @('bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'); Resource = @($modelResources) },
+    @{ Sid = 'OcrScannedPdfs'; Effect = 'Allow'; Action = @('textract:StartDocumentTextDetection', 'textract:GetDocumentTextDetection'); Resource = '*' },
+    # Large uploads (over 50 MB) staged by the browser under uploads/: read, fingerprint, move into content/, delete.
+    @{ Sid = 'FinalizeLargeUploads'; Effect = 'Allow'; Action = @('s3:GetObject', 's3:DeleteObject'); Resource = "arn:aws:s3:::$bucket/uploads/*" },
+    @{ Sid = 'ListLargeUploads'; Effect = 'Allow'; Action = 's3:ListBucket'; Resource = "arn:aws:s3:::$bucket"; Condition = @{ StringLike = @{ 's3:prefix' = @('uploads/*') } } },
     @{ Sid = 'SemanticIndex'; Effect = 'Allow'; Action = 'bedrock:InvokeModel'; Resource = "arn:aws:bedrock:${region}::foundation-model/amazon.titan-embed-text-v2:0" }) }
 
 $tmp = Join-Path $env:TEMP 'aecp-worker-iam'; New-Item -ItemType Directory -Force $tmp | Out-Null
@@ -77,7 +81,9 @@ $definition = @{
             @{ name = 'BEDROCK_MODEL_IDS'; value = ($models -join ',') },
             # Embeds reviewed passages for semantic search (Titan Text Embeddings V2).
             @{ name = 'SEMANTIC_SEARCH'; value = 'true' })
-        secrets = @(@{ name = 'DB_PASSWORD'; valueFrom = "${secret}:aecp-dev-library-db-runtime-TKkby2" }) + $(if ($vimeoReady) { @(@{ name = 'VIMEO_ACCESS_TOKEN'; valueFrom = $vimeoSecret }) } else { @() })
+        # PAYLOAD_SECRET: the worker registers large uploads through Payload, with the same rules as direct uploads.
+        secrets = @(@{ name = 'DB_PASSWORD'; valueFrom = "${secret}:aecp-dev-library-db-runtime-TKkby2" },
+                    @{ name = 'PAYLOAD_SECRET'; valueFrom = "${secret}:aecp-dev-library-payload-secret-JHvUB0" }) + $(if ($vimeoReady) { @(@{ name = 'VIMEO_ACCESS_TOKEN'; valueFrom = $vimeoSecret }) } else { @() })
         logConfiguration = @{ logDriver = 'awslogs'; options = @{ 'awslogs-group' = $logGroup; 'awslogs-region' = $region; 'awslogs-stream-prefix' = 'worker' } }
     })
     tags = @(@{ key = 'Project'; value = 'AEContentPlatform' }, @{ key = 'Environment'; value = 'dev' }, @{ key = 'Owner'; value = 'AE Content Platform' })

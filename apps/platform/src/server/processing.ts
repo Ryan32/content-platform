@@ -34,7 +34,7 @@ export async function createItemFromFile(payload: Payload, user: { id: unknown; 
   }
 }
 
-type ContentDoc = { id: number; state: string; sourceKey?: string | null; sourceHash?: string | null; vimeoId?: string | null; thumbnailVersion?: string | null; thumbnailSource?: string | null }
+export type ContentDoc = { id: number; state: string; sourceKey?: string | null; sourceHash?: string | null; vimeoId?: string | null; thumbnailVersion?: string | null; thumbnailSource?: string | null }
 
 /**
  * Stores an editor's file privately and registers it on the library item. Manually created items take the file's
@@ -50,9 +50,18 @@ export async function uploadSource(payload: Payload, contentId: number, file: Fi
   if (!UPLOAD_TYPES[extension]) throw new UploadError(415, 'Unsupported file type. Use PDF, Word, PowerPoint, Excel, VTT, text, MP3, MP4, WAV, M4A, FLAC, OGG, or WEBM.')
   if (!file.size || file.size > MAX_DOCUMENT_BYTES) throw new UploadError(413, 'Files must be between 1 byte and 50 MB.')
   const bytes = new Uint8Array(await file.arrayBuffer())
-  const hash = createHash('sha256').update(bytes).digest('hex')
   const object = await stageOriginal(client, process.env.CONTENT_BUCKET, contentId, bytes, extension)
+  return registerSource(payload, content, object, extension)
+}
 
+/**
+ * Registers a stored original (immutable `content/<id>/<sha256>.<ext>`) as the item's file. Manually created items take
+ * its fingerprint as their source version; imported items keep theirs. Shared by direct and large (S3) uploads.
+ */
+export async function registerSource(payload: Payload, content: ContentDoc, object: { key: string; hash: string }, extension: string) {
+  const contentId = content.id, hash = object.hash
+  if (!['intake', 'draft'].includes(content.state)) throw new UploadError(409, 'Files can only be added while the item is in Intake or Draft. Ask an administrator to move it back to Draft.')
+  if (!UPLOAD_TYPES[extension]) throw new UploadError(415, 'Unsupported file type.')
   const manual = !content.sourceKey || content.sourceKey.startsWith('manual:')
   let version = content.sourceHash
   if (manual && version !== hash) {
@@ -73,14 +82,16 @@ export async function processingStatus(payload: Payload, contentId: number) {
   const content = await payload.findByID({ collection: 'content', id: contentId, depth: 0, overrideAccess: true, disableErrors: true }) as ContentDoc | null
   if (!content) return null
   const version = content.sourceHash ?? ''
-  const [assets, jobs, suggestions, settings] = await Promise.all([
+  const { pendingLargeUploads } = await import('./large-upload')
+  const [assets, jobs, suggestions, settings, pendingUploads] = await Promise.all([
     payload.find({ collection: 'assets', overrideAccess: true, depth: 0, limit: 50, sort: '-createdAt', where: { content: { equals: contentId } } }),
     payload.find({ collection: 'processing-jobs', overrideAccess: true, depth: 0, limit: 50, sort: '-createdAt', where: { content: { equals: contentId } } }),
     payload.find({ collection: 'suggestions', overrideAccess: true, depth: 0, limit: 20, sort: '-createdAt', where: { content: { equals: contentId } } }),
     payload.findGlobal({ slug: 'automation-settings', overrideAccess: true, depth: 0 }).catch(() => null),
+    pendingLargeUploads(contentId),
   ])
   return {
-    state: content.state, vimeoId: content.vimeoId ?? null,
+    state: content.state, vimeoId: content.vimeoId ?? null, pendingUploads,
     thumbnail: { version: content.thumbnailVersion ?? null, source: content.thumbnailSource ?? null },
     automation: settings ? { paused: Boolean(settings.paused), documents: settings.documentsEnabled !== false, vimeo: settings.vimeoEnabled !== false,
       transcription: settings.transcriptionEnabled !== false, tagging: settings.taggingEnabled !== false } : null,

@@ -30,7 +30,15 @@ try {
     let stopping = false
     for (const signal of ['SIGTERM', 'SIGINT'] as const) process.on(signal, () => { stopping = true })
     const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
-    let lastScan = 0, lastThumbs = 0, lastIndex = 0, lastSummary = ''
+    let lastScan = 0, lastThumbs = 0, lastIndex = 0, lastUploads = 0, lastSummary = ''
+    // Payload (for registering large uploads with the same rules as direct uploads) starts on first use.
+    let payloadInstance: import('payload').Payload | undefined
+    const payloadFor = async () => payloadInstance ??= await (async () => {
+      const [{ getPayload }, { default: config }] = await Promise.all([import('payload'), import('../payload.config')])
+      const resolved = await config
+      resolved.logger = { options: { level: 'warn' } } as typeof resolved.logger
+      return getPayload({ config: resolved })
+    })()
     const { bedrockEmbedder, semanticSearchEnabled, syncEmbeddings } = await import('./embeddings')
     const indexing = semanticSearchEnabled() && process.env.ALLOW_PAID_PROCESSING === 'true' ? bedrockEmbedder() : null
     const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3')
@@ -60,6 +68,18 @@ try {
           const made = await syncThumbnails(pool, thumbnailDeps)
           if (made.length) console.log(JSON.stringify({ status: 'thumbnails', results: made }))
         }
+        if (process.env.CONTENT_BUCKET && process.env.PAYLOAD_SECRET && Date.now() - lastUploads > 15000) {
+          // Large uploads (over 50 MB) arrive in uploads/; fingerprint, move into place and register them.
+          lastUploads = Date.now()
+          const [{ finalizeUploads, s3FinalizeDeps }, { registerSource, UploadError }] = await Promise.all([import('./finalize-uploads'), import('../server/processing')])
+          const results = await finalizeUploads(s3FinalizeDeps(s3, process.env.CONTENT_BUCKET, async (contentId, object, extension) => {
+            const payload = await payloadFor()
+            const content = await payload.findByID({ collection: 'content', id: contentId, depth: 0, overrideAccess: true, disableErrors: true })
+            if (!content) throw new UploadError(404, 'Library item not found.')
+            await registerSource(payload, content as never, object, extension)
+          }))
+          if (results.length) console.log(JSON.stringify({ status: 'large_uploads', results: results.map(r => ({ status: r.status, code: r.code })) }))
+        }
         if (indexing && Date.now() - lastIndex > 15000) {
           // Semantic search index for reviewed passages; prunes superseded evidence. Bounded per pass.
           lastIndex = Date.now()
@@ -76,6 +96,7 @@ try {
         await sleep(30000)
       }
     }
+    await payloadInstance?.destroy().catch(() => undefined)
     console.log(JSON.stringify({ status: 'worker_stopped' }))
   } else if (command === 'work') {
     if (args.length) throw new ProcessingError('unexpected_arguments')

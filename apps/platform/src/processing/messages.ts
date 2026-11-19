@@ -29,7 +29,10 @@ const MESSAGES: Record<string, string> = {
   source_jobs_changed: 'The item\'s processed files changed while it was being analyzed. A new analysis is queued automatically.',
   invalid_mp4: 'The downloaded video was not a valid MP4 file.',
   vimeo_download_failed: 'The video file could not be downloaded from Vimeo. The job can be retried.',
-  pdf_requires_ocr: 'This PDF is a scanned image with no text layer. OCR is not available yet; upload a text-based PDF or add the text manually.',
+  pdf_requires_ocr: 'This PDF is a scanned image with no text layer. It is read with OCR when paid processing and transcription/OCR are on.',
+  ocr_job_failed: 'Amazon Textract could not read this PDF. It may be damaged, password-protected, or over 3,000 pages.',
+  ocr_result_limit: 'The OCR result was larger than the processing limit.',
+  invalid_ocr_input: 'This file cannot be sent to OCR.',
   pdf_page_limit: 'The PDF has more pages than the processing limit.',
   invalid_pdf: 'The PDF could not be read. It may be damaged.',
   invalid_document: 'The document could not be read. It may be damaged or in an unsupported format.',
@@ -61,5 +64,8 @@ export const STEP_LABEL: Record<string, string> = { extract: 'Text extraction', 
 export const STATE_LABEL: Record<string, string> = { queued: 'Waiting', running: 'Running', succeeded: 'Done', failed: 'Failed' }
 export function jobLabel(stage: string, input: unknown) {
   const kind = input && typeof input === 'object' && 'kind' in input ? String((input as { kind: unknown }).kind) : ''
+  if (kind === 'analyze') return 'AI analysis (all sources)'
+  const format = input && typeof input === 'object' && 'format' in input ? String((input as { format: unknown }).format) : ''
+  if (kind === 'document' && format === 'pdf') return 'PDF text (OCR if scanned)'
   return kind === 'vimeo' ? 'Vimeo captions / transcription' : STEP_LABEL[stage] ?? stage
 }

@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
+import { sendFile, UploadFailure, UPLOAD_HINT } from '../upload-client'
 
 const TYPES = '.pdf,.docx,.pptx,.xlsx,.vtt,.txt,.mp3,.mp4,.wav,.m4a,.flac,.ogg,.webm'
 const titleFrom = (name: string) => name.replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200) || 'Untitled'
@@ -13,6 +14,7 @@ export function UploadStep() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [dragging, setDragging] = useState(false)
+  const [progress, setProgress] = useState<number | null>(null)
   const picker = useRef<HTMLInputElement>(null)
   const go = (id: number) => { window.location.href = `/admin/add-content?id=${id}&step=2` }
 
@@ -21,11 +23,14 @@ export function UploadStep() {
     try {
       if (mode === 'file') {
         if (!file) throw new Error('Choose a file.')
-        const body = new FormData(); body.append('file', file); body.append('title', title || titleFrom(file.name))
-        const response = await fetch('/library-api/bulk', { method: 'POST', body, credentials: 'same-origin' })
-        const result = await response.json().catch(() => ({}))
-        if (!response.ok && !result.contentId) throw new Error(result.error ?? 'Upload failed.')
-        return go(result.contentId)
+        try {
+          const result = await sendFile(file, { title: title || titleFrom(file.name), onProgress: setProgress })
+          return go(result.contentId)
+        } catch (e) {
+          // The item exists but its file did not arrive: continue to it so the editor can retry from its Processing panel.
+          if (e instanceof UploadFailure && e.contentId) return go(e.contentId)
+          throw e
+        }
       }
       const id = /(\d{6,})/.exec(vimeo)?.[1]
       if (mode === 'vimeo' && !id) throw new Error('Paste the Vimeo link or the number at the end of it.')
@@ -48,7 +53,7 @@ export function UploadStep() {
     {mode === 'file' && <div className={`ae-drop${dragging ? ' on' : ''}`} onDragOver={e => { e.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)}
       onDrop={e => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) { setFile(f); if (!title) setTitle(titleFrom(f.name)) } }}>
       <strong>{file ? file.name : 'Drop a file here'}</strong>
-      <span className="ae-muted">{file ? `${(file.size / 1048576).toFixed(1)} MB` : 'PDF, Word, PowerPoint, Excel, captions, text, audio or video. Up to 50 MB.'}</span>
+      <span className="ae-muted">{file ? `${(file.size / 1048576).toFixed(1)} MB` : `PDF, Word, PowerPoint, Excel, captions, text, audio or video. ${UPLOAD_HINT}`}</span>
       <button type="button" className="ae-btn ae-btn--secondary ae-btn--small" onClick={() => picker.current?.click()}>{file ? 'Replace' : 'Choose a file'}</button>
       <input ref={picker} type="file" accept={TYPES} hidden onChange={e => { const f = e.target.files?.[0]; if (f) { setFile(f); if (!title) setTitle(titleFrom(f.name)) } }} />
     </div>}
@@ -57,7 +62,7 @@ export function UploadStep() {
     <label className="ae-field"><span>Title {mode === 'file' && <em className="ae-muted">(AI can improve it)</em>}</span><input value={title} onChange={e => setTitle(e.target.value)} maxLength={200} /></label>
     {error && <p role="alert" className="ae-notice ae-notice--fail">{error}</p>}
     <div className="ae-actions"><span className="ae-muted">AI reads it, writes a summary and takeaways, and suggests where it belongs. Nothing goes live until it&apos;s approved.</span>
-      <button className="ae-btn ae-btn--primary" disabled={busy}>{busy ? 'Uploading…' : 'Continue'}</button></div>
+      <button className="ae-btn ae-btn--primary" disabled={busy}>{busy ? (progress !== null ? `Uploading ${Math.round(progress * 100)}%` : 'Uploading…') : 'Continue'}</button></div>
   </form>
 }
 

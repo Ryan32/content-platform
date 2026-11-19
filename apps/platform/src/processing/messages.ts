@@ -30,6 +30,7 @@ const MESSAGES: Record<string, string> = {
   invalid_mp4: 'The downloaded video was not a valid MP4 file.',
   vimeo_download_failed: 'The video file could not be downloaded from Vimeo. The job can be retried.',
   pdf_requires_ocr: 'This PDF is a scanned image with no text layer. It is read with OCR when paid processing and transcription/OCR are on.',
+  evidence_store_unavailable: 'The results could not be saved to long-term evidence storage, so the step will retry. Nothing was lost.',
   invalid_image: 'The picture could not be opened. It may be damaged or not really an image.',
   image_too_small: 'The picture is too small to be meaningful (an icon or spacer), so it was skipped.',
   image_too_large: 'The picture is too large to send to the AI model.',

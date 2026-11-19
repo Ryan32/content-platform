@@ -10,7 +10,8 @@ import { ProcessingError } from './jobs'
 export const OCR_PROCESSOR = 'ae-textract/1'
 export const MAX_OCR_BYTES = 500 * 1024 * 1024
 
-export async function ocrPdf(input: { bucket: string; key: string; jobKey: string }, client = new TextractClient({})):
+/** `onRaw` receives every Textract result page as returned (all blocks with confidence and geometry) for evidence. */
+export async function ocrPdf(input: { bucket: string; key: string; jobKey: string }, client = new TextractClient({}), onRaw?: (pages: unknown[]) => void):
   Promise<{ status: 'pending' } | { status: 'complete'; extraction: Extraction }> {
   const { bucket, key, jobKey } = input
   if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(bucket) || !/^[a-f0-9]{64}$/.test(jobKey) || !/^content\/\d+\/[a-f0-9]{64}\.pdf$/.test(key)) throw new ProcessingError('invalid_ocr_input')
@@ -19,12 +20,14 @@ export async function ocrPdf(input: { bucket: string; key: string; jobKey: strin
   if (!started.JobId) throw new ProcessingError('ocr_job_failed', true)
   const lines = new Map<number, string[]>()
   let token: string | undefined, pages = 0
+  const raw: unknown[] = []
   for (let call = 0; call < 400; call++) {
     const page = await client.send(new GetDocumentTextDetectionCommand({ JobId: started.JobId, MaxResults: 1000, NextToken: token }))
     if (page.JobStatus === 'IN_PROGRESS') return { status: 'pending' }
     if (page.JobStatus === 'FAILED') throw new ProcessingError('ocr_job_failed')
     if (page.JobStatus !== 'SUCCEEDED' && page.JobStatus !== 'PARTIAL_SUCCESS') throw new ProcessingError('ocr_job_failed')
     pages = Math.max(pages, page.DocumentMetadata?.Pages ?? 0)
+    raw.push({ JobStatus: page.JobStatus, DocumentMetadata: page.DocumentMetadata, Blocks: page.Blocks, Warnings: page.Warnings, ModelVersion: page.DetectDocumentTextModelVersion })
     for (const block of page.Blocks ?? [] as Block[]) {
       if (block.BlockType !== 'LINE' || !block.Text) continue
       const n = block.Page ?? 1
@@ -37,6 +40,7 @@ export async function ocrPdf(input: { bucket: string; key: string; jobKey: strin
       if (page.JobStatus === 'PARTIAL_SUCCESS') output.result.warnings.push('Some pages could not be read by OCR.')
       if (pages && lines.size < pages) output.result.warnings.push(`${pages - lines.size} page(s) had no readable text, even with OCR.`)
       output.result.warnings.push('Text was read by OCR from page images; check names and numbers against the original.')
+      onRaw?.(raw)
       return { status: 'complete', extraction: output.finish() }
     }
   }

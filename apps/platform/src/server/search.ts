@@ -9,24 +9,8 @@ export const SEARCH_DOCUMENT = `(setweight(to_tsvector('english', coalesce(title
 type Queryable = { query: (sql: string, values: unknown[]) => Promise<{ rows: any[] }> }
 /** Where a query matched on a page: a reviewed passage, possibly inside one of the page's files. */
 export type SearchMatch = { citationId: string; locator: string; assetId?: number }
-const toMatch = (r: { citation_id: string; locator: string; asset_id?: unknown }): SearchMatch =>
-  ({ citationId: String(r.citation_id), locator: String(r.locator), ...(r.asset_id != null ? { assetId: Number(r.asset_id) } : {}) })
-/** Must match the content_passages_fts index in migration 20261119_040000_semantic_index. */
-export const PASSAGE_DOCUMENT = `to_tsvector('english', p.text)`
-
-/**
- * Pages whose reviewed passages (including text inside their files) match the words, with the best passage for each.
- * Only current evidence of published pages; authorization is applied afterwards by the caller.
- */
-export async function passageMatches(db: Queryable, query: string, limit = 300): Promise<Map<number, SearchMatch>> {
-  const { rows } = await db.query(`SELECT id, citation_id, locator, asset_id FROM (
-      SELECT DISTINCT ON (c.id) c.id, p.citation_id, p.locator, p.asset_id, ts_rank_cd(${PASSAGE_DOCUMENT}, q) AS rank
-      FROM content c JOIN content_passages p ON p._parent_id = c.id AND p.version = c.evidence_version, websearch_to_tsquery('english', $1) q
-      WHERE numnode(q) > 0 AND c.state = 'published' AND ${PASSAGE_DOCUMENT} @@ q
-      ORDER BY c.id, rank DESC) best ORDER BY rank DESC LIMIT $2`, [query, limit])
-  return new Map(rows.map(r => [Number(r.id), toMatch(r)]))
-}
-
+const toMatch = (r: { citation_id: string | null; locator: string; asset_id?: unknown }): SearchMatch =>
+  ({ citationId: r.citation_id ? String(r.citation_id) : '', locator: String(r.locator), ...(r.asset_id != null ? { assetId: Number(r.asset_id) } : {}) })
 /** Published content IDs matching the query, best first. Authorization is applied afterwards by the caller. Null if the query has no searchable words. */
 export async function rankedContentIds(db: Queryable, query: string, limit = 500): Promise<number[] | null> {
   const { rows } = await db.query(`SELECT c.id FROM content c, websearch_to_tsquery('english', $1) q
@@ -36,6 +20,23 @@ export async function rankedContentIds(db: Queryable, query: string, limit = 500
   // Stop-word-only queries (e.g. "the") produce an empty tsquery; let the caller fall back to substring matching.
   const { rows: check } = await db.query(`SELECT numnode(websearch_to_tsquery('english', $1)) AS id`, [query])
   return Number(check[0]?.id) > 0 ? [] : null
+}
+
+/** Chunks that are current for a published item (the reader index). Authorization is still applied by the caller. */
+const CURRENT_PUBLISHED = `JOIN search_chunk_state st ON st.content_id = k.content_id AND st.build_version = k.build_version
+  JOIN content c ON c.id = k.content_id AND c.state = 'published'`
+
+/**
+ * Keyword matches anywhere on a page (curated fields, article, every file, transcripts, OCR, pictures), scored by
+ * relevance x source weight; the best chunk per page says where it matched.
+ */
+export async function passageMatches(db: Queryable, query: string, limit = 300): Promise<Map<number, SearchMatch>> {
+  const { rows } = await db.query(`SELECT id, citation_id, locator, asset_id FROM (
+      SELECT DISTINCT ON (k.content_id) k.content_id AS id, k.citation_id, k.locator, k.asset_id, ts_rank_cd(k.tsv, q) * k.weight AS score
+      FROM search_chunks k ${CURRENT_PUBLISHED}, websearch_to_tsquery('english', $1) q
+      WHERE numnode(q) > 0 AND k.tsv @@ q
+      ORDER BY k.content_id, score DESC) best ORDER BY score DESC LIMIT $2`, [query, limit])
+  return new Map(rows.map(r => [Number(r.id), toMatch(r)]))
 }
 
 /** Cosine distance above which a passage is not considered a match (normalized Titan V2 vectors). */
@@ -48,17 +49,17 @@ const MAX_DISTANCE = 0.75
 export async function semanticContentIds(db: Queryable, embed: Embed, query: string, limit = 100): Promise<number[]> {
   return [...(await semanticMatches(db, embed, query, limit)).keys()]
 }
-/** Closest pages by meaning, best first, each with its closest passage. */
+/** Closest pages by meaning: nearest chunks, scored by similarity x source weight, best chunk per page. */
 export async function semanticMatches(db: Queryable, embed: Embed, query: string, limit = 100): Promise<Map<number, SearchMatch>> {
   const vector = vectorLiteral(await embed(query, AbortSignal.timeout(4000)))
   const { rows } = await db.query(`SELECT id, citation_id, locator, asset_id FROM (
-      SELECT DISTINCT ON (n.content_id) n.content_id AS id, n.citation_id, n.distance, p.locator, p.asset_id FROM (
-        SELECT e.content_id, e.citation_id, e.evidence_version, e.embedding <=> $1::vector AS distance FROM passage_embeddings e
-        WHERE e.model = $2 ORDER BY e.embedding <=> $1::vector LIMIT 400) n
-      JOIN content c ON c.id = n.content_id AND c.state = 'published' AND c.evidence_version = n.evidence_version
-      LEFT JOIN content_passages p ON p._parent_id = n.content_id AND p.citation_id = n.citation_id
-      WHERE n.distance < $3 ORDER BY n.content_id, n.distance) best
-    ORDER BY distance LIMIT $4`, [vector, embeddingModel(), MAX_DISTANCE, limit])
+      SELECT DISTINCT ON (n.content_id) n.content_id AS id, n.citation_id, n.locator, n.asset_id, (1 - n.distance) * n.weight AS score FROM (
+        SELECT k.content_id, k.build_version, k.citation_id, k.locator, k.asset_id, k.weight, k.embedding <=> $1::vector AS distance
+        FROM search_chunks k WHERE k.model = $2 AND k.embedding IS NOT NULL ORDER BY k.embedding <=> $1::vector LIMIT 400) n
+      JOIN search_chunk_state st ON st.content_id = n.content_id AND st.build_version = n.build_version
+      JOIN content c ON c.id = n.content_id AND c.state = 'published'
+      WHERE n.distance < $3 ORDER BY n.content_id, score DESC) best
+    ORDER BY score DESC LIMIT $4`, [vector, embeddingModel(), MAX_DISTANCE, limit])
   return new Map(rows.map(r => [Number(r.id), toMatch({ ...r, locator: r.locator ?? '' })]))
 }
 
@@ -87,7 +88,8 @@ export async function hybridSearch(db: Queryable, query: string, embed?: Embed):
   const inFiles = keyword === null ? new Map<number, SearchMatch>() : await passageMatches(db, query).catch(() => new Map<number, SearchMatch>())
   let semantic = new Map<number, SearchMatch>()
   if (embed && semanticSearchEnabled() && query.trim().length >= 3) semantic = await semanticMatches(db, embed, query).catch(() => new Map())
-  const matches = new Map([...semantic, ...inFiles])   // a literal word match is the clearer pointer
+  // A literal word match is the clearer pointer; curated-field matches (title, tags) need no pointer.
+  const matches = new Map([...semantic, ...inFiles].filter(([, m]) => m.citationId || m.assetId))
   const lists = [keyword ?? [], [...inFiles.keys()], [...semantic.keys()]].filter(l => l.length)
   if (!lists.length) return { ids: keyword, matches }
   return { ids: lists.length === 1 ? lists[0] : fuse(...lists), matches }

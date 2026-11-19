@@ -39,6 +39,69 @@ Search covers page text, the reviewed text inside every file (full-text index on
 
 Pages with several Vimeo videos keep all of them (main player plus "More videos"); each is transcribed and included in the page's analysis and search. **Events (`tribe_events`, 26 records) are not migrated**; events live in AE Portal and may be dropped from the library altogether.
 
+## Keep everything: evidence, full-text index, analytics lake (owner decision, 2026-11-18)
+
+**1. Lossless evidence.** Every raw provider output is kept as returned, gzipped, under `evidence/<item>/<kind>/<processor>/<sha256>.json.gz` in the private bucket (no expiry), and listed in `evidence_artifacts`:
+- Textract: every result page with all blocks, confidence and geometry.
+- Transcribe: the full output with words, timings, confidence and speaker labels (now enabled).
+- Vimeo caption files as served.
+- Every full extraction.
+- Every model call: purpose, model, prompt version, the full request (image bytes replaced by their fingerprint), the full response, stop reason, tokens and latency.
+
+Captures are saved whether the job succeeds or fails. A failed save fails the job as retryable (`evidence_store_unavailable`), never silently. Extraction limits were raised so large files are kept, not rejected: 64 MiB of text and 50,000 passages.
+
+**2. Everything indexed, weighted.** `search_chunks` holds every piece of text on a Draft or Published item, rebuilt when anything on the item changes:
+- title, summary, takeaways, tags, and each file's name and description;
+- article text, each file's text, transcripts, OCR text and picture readings.
+
+Long text is split into overlapping windows of about 3,500 characters; short transcript segments are merged. Each chunk carries its source and weight:
+
+| Source | Weight |
+| --- | --- |
+| title | 3.0 |
+| summary | 2.5 |
+| takeaway, tag, file | 2.0 |
+| article | 1.2 |
+| document, slides | 1.0 |
+| sheet, captions | 0.9 |
+| transcript | 0.8 |
+| OCR | 0.7 |
+| picture | 0.6 |
+
+Keyword relevance and vector similarity are each multiplied by the source weight; page-level keyword, chunk keyword and chunk meaning rankings are fused. Only current chunks of Published items can match for readers, and authorization is applied afterwards as before. Every chunk is embedded (Titan Text Embeddings V2).
+
+**3. Analytics lake (Iceberg on Amazon S3 Tables, read in place by Snowflake).** Rows go first to the `analytics_outbox` table, often in the same transaction as the change they describe. The worker ships them to one Amazon Data Firehose stream per Iceberg table; a row is marked shipped only after Firehose accepts it, and shipped rows are pruned after 7 days (the Iceberg tables are the record). Tables in namespace `library`, all append-only:
+
+| Table | Contents |
+| --- | --- |
+| `events` | Job success, retry and failure; review decisions field by field (AI value, previous value, pre-selected, chosen, final, edited), tags, new tags and file descriptions. |
+| `model_calls` | Purpose, model, prompt version, tokens, latency, evidence key. |
+| `evidence` | The evidence manifest. |
+| `chunks` | Every chunk with source, weight, text and embedding. |
+| `items` | A snapshot each time an item is indexed. |
+
+Every record also carries the full row as JSON text in `payload`, so no field is lost to the column mapping. Staff appear only as `user:<internal id>`; reader identities are not exported.
+
+### Snowflake (read in place, no loading)
+
+Verify the syntax against current Snowflake docs before running ([REST catalog integration](https://docs.snowflake.com/en/sql-reference/sql/create-catalog-integration-rest); S3 Tables REST integration GA 2026-08-10). The IAM role must trust Snowflake's principal and allow S3 Tables read access on the table bucket.
+
+```sql
+CREATE CATALOG INTEGRATION ae_library_s3tables
+  CATALOG_SOURCE = ICEBERG_REST
+  TABLE_FORMAT = ICEBERG
+  CATALOG_API_TYPE = AWS_S3TABLES
+  CATALOG_NAME = '<table bucket ARN printed by analytics-iceberg.ps1>'
+  REST_CONFIG = ( CATALOG_URI = 'https://s3tables.us-east-1.amazonaws.com/iceberg' )
+  REST_AUTHENTICATION = ( TYPE = SIGV4  SIGV4_IAM_ROLE = '<arn of a Snowflake read role>'  SIGV4_SIGNING_REGION = 'us-east-1' )
+  ACCESS_DELEGATION_MODE = VENDED_CREDENTIALS
+  ENABLED = TRUE;
+CREATE DATABASE ae_library_lake LINKED_CATALOG = ( CATALOG = 'ae_library_s3tables' );
+-- Then: SELECT * FROM ae_library_lake."library".events; current chunks per item = latest build_version per content_id.
+```
+
+Library content is access-restricted; grant Snowflake roles accordingly.
+
 ## Decisions
 
 - **ADR-035 — import files enter the normal pipeline.** No import-only processing path. Bytes are verified at build, re-verified before upload, size-checked on copy, and attached only to items whose source version still matches the package. Reruns reuse objects and file records.
@@ -52,10 +115,14 @@ Pages with several Vimeo videos keep all of them (main player plus "More videos"
 - **ADR-045 — original source dates are separate fields**, never overwriting Payload's own timestamps; `listedAt` is the reader's sort date.
 - **ADR-046 — page-first files (hybrid).** One library item per WordPress package/post; each file is a named section with its own description and deep link, not a separate item. Keeps one set of access, review dates and approval per page. A file can later be split into its own item if it needs to stand alone.
 - **ADR-047 — citations know their file.** Passages carry the asset they came from, so search, citations and MCP can point to the exact file on the page.
+- **ADR-048 — lossless evidence.** Raw provider outputs, full extractions and model calls are kept forever under `evidence/` (content-addressed, gzipped) with a database manifest; reprocessing never needs to pay for OCR or transcription again.
+- **ADR-049 — one weighted index over everything.** `search_chunks` replaces passage-only embeddings: every source is chunked, keyword-indexed and embedded, weighted by source; nothing is excluded from search, curated fields simply rank higher.
+- **ADR-050 — analytics as append-only Iceberg tables on S3 Tables** via a transactional outbox and Firehose; Snowflake reads them in place through a catalog-linked database. Chosen over nightly file exports (owner decision, 2026-11-18).
+- **ADR-051 — review decisions are labels.** Each decision records, per field, the AI value, prior value, pre-selection, choice, final value and whether the reviewer edited the AI wording.
 - **ADR-041 — OCR with Amazon Textract.** Asynchronous text detection on the item's private S3 object (500 MB / 3,000 pages), polled statelessly like Transcribe (idempotent per job key). Counts as a paid step under the Transcription switch and the daily paid-job limit. Results are marked `(OCR)` per page with a check-the-numbers warning.
 - **ADR-042 — uploads over 50 MB go browser → S3.** The app signs a one-hour PUT to `uploads/<item>/<uuid>.<ext>` with the exact size, type, encryption and uploader signed (audio/video ≤ 2 GB, PDF ≤ 500 MB). The worker streams and fingerprints every byte, copies it to the immutable `content/<item>/<sha256>.<ext>` key with the fingerprint recorded, registers it through Payload with the same rules as a direct upload, and deletes the staging object. Unsigned, oversized, fake-PDF or unattachable uploads are deleted; abandoned staging objects expire after 2 days (bucket lifecycle). Files up to 50 MB keep the existing direct path.
 
-Requirements: **REQ-IMPORT-09** (one page per package, real file names, roles), **REQ-AI-04** (per-file descriptions), **REQ-SEARCH-04** (hits inside files open the page at that file), **REQ-INGEST-05** (every video on a page), **REQ-INGEST-04** (every backup file type), **REQ-AI-03** (pictures), **REQ-IMPORT-08** (original dates, featured-image covers), **REQ-INGEST-03** (OCR), **REQ-ASSET-03** (large uploads), **REQ-IMPORT-07** (import files attach idempotently, version-pinned), **REQ-AI-02** (combined analysis, keep/backfill/propose review), **REQ-SEARCH-02** (hybrid ranking never widens access; degrades to keyword), **REQ-SEARCH-03** (index tracks current evidence and state). Tests: `import-attach`, `analysis`, `analysis-review`, `automation`, `vimeo-media`, `semantic-search`, `ocr-and-large-uploads`, `all-formats`, `file-pages`.
+Requirements: **REQ-DATA-01** (analytics outbox to Iceberg), **REQ-DATA-02** (lossless evidence), **REQ-DATA-03** (review labels), **REQ-SEARCH-05** (everything indexed, weighted), **REQ-IMPORT-09** (one page per package, real file names, roles), **REQ-AI-04** (per-file descriptions), **REQ-SEARCH-04** (hits inside files open the page at that file), **REQ-INGEST-05** (every video on a page), **REQ-INGEST-04** (every backup file type), **REQ-AI-03** (pictures), **REQ-IMPORT-08** (original dates, featured-image covers), **REQ-INGEST-03** (OCR), **REQ-ASSET-03** (large uploads), **REQ-IMPORT-07** (import files attach idempotently, version-pinned), **REQ-AI-02** (combined analysis, keep/backfill/propose review), **REQ-SEARCH-02** (hybrid ranking never widens access; degrades to keyword), **REQ-SEARCH-03** (index tracks current evidence and state). Tests: `import-attach`, `analysis`, `analysis-review`, `automation`, `vimeo-media`, `semantic-search`, `ocr-and-large-uploads`, `all-formats`, `file-pages`.
 
 ## Deploy and live check (AWS laptop)
 
@@ -66,7 +133,8 @@ Pull `main`, then:
 3. `run-task.ps1 -Step bootstrap -OperationsDigest <ops>` — idempotent; now also runs `CREATE EXTENSION IF NOT EXISTS vector` as the master role.
 4. `run-task.ps1 -Step migrate -OperationsDigest <ops>` — applies `20261119_040000_semantic_index`.
 5. `bucket-uploads.ps1` (browser-upload CORS for the library origin; 2-day expiry for abandoned `uploads/`; keeps existing rules).
-6. `worker-service.ps1 -ImageDigest <ops>` (adds Textract, Titan embedding, `uploads/` finalize and multipart-abort permissions, `PAYLOAD_SECRET`, `SEMANTIC_SEARCH=true`) and `web-service.ps1 -ImageDigest <web>` (adds the Titan query permission, signing PUTs into `uploads/`, `SEMANTIC_SEARCH=true`), then `run-task.ps1 -Step smoke`.
+6. `analytics-iceberg.ps1` (after enabling the S3 Tables integration with AWS analytics services in the S3 console): table bucket `aecp-dev-library-analytics`, namespace `library`, five Iceberg tables, Firehose role and five streams `aecp-dev-library-*`. If Lake Formation governs the catalog, grant the Firehose role DESCRIBE/SELECT/INSERT/ALTER on the tables. Until this runs, analytics rows wait safely in the outbox.
+6b. `worker-service.ps1 -ImageDigest <ops>` (adds Textract, Titan embedding, `uploads/` finalize, `evidence/` write/read, Firehose delivery and multipart-abort permissions, `PAYLOAD_SECRET`, `SEMANTIC_SEARCH=true`, `ANALYTICS_FIREHOSE_PREFIX`) and `web-service.ps1 -ImageDigest <web>` (adds the Titan query permission, signing PUTs into `uploads/`, `SEMANTIC_SEARCH=true`), then `run-task.ps1 -Step smoke`.
 7. Store the Vimeo token in `aecp-dev-library-vimeo-token`, then rerun `worker-service.ps1` so the worker receives it.
 8. Confirm Textract is available and in Bedrock that Claude Haiku/Sonnet 5.5 and Titan Text Embeddings V2 are invocable in us-east-1.
 9. Import: `import-batches.ps1 -BatchDir <copied pilot-200-v3> -OperationsDigest <ops> -PreviewOnly -Only batch-001`, then without `-PreviewOnly`.

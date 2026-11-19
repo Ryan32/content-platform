@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 import { DOCUMENT_FORMATS, IMAGE_FORMATS } from './formats'
+import { emit } from './analytics'
 
 export const PROCESSOR = 'ae-processing/1'
 export const inputSchema = z.discriminatedUnion('kind', [
@@ -77,6 +78,12 @@ export class JobStore {
       if (proposal) await db.query(`INSERT INTO suggestions (job_key,content_id,source_version,model,proposal,decision)
         VALUES ($1,$2,$3,$4,$5,'pending') ON CONFLICT (job_key) DO NOTHING`,
       [job.idempotency_key, job.content_id, job.source_version, proposal.model, JSON.stringify(proposal.data)])
+      // Analytics, atomically with the result: what ran, how long it took overall, and what it produced.
+      const extraction = result as { processorVersion?: string; passages?: unknown[]; warnings?: unknown[] }
+      await emit(db, { stream: 'events', event: 'job.succeeded', contentId: job.content_id, jobId: job.id, data: { kind: job.input.kind,
+        source_version: job.source_version, attempts: job.attempts, processor: extraction?.processorVersion ?? null,
+        passages: Array.isArray(extraction?.passages) ? extraction.passages.length : null, warnings: Array.isArray(extraction?.warnings) ? extraction.warnings : null,
+        proposal: Boolean(proposal), model: proposal?.model ?? null } })
       await db.query('COMMIT')
     } catch (error) { await db.query('ROLLBACK'); throw error } finally { db.release() }
   }
@@ -91,6 +98,8 @@ export class JobStore {
     await this.pool.query(`UPDATE processing_jobs SET state=$3::enum_processing_jobs_state,error_code=$4,next_run_at=now()+($5::integer * interval '1 second'),
       lease_token=NULL,lease_until=NULL,updated_at=now() WHERE id=$1 AND lease_token=$2 AND state='running' AND lease_until>now()`,
     [job.id, job.lease_token, retry ? 'queued' : 'failed', known ? error.code : 'processing_failed', Math.min(900, 30 * 2 ** job.attempts)])
+    await emit(this.pool, { stream: 'events', event: retry ? 'job.retrying' : 'job.failed', contentId: job.content_id, jobId: job.id,
+      data: { kind: job.input?.kind ?? null, source_version: job.source_version, attempts: job.attempts, error_code: known ? error.code : 'processing_failed' } }).catch(() => undefined)
   }
   async retry(id: number) {
     const r = await this.pool.query(`UPDATE processing_jobs SET state='queued',attempts=0,error_code=NULL,next_run_at=now(),deadline_at=now()+interval '24 hours'

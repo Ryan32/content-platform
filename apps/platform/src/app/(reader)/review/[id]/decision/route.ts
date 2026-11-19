@@ -2,7 +2,8 @@ import { createLocalReq } from 'payload'
 import { editorContext } from '../../../../../server/editor'
 import { reviewInput, reviewPatch, proposalEnvelope, taxonomyUnchanged } from '../../../../../processing/review'
 import { randomUUID } from 'node:crypto'
-import { analysisPatch, fileDescriptionUpdates, newTagKey, readAnalysisForm } from '../../../../../processing/analysis-review'
+import { analysisPatch, fileDescriptionUpdates, newTagKey, readAnalysisForm, reviewLabels } from '../../../../../processing/analysis-review'
+import { actorOf, emit } from '../../../../../processing/analytics'
 import { analysisEnvelope, ANALYSIS_VERSION } from '../../../../../processing/analysis'
 /** Returns to the review page, or to the Add content wizard when the decision was made there. */
 const location = (id: string, error?: string, returnTo?: string | null) => returnTo
@@ -61,12 +62,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       }
       const patch = analysisPatch(suggestion.proposal, content, suggestion.sourceVersion, v2.data, newTagIds)
       if (patch) await ctx.payload.update({ collection: 'content', id: contentId, data: patch as never, req, overrideAccess: true, context: { reviewedEvidence: true } })
+      let fileUpdates: { assetId: number; description: string }[] = []
       if (patch) {
         // Per-file descriptions: only this item's files of the reviewed source version.
         const files = await ctx.payload.find({ collection: 'assets', req, overrideAccess: true, depth: 0, pagination: false,
           where: { and: [{ content: { equals: contentId } }, { version: { equals: suggestion.sourceVersion } }] } })
         const current = new Map(files.docs.map(f => [Number(f.id), (f as { description?: string | null }).description]))
-        for (const update of fileDescriptionUpdates(envelope, v2.data, current))
+        fileUpdates = fileDescriptionUpdates(envelope, v2.data, current)
+        for (const update of fileUpdates)
           await ctx.payload.update({ collection: 'assets', id: update.assetId, data: { description: update.description } as never, req, overrideAccess: true })
       }
       await ctx.payload.update({ collection: 'suggestions', id: Number(id), req, overrideAccess: true,
@@ -74,6 +77,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       await ctx.payload.db.commitTransaction(tx)
       const persisted = await ctx.payload.findByID({ collection: 'suggestions', id: Number(id), user: ctx.user, overrideAccess: false, depth: 0 })
       if (persisted.reviewAttempt !== reviewAttempt) throw new Error('commit_unconfirmed')
+      // Human decisions as ML labels (after the committed decision; never blocks the reviewer).
+      const pool = (ctx.payload.db as unknown as { pool?: Parameters<typeof emit>[0] }).pool
+      if (pool) await emit(pool, { stream: 'events', event: 'review.decision', contentId, actor: actorOf(ctx.user),
+        data: { suggestion_id: Number(id), model: suggestion.model, ...reviewLabels(envelope, v2.data, patch, fileUpdates, newTagIds) } }).catch(() => undefined)
       return back(id)
     }
     if (!input.success) throw new Error('invalid')

@@ -4,6 +4,15 @@ This document captures work completed in the originating Portal conversation. Ve
 
 ## Active priority — core platform and general MCP
 
+### Keep everything: lossless evidence, weighted full index, Iceberg analytics lake — 2026-11-18
+
+- **Implemented and tested locally; not deployed or provisioned.** Owner: keep all AI/OCR/transcription output for context and AI/ML; index everything, weighting curated fields above raw text; analytics as Iceberg tables on Amazon S3 Tables read in place by Snowflake (us-east-1). See [AI-PIPELINE.md](AI-PIPELINE.md) "Keep everything", ADR-048–051.
+- Evidence: raw Textract pages, Transcribe JSON (speaker labels now on), Vimeo VTT, full extractions and every model call (request, response, tokens, latency, prompt version) saved gzipped under `evidence/` with an `evidence_artifacts` manifest, on success and failure. Extraction caps raised (64 MiB / 50,000 passages).
+- Search: `search_chunks` over every source with weights (title 3.0 … picture 0.6), rebuilt on any change, embedded with Titan V2; keyword and semantic scores weighted, fused with page-level keyword. Replaces passage-only embeddings.
+- Analytics: `analytics_outbox` → Firehose (one stream per table) → S3 Tables namespace `library`: `events` (jobs, field-by-field review labels), `model_calls`, `evidence`, `chunks` (with embeddings), `items`. New script `infra/aws/library/analytics-iceberg.ps1`; Snowflake catalog-linked database SQL in the docs (verify syntax first). New dependency `@aws-sdk/client-firehose` 3.1171.0.
+- Migration: `20261119_040000_semantic_index` was replaced (never applied) by `20261119_040000_search_and_evidence` (evidence manifest, chunks with generated tsvector + HNSW, chunk state, outbox). Infra scripts reference the new name.
+- Validation: typecheck; 172 tests in 28 files (chunk weighting/merging/windows, outbox shipping incl. Firehose outage, evidence keys and gzip, review labels); production build with 10 indexed migrations. A temporary real-PostgreSQL 17 + pgvector check (not committed) ran the migration, chunk rebuild on change (incl. file description edits), embedding, weighted keyword and semantic search with file pointers, draft/archived exclusion, evidence de-duplication and outbox shipping. Not tested: real S3/Firehose/S3 Tables/Snowflake, Textract/Transcribe evidence capture against live providers.
+
 ### One page per package, named files, every video; events excluded — 2026-11-18
 
 - **Implemented and tested locally; not deployed.** Owner chose the hybrid: one page per WordPress package/post with a section per file (real file name, size, AI description reviewed in Review, preview/download by access, deep link). Search finds words inside files and links to the page opened at that file and passage; MCP returns `matchedIn`/`matchUrl`. Article pictures are `inline` (not downloads). Pages with several Vimeo videos keep and process all of them. Events (`tribe_events`) are excluded from migration. Uploads keep their file names (large uploads via signed metadata). See [AI-PIPELINE.md](AI-PIPELINE.md), ADR-046/047.

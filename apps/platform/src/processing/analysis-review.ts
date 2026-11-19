@@ -129,3 +129,28 @@ export function analysisPatch(value: unknown, content: { sourceHash?: string | n
   if (content.state === 'intake') patch.state = 'draft'
   return patch
 }
+
+/**
+ * Field-by-field labels for AI/ML (analytics `events`, event `review.decision`): what the AI proposed, what was there,
+ * what the screen pre-selected, what the reviewer chose and the final value. Human edits are the most valuable signal.
+ */
+export function reviewLabels(e: AnalysisEnvelope, input: AnalysisReviewInput, patch: Record<string, unknown> | null,
+  fileUpdates: { assetId: number; description: string }[], newTagIds: number[]) {
+  const fields = REVIEW_FIELDS.filter(f => suggestedValue(e, f) !== undefined).map(field => {
+    const ai = suggestedValue(e, field), before = currentValue(e.current, field)
+    const preselected = defaultChoice(e, field), chosen = input.use[field] ?? preselected
+    const key = field === 'summary' ? 'description' : field
+    const after = patch && key in patch ? (field === 'takeaways' ? (patch.takeaways as { text: string }[]).map(t => t.text) : patch[key]) : before
+    const typed = field === 'title' ? input.title : field === 'summary' ? input.summary : undefined
+    return { field, ai, before, preselected, chosen, after, edited: typed !== undefined && chosen === 'suggested' && typed !== ai }
+  })
+  const suggestedTags = e.analysis.tags.map(t => t.termId)
+  return {
+    decision: input.decision, analysis_version: e.analysisVersion, migrated: e.current.migrated, fields,
+    tags: { before: e.current.tags, suggested: suggestedTags, final: patch ? patch.acceptedTags : e.current.tags,
+      accepted_suggestions: input.tags.filter(t => suggestedTags.includes(t)), rejected_suggestions: suggestedTags.filter(t => !input.tags.includes(t)) },
+    new_tags: { proposed: e.analysis.newTags.map(t => ({ label: t.label, dimension: t.dimension })), accepted: input.newTags, created_or_reused_ids: newTagIds },
+    files: fileSuggestions(e).map(f => ({ asset_id: f.assetId, ai: f.summary, final: fileUpdates.find(u => u.assetId === f.assetId)?.description ?? null })),
+    conflicts: e.analysis.conflicts, warnings: e.analysis.warnings, sources: e.sources,
+  }
+}

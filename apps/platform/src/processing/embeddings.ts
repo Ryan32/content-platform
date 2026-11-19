@@ -31,32 +31,3 @@ export const vectorLiteral = (v: number[]) => {
   if (v.length !== EMBEDDING_DIMENSIONS || v.some(x => !Number.isFinite(x))) throw new ProcessingError('invalid_embedding')
   return `[${v.join(',')}]`
 }
-
-type Db = { query: (sql: string, values?: unknown[]) => Promise<{ rows: any[]; rowCount?: number | null }> }
-
-/**
- * Worker step: embed reviewed citation passages of Draft/Published items that have no embedding for the current
- * evidence version, and prune embeddings for superseded evidence. Bounded per call; safe to run repeatedly.
- */
-export async function syncEmbeddings(db: Db, embed: Embed, batch = 48) {
-  const model = embeddingModel()
-  const pruned = await db.query(`DELETE FROM passage_embeddings e USING content c WHERE e.content_id=c.id
-    AND (e.evidence_version <> c.evidence_version OR c.state NOT IN ('draft','published'))`)
-  const { rows } = await db.query(`SELECT c.id AS content_id, c.title, p.citation_id, p.version, p.locator, p.text
-    FROM content c JOIN content_passages p ON p._parent_id=c.id AND p.version=c.evidence_version
-    WHERE c.state IN ('draft','published') AND NOT EXISTS (SELECT 1 FROM passage_embeddings e
-      WHERE e.content_id=c.id AND e.citation_id=p.citation_id AND e.model=$1)
-    ORDER BY c.state='published' DESC, c.id, p._order LIMIT $2`, [model, batch])
-  let embedded = 0
-  for (let i = 0; i < rows.length; i += 4) {
-    await Promise.all(rows.slice(i, i + 4).map(async row => {
-      // Title and location give short passages their context.
-      const vector = await embed(`${row.title}\n${row.locator}\n${row.text}`)
-      await db.query(`INSERT INTO passage_embeddings (content_id, citation_id, evidence_version, model, embedding)
-        SELECT $1::integer, $2::varchar, $3::varchar, $4::varchar, $5::vector WHERE EXISTS (SELECT 1 FROM content WHERE id=$1::integer AND evidence_version=$3::varchar)
-        ON CONFLICT (content_id, citation_id, model) DO NOTHING`, [row.content_id, row.citation_id, row.version, model, vectorLiteral(vector)])
-      embedded++
-    }))
-  }
-  return { embedded, pruned: pruned.rowCount ?? 0 }
-}

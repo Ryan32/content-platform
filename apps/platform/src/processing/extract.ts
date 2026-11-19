@@ -22,9 +22,10 @@ export class EvidenceBuilder {
     const text = raw.replace(/\s+/g, ' ').trim()
     if (!text) return
     this.characters += text.length
-    if (this.characters > 2 * MiB) throw new ProcessingError('extracted_text_limit')
+    // Keep everything: limits only stop pathological input (64 MiB of text, 50,000 passages), never ordinary large files.
+    if (this.characters > 64 * MiB) throw new ProcessingError('extracted_text_limit')
     for (let start = 0; start < text.length; start += 16000) {
-      if (this.result.passages.length >= 2000) throw new ProcessingError('passage_limit')
+      if (this.result.passages.length >= 50000) throw new ProcessingError('passage_limit')
       this.result.passages.push({ id: 'e' + (this.result.passages.length + 1), locator, text: text.slice(start, start + 16000) })
     }
   }

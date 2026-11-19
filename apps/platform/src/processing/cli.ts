@@ -30,7 +30,7 @@ try {
     let stopping = false
     for (const signal of ['SIGTERM', 'SIGINT'] as const) process.on(signal, () => { stopping = true })
     const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
-    let lastScan = 0, lastThumbs = 0, lastIndex = 0, lastUploads = 0, lastSummary = ''
+    let lastScan = 0, lastThumbs = 0, lastIndex = 0, lastUploads = 0, lastShip = 0, lastSummary = ''
     // Payload (for registering large uploads with the same rules as direct uploads) starts on first use.
     let payloadInstance: import('payload').Payload | undefined
     const payloadFor = async () => payloadInstance ??= await (async () => {
@@ -39,8 +39,12 @@ try {
       resolved.logger = { options: { level: 'warn' } } as typeof resolved.logger
       return getPayload({ config: resolved })
     })()
-    const { bedrockEmbedder, semanticSearchEnabled, syncEmbeddings } = await import('./embeddings')
-    const indexing = semanticSearchEnabled() && process.env.ALLOW_PAID_PROCESSING === 'true' ? bedrockEmbedder() : null
+    const { bedrockEmbedder, semanticSearchEnabled } = await import('./embeddings')
+    const { syncChunks, embedChunks } = await import('./chunks')
+    const { shipOutbox, firehoseShipper, firehoseStreams } = await import('./analytics')
+    // Chunks (keyword index) are always kept current; embeddings need Bedrock; analytics ship when streams are configured.
+    const embedding = semanticSearchEnabled() && process.env.ALLOW_PAID_PROCESSING === 'true' ? bedrockEmbedder() : null
+    const shipping = Object.keys(firehoseStreams()).length ? firehoseShipper() : null
     const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3')
     const { readOriginal } = await import('./storage')
     const [{ syncThumbnails, vimeoThumbnail }, { renderPdfThumbnail }] = await Promise.all([import('./thumbnails'), import('./pdf-thumbnail')])
@@ -80,12 +84,18 @@ try {
           }))
           if (results.length) console.log(JSON.stringify({ status: 'large_uploads', results: results.map(r => ({ status: r.status, code: r.code })) }))
         }
-        if (indexing && Date.now() - lastIndex > 15000) {
-          // Semantic search index for reviewed passages; prunes superseded evidence. Bounded per pass.
+        if (Date.now() - lastIndex > 15000) {
+          // Search index: rebuild changed items' chunks, then embed new chunks. Bounded per pass; repeats sooner while busy.
           lastIndex = Date.now()
-          const indexed = await syncEmbeddings(pool, indexing)
-          if (indexed.embedded || indexed.pruned) console.log(JSON.stringify({ status: 'indexed', ...indexed }))
-          if (indexed.embedded) lastIndex = 0
+          const built = await syncChunks(pool)
+          const embedded = embedding ? await embedChunks(pool, embedding) : { embedded: 0 }
+          if (built.rebuilt || built.dropped || embedded.embedded) { console.log(JSON.stringify({ status: 'indexed', ...built, ...embedded })); lastIndex = 0 }
+        }
+        if (shipping && Date.now() - lastShip > 30000) {
+          // Analytics outbox -> Firehose -> Iceberg (S3 Tables). Rows stay pending until Firehose accepts them.
+          lastShip = Date.now()
+          const shipped = await shipOutbox(pool, shipping)
+          if (Object.values(shipped).some(Boolean)) console.log(JSON.stringify({ status: 'analytics_shipped', ...shipped }))
         }
         const outcome = await workOnce(store, processors)
         if (outcome.status === 'idle') await sleep(5000)

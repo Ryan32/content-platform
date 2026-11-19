@@ -47,6 +47,10 @@ $task = @{ Version = '2012-10-17'; Statement = @(
     # Large uploads (over 50 MB) staged by the browser under uploads/: read, fingerprint, move into content/, delete.
     @{ Sid = 'FinalizeLargeUploads'; Effect = 'Allow'; Action = @('s3:GetObject', 's3:DeleteObject'); Resource = "arn:aws:s3:::$bucket/uploads/*" },
     @{ Sid = 'ListLargeUploads'; Effect = 'Allow'; Action = 's3:ListBucket'; Resource = "arn:aws:s3:::$bucket"; Condition = @{ StringLike = @{ 's3:prefix' = @('uploads/*') } } },
+    # Lossless evidence (raw provider outputs, model calls, full extractions): write once, read for reprocessing. Never expires.
+    @{ Sid = 'Evidence'; Effect = 'Allow'; Action = @('s3:PutObject', 's3:GetObject'); Resource = "arn:aws:s3:::$bucket/evidence/*" },
+    # Analytics outbox -> Firehose -> S3 Tables (Iceberg), read in place by Snowflake. See analytics-iceberg.ps1.
+    @{ Sid = 'AnalyticsDelivery'; Effect = 'Allow'; Action = @('firehose:PutRecordBatch', 'firehose:PutRecord'); Resource = "arn:aws:firehose:${region}:${account}:deliverystream/aecp-dev-library-*" },
     @{ Sid = 'SemanticIndex'; Effect = 'Allow'; Action = 'bedrock:InvokeModel'; Resource = "arn:aws:bedrock:${region}::foundation-model/amazon.titan-embed-text-v2:0" }) }
 
 $tmp = Join-Path $env:TEMP 'aecp-worker-iam'; New-Item -ItemType Directory -Force $tmp | Out-Null
@@ -81,7 +85,10 @@ $definition = @{
             @{ name = 'ALLOW_PAID_PROCESSING'; value = 'true' },
             @{ name = 'BEDROCK_MODEL_IDS'; value = ($models -join ',') },
             # Embeds reviewed passages for semantic search (Titan Text Embeddings V2).
-            @{ name = 'SEMANTIC_SEARCH'; value = 'true' })
+            @{ name = 'SEMANTIC_SEARCH'; value = 'true' },
+            # Analytics streams (created by analytics-iceberg.ps1). Until they exist, rows wait safely in the outbox.
+            @{ name = 'ANALYTICS_FIREHOSE_PREFIX'; value = 'aecp-dev-library' },
+            @{ name = 'ANALYTICS_ENVIRONMENT'; value = 'dev' })
         # PAYLOAD_SECRET: the worker registers large uploads through Payload, with the same rules as direct uploads.
         secrets = @(@{ name = 'DB_PASSWORD'; valueFrom = "${secret}:aecp-dev-library-db-runtime-TKkby2" },
                     @{ name = 'PAYLOAD_SECRET'; valueFrom = "${secret}:aecp-dev-library-payload-secret-JHvUB0" }) + $(if ($vimeoReady) { @(@{ name = 'VIMEO_ACCESS_TOKEN'; valueFrom = $vimeoSecret }) } else { @() })

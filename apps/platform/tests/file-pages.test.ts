@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { digest, sha256, type IntakePackage } from '../src/import/package'
 import { attachFiles, decodeName, type AttachDeps } from '../src/import/attach'
 import { ANALYSIS_VERSION, validateAnalysis, type AnalysisEnvelope } from '../src/processing/analysis'
-import { analysisPatch, fileDescriptionUpdates, fileSuggestions, readAnalysisForm } from '../src/processing/analysis-review'
+import { analysisPatch, fileDescriptionUpdates, fileSuggestions, readAnalysisForm, reviewLabels } from '../src/processing/analysis-review'
 import { createLibrary, matchHref, type LibraryRepository } from '../src/domain/library'
 import { hybridSearch } from '../src/server/search'
 import { reconcile } from '../src/processing/reconcile'
@@ -82,7 +82,7 @@ describe('REQ-SEARCH-04: search hits inside files open the page at that file', (
   })
   it('finds pages by words inside their files and tells MCP clients where', async () => {
     const db = { query: vi.fn(async (sql: string) => {
-      if (sql.includes('content_passages p ON p._parent_id = c.id')) return { rows: [{ id: 7, citation_id: 'abc-s2-e1', locator: 'Marketing-Kit_DL.pdf · Page 1', asset_id: 22 }] }
+      if (sql.includes('k.tsv @@ q')) return { rows: [{ id: 7, citation_id: 'abc-s2-e1', locator: 'Marketing-Kit_DL.pdf · Page 1', asset_id: 22 }] }
       if (sql.includes('numnode(q) > 0')) return { rows: [] }
       return { rows: [{ id: 1 }] }
     }) }
@@ -103,5 +103,21 @@ describe('REQ-INGEST-05: every video on a page is processed', () => {
     await reconcile(db as unknown as Pool, { enqueue } as unknown as JobStore, { ...DEFAULT_SETTINGS, taggingEnabled: false })
     expect(enqueue).toHaveBeenCalledWith(5, 'v5', { kind: 'vimeo', videoId: '111' })
     expect(enqueue).toHaveBeenCalledWith(5, 'v5', { kind: 'vimeo', videoId: '222' })
+  })
+})
+
+describe('REQ-DATA-03: review decisions recorded as ML labels', () => {
+  it('records, per field, what the AI proposed, what was there, what was pre-selected, chosen and kept, and edits', () => {
+    const e = envelope()
+    e.analysis.title = { value: 'AI title', reason: '', evidenceIds: [] }
+    const input = form({ use_title: 'suggested', title: 'Reviewer title' })
+    const patch = analysisPatch(e, { sourceHash: 'v', updatedAt: 't', state: 'intake', body: '' }, 'v', input, [])!
+    const labels = reviewLabels(e, input, patch, [{ assetId: 21, description: 'The client-facing whitepaper.' }], [])
+    const title = labels.fields.find(f => f.field === 'title')!
+    expect(title).toMatchObject({ ai: 'AI title', before: 'Tax Planning', preselected: 'current', chosen: 'suggested', after: 'Reviewer title', edited: true })
+    const summary = labels.fields.find(f => f.field === 'summary')!
+    expect(summary).toMatchObject({ ai: 'S', before: 'Team summary', chosen: 'current', after: 'Team summary', edited: false })
+    expect(labels.files).toEqual([{ asset_id: 21, ai: 'The client-facing whitepaper.', final: 'The client-facing whitepaper.' }, { asset_id: 22, ai: 'A direct-mail version for advisors.', final: null }])
+    expect(labels.decision).toBe('accepted')
   })
 })

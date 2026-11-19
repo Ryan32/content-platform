@@ -7,7 +7,7 @@ import * as migration_20261118_234658_review_windows_and_sections from './202611
 import * as migration_20261119_011841_library_pages from './20261119_011841_library_pages';
 import * as migration_20261119_030446_original_dates from './20261119_030446_original_dates';
 import * as migration_20261119_031820_file_names_and_videos from './20261119_031820_file_names_and_videos';
-import * as migration_20261119_040000_semantic_index from './20261119_040000_semantic_index';
+import * as migration_20261119_040000_search_and_evidence from './20261119_040000_search_and_evidence';
 
 export const migrations = [
   {
@@ -56,8 +56,8 @@ export const migrations = [
     name: '20261119_031820_file_names_and_videos',
   },
   {
-    up: migration_20261119_040000_semantic_index.up,
-    down: migration_20261119_040000_semantic_index.down,
-    name: '20261119_040000_semantic_index'
+    up: migration_20261119_040000_search_and_evidence.up,
+    down: migration_20261119_040000_search_and_evidence.down,
+    name: '20261119_040000_search_and_evidence'
   },
 ];

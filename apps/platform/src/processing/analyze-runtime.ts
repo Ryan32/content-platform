@@ -47,7 +47,6 @@ export async function analyzeItem(db: Pool, job: Job, run = analyze): Promise<An
   const add = (label: string, list: { id: string; text: string; locator: string }[], n: number, assetId?: number) => {
     let used = 0
     for (const p of list) {
-      if (passages.length >= 4000) break
       passages.push({ id: `s${n}-${p.id}`, text: p.text, locator: `${label} · ${p.locator}`.slice(0, 200), ...(assetId ? { assetId } : {}) }); used++
     }
     sources.push({ id: `s${n}`, ...(assetId ? { assetId } : {}), label, passages: used, status: used < list.length ? 'truncated' : 'used' })

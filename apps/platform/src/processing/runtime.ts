@@ -12,6 +12,42 @@ import { extractionSchema } from './review'
 import type { Processors } from './engine'
 import { stageVimeoMedia } from './vimeo-media'
 import { approvedModels, paidBlock, readSettings, type PaidStep } from './settings'
+import { noEvidence, s3EvidenceSink, type EvidenceKind, type EvidenceSink, type ModelCall } from './evidence'
+import { emit } from './analytics'
+import { OCR_PROCESSOR } from './ocr'
+import { analyze } from './analysis'
+
+/**
+ * Everything a job learns is kept: raw provider outputs and model calls are captured during the job and saved as
+ * evidence (S3, forever) plus analytics rows, whether the job succeeds or fails. Successful extractions are saved in
+ * full too. A failure to save evidence fails the job as retryable rather than silently losing data.
+ */
+class Capture {
+  raws: { kind: EvidenceKind; processor: string; body: unknown; meta?: Record<string, unknown> }[] = []
+  calls: ModelCall[] = []
+  raw = (kind: EvidenceKind, processor: string, meta?: Record<string, unknown>) => (body: unknown) => { this.raws.push({ kind, processor, body, meta }) }
+  record = (call: ModelCall) => { this.calls.push(call) }
+}
+async function persist(db: Pool, sink: EvidenceSink, job: Job, cap: Capture, extraction: Extraction | null, assetId?: number) {
+  try {
+    const saved = []
+    for (const r of cap.raws) saved.push({ r, at: await sink.save({ kind: r.kind, processor: r.processor, contentId: job.content_id, jobId: job.id, assetId, body: r.body, meta: r.meta }) })
+    if (extraction) saved.push({ r: { kind: 'extraction' as const, processor: extraction.processorVersion, meta: {} }, at: await sink.save({ kind: 'extraction', processor: extraction.processorVersion,
+      contentId: job.content_id, jobId: job.id, assetId, body: extraction, meta: { passages: extraction.passages.length, warnings: extraction.warnings } }) })
+    const calls = []
+    for (const c of cap.calls) calls.push({ c, at: await sink.save({ kind: 'model-call', processor: c.promptVersion, model: c.modelId, contentId: job.content_id, jobId: job.id, assetId, body: c,
+      meta: { purpose: c.purpose, usage: c.usage ?? null, latencyMs: c.latencyMs, stopReason: c.stopReason ?? null } }) })
+    await emit(db, [
+      ...saved.filter(x => x.at).map(({ r, at }) => ({ stream: 'evidence' as const, event: 'evidence.saved', contentId: job.content_id, jobId: job.id,
+        data: { kind: r.kind, processor: r.processor, asset_id: assetId ?? null, s3_key: at!.key, sha256: at!.sha256, bytes: at!.bytes, meta: r.meta ?? {} } })),
+      ...calls.map(({ c, at }) => ({ stream: 'model_calls' as const, event: 'model.call', contentId: job.content_id, jobId: job.id,
+        data: { purpose: c.purpose, model: c.modelId, prompt_version: c.promptVersion, stop_reason: c.stopReason ?? null, input_tokens: c.usage?.inputTokens ?? null,
+          output_tokens: c.usage?.outputTokens ?? null, latency_ms: c.latencyMs, evidence_key: at?.key ?? null } })),
+    ])
+  } catch {
+    throw new ProcessingError('evidence_store_unavailable', true)
+  }
+}
 
 async function paid(db: Pool, step: PaidStep) {
   const blocked = await paidBlock(db, step, undefined, true)
@@ -29,7 +65,16 @@ function bucket() {
   if (!process.env.CONTENT_BUCKET) throw new ProcessingError('content_bucket_required')
   return process.env.CONTENT_BUCKET
 }
-export function runtimeProcessors(db: Pool): Processors {
+export function runtimeProcessors(db: Pool, sink: EvidenceSink = process.env.CONTENT_BUCKET ? s3EvidenceSink(db, process.env.CONTENT_BUCKET) : noEvidence): Processors {
+  /** Runs a job body with capture; saves captured evidence (and the extraction, on success) before returning. */
+  const captured = async <T>(job: Job, body: (cap: Capture) => Promise<T>, extractionOf: (result: T) => Extraction | null = () => null) => {
+    const cap = new Capture()
+    const assetId = 'assetId' in job.input ? job.input.assetId : undefined
+    let result: T
+    try { result = await body(cap) } catch (error) { await persist(db, sink, job, cap, null, assetId).catch(() => undefined); throw error }
+    await persist(db, sink, job, cap, extractionOf(result), assetId)
+    return result
+  }
   const current = async (job: Job) => {
     const { rows } = await db.query('SELECT source_hash,vimeo_id FROM content WHERE id=$1 AND source_hash=$2', [job.content_id, job.source_version])
     if (!rows[0]) throw new ProcessingError('source_version_mismatch')
@@ -57,7 +102,27 @@ export function runtimeProcessors(db: Pool): Processors {
     }
   }
   return {
-    extract: job => wrap(async () => {
+    extract: job => wrap(() => captured(job, cap => extractWith(job, cap), result => result)),
+    analyze: job => wrap(() => captured(job, async cap => {
+      await current(job); await paid(db, 'tagging')
+      if (job.input.kind !== 'analyze' || !approvedModels().includes(job.input.modelId)) throw new ProcessingError('model_not_approved')
+      const { analyzeItem } = await import('./analyze-runtime')
+      return analyzeItem(db, job, (input, model) => analyze(input, model, undefined, cap.record))
+    })),
+    classify: job => wrap(() => captured(job, async cap => {
+      await current(job); await paid(db, 'tagging')
+      const input = job.input
+      if (input.kind !== 'classify' || !approvedModels().includes(input.modelId)) throw new ProcessingError('model_not_approved')
+      const { rows } = await db.query(`SELECT result,input FROM processing_jobs WHERE id=$1 AND content_id=$2 AND source_version=$3 AND state='succeeded' AND stage IN ('extract','transcribe')`,
+      [input.extractionJobId, job.content_id, job.source_version])
+      const extraction = extractionSchema.parse(rows[0]?.result)
+      if (rows[0].input?.videoId !== input.videoId) throw new ProcessingError('vimeo_source_changed')
+      const proposal = await classify(extraction, input.taxonomy, input.modelId, undefined, cap.record)
+      return { extraction, proposal }
+    })),
+  }
+
+  async function extractWith(job: Job, cap: Capture): Promise<Extraction | null> {
       const content = await current(job)
       const input = job.input
       if (input.kind === 'classify' || input.kind === 'analyze') throw new ProcessingError('wrong_job_stage')
@@ -67,11 +132,12 @@ export function runtimeProcessors(db: Pool): Processors {
         const videoId = input.videoId
         if (!/^\d+$/.test(videoId)) throw new ProcessingError('vimeo_id_required')
         if (!process.env.VIMEO_ACCESS_TOKEN) throw new ProcessingError('vimeo_configuration_required')
-        const result = await getVimeoCaptions(videoId, process.env.VIMEO_ACCESS_TOKEN)
+        const result = await getVimeoCaptions(videoId, process.env.VIMEO_ACCESS_TOKEN, fetch, cap.raw('vimeo-captions', 'ae-vimeo-vtt/1', { videoId }))
         if (result) return result
         await paid(db, 'transcription')
         const inputKey = await stageVimeoMedia(videoId, process.env.VIMEO_ACCESS_TOKEN, bucket(), job.idempotency_key)
-        const speech = await transcribeMedia({ bucket: bucket(), inputKey, outputPrefix: 'processing/transcribe/', jobKey: job.idempotency_key, mediaFormat: 'mp4' })
+        const speech = await transcribeMedia({ bucket: bucket(), inputKey, outputPrefix: 'processing/transcribe/', jobKey: job.idempotency_key, mediaFormat: 'mp4' },
+          undefined, cap.raw('transcribe', 'ae-transcribe/1', { videoId }))
         return speech.status === 'pending' ? null : speech.extraction
       }
       const file = await asset(job, input.assetId)
@@ -79,7 +145,7 @@ export function runtimeProcessors(db: Pool): Processors {
       if (input.kind === 'document' && input.format === 'pdf') {
         const ocr = async () => {
           await paid(db, 'transcription')
-          const result = await ocrPdf({ bucket: bucket(), key: file.object_key, jobKey: job.idempotency_key })
+          const result = await ocrPdf({ bucket: bucket(), key: file.object_key, jobKey: job.idempotency_key }, undefined, cap.raw('textract', OCR_PROCESSOR))
           return result.status === 'pending' ? null : result.extraction
         }
         // Large PDFs skip the in-memory text layer and go straight to OCR (which also reads typed text).
@@ -101,8 +167,8 @@ export function runtimeProcessors(db: Pool): Processors {
       if (input.kind === 'image') {
         const bytes = await readOriginal(s3, bucket(), file.object_key, file.sha256, MAX_BYTES[input.format])
         if (input.format === 'svg') { const out = new EvidenceBuilder('ae-svg/1'); svgText(bytes, out, 'Picture'); return out.finish() }
-        const { pictureExtraction } = await import('./vision')
-        return pictureExtraction(bytes, await visionModel(db))
+        const { pictureExtraction, readPicture } = await import('./vision')
+        return pictureExtraction(bytes, await visionModel(db), (jpeg, model) => readPicture(jpeg, model, undefined, cap.record))
       }
       if (input.kind === 'document') {
         const stats = emptyStats()
@@ -115,31 +181,14 @@ export function runtimeProcessors(db: Pool): Processors {
           if (!extraction.passages.length) throw error
           return { ...extraction, warnings: [...extraction.warnings, `${stats.images.length} picture(s) were not read because AI processing is off or at its daily limit.`] } satisfies Extraction
         }
-        const { appendPictures } = await import('./vision')
-        return appendPictures(extraction, stats.images, model)
+        const { appendPictures, readPicture } = await import('./vision')
+        return appendPictures(extraction, stats.images, model, (jpeg, m) => readPicture(jpeg, m, undefined, cap.record))
       }
       await paid(db, 'transcription')
       // Stage originals under immutable hashed keys. Reverify before paid processing (up to Transcribe's 2 GB).
       await verifyOriginal(s3, bucket(), file.object_key, file.sha256, MAX_MEDIA_BYTES)
-      const result = await transcribeMedia({ bucket: bucket(), inputKey: file.object_key, outputPrefix: 'processing/transcribe/', jobKey: job.idempotency_key })
+      const result = await transcribeMedia({ bucket: bucket(), inputKey: file.object_key, outputPrefix: 'processing/transcribe/', jobKey: job.idempotency_key },
+        undefined, cap.raw('transcribe', 'ae-transcribe/1'))
       return result.status === 'pending' ? null : result.extraction
-    }),
-    analyze: job => wrap(async () => {
-      await current(job); await paid(db, 'tagging')
-      if (job.input.kind !== 'analyze' || !approvedModels().includes(job.input.modelId)) throw new ProcessingError('model_not_approved')
-      const { analyzeItem } = await import('./analyze-runtime')
-      return analyzeItem(db, job)
-    }),
-    classify: job => wrap(async () => {
-      await current(job); await paid(db, 'tagging')
-      const input = job.input
-      if (input.kind !== 'classify' || !approvedModels().includes(input.modelId)) throw new ProcessingError('model_not_approved')
-      const { rows } = await db.query(`SELECT result,input FROM processing_jobs WHERE id=$1 AND content_id=$2 AND source_version=$3 AND state='succeeded' AND stage IN ('extract','transcribe')`,
-      [input.extractionJobId, job.content_id, job.source_version])
-      const extraction = extractionSchema.parse(rows[0]?.result)
-      if (rows[0].input?.videoId !== input.videoId) throw new ProcessingError('vimeo_source_changed')
-      const proposal = await classify(extraction, input.taxonomy, input.modelId)
-      return { extraction, proposal }
-    }),
   }
 }

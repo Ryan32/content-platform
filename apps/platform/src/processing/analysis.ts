@@ -1,4 +1,6 @@
-import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime'
+import { BedrockRuntimeClient } from '@aws-sdk/client-bedrock-runtime'
+import { converse } from './model-calls'
+import type { ModelRecorder } from './evidence'
 import { z } from 'zod'
 import { ProcessingError } from './jobs'
 import { AUDIENCES, CONTENT_KINDS, LICENSING, LINES, PAGE_OPTIONS, PROGRAMS, SECTION_OPTIONS, TOPIC_OPTIONS } from '../domain/navigation'
@@ -61,7 +63,7 @@ export const analysisEnvelope = z.object({
   sourceVimeoId: z.string().regex(/^\d+$/).optional(),
   sources: z.array(z.object({ id: z.string().regex(/^s\d{1,3}$/).optional(), assetId: z.number().int().positive().optional(), label: z.string().max(200),
     passages: z.number().int().nonnegative(), status: z.enum(['used', 'failed', 'truncated']) }).strict()).max(60),
-  passages: z.array(passageSchema).min(1).max(4000),
+  passages: z.array(passageSchema).min(1).max(100000),
   current: currentRecordSchema,
   analysis: analysisSchema,
   taxonomy: z.array(term).max(500), taxonomyIds: z.array(z.number().int().positive()), taxonomyVersion: z.string(),
@@ -118,7 +120,7 @@ export function modelPassages(passages: AnalysisInput['passages'], budget = 1800
   return { passages: picked, truncated: picked.length < passages.length }
 }
 
-export async function analyze(input: AnalysisInput, modelId: string, client = new BedrockRuntimeClient({})): Promise<{ analysis: Analysis; truncated: boolean }> {
+export async function analyze(input: AnalysisInput, modelId: string, client = new BedrockRuntimeClient({}), record?: ModelRecorder): Promise<{ analysis: Analysis; truncated: boolean }> {
   if (!modelId || !input.passages.length) throw new ProcessingError('classification_input_limit')
   const sample = modelPassages(input.passages)
   const options = Object.fromEntries(Object.entries({ kind: CONTENT_KINDS, section: SECTION_OPTIONS, topics: TOPIC_OPTIONS, pages: PAGE_OPTIONS,
@@ -127,11 +129,11 @@ export async function analyze(input: AnalysisInput, modelId: string, client = ne
     tagTerms: input.taxonomy, carriers: input.carriers, fileSources: input.fileSources ?? [], passages: sample.passages.map(({ assetId: _, ...p }) => p) })
   if (Buffer.byteLength(payload) > 400000) throw new ProcessingError('classification_input_limit')
   const name = 'submit_analysis'
-  const response = await client.send(new ConverseCommand({ modelId, system: [{ text: SYSTEM }],
+  const response = await converse(client, { modelId, system: [{ text: SYSTEM }],
     messages: [{ role: 'user', content: [{ text: payload }] }], inferenceConfig: { maxTokens: 6000 },
     toolConfig: { tools: [{ toolSpec: { name, description: 'Return the proposed catalogue metadata for staff review.',
       inputSchema: { json: z.json().parse(z.toJSONSchema(analysisSchema, { target: 'draft-7' })) } } }], toolChoice: { tool: { name } } },
-  }))
+  }, 'analysis', record)
   const uses = response.output?.message?.content?.filter(block => block.toolUse)
   if (response.stopReason !== 'tool_use' || uses?.length !== 1 || uses[0].toolUse?.name !== name) throw new ProcessingError('invalid_model_response')
   const analysis = validateAnalysis(uses[0].toolUse.input, new Set(sample.passages.map(p => p.id)), input.taxonomy.map(t => t.id), input.carriers.map(c => c.id),

@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { proposalSchema, validateProposal } from './schema'
 
 export const extractionSchema = z.object({
-  passages: z.array(z.object({ id: z.string().min(1).max(160), text: z.string().min(1).max(20000), locator: z.string().min(1).max(200) }).strict()).min(1).max(2000),
+  passages: z.array(z.object({ id: z.string().min(1).max(160), text: z.string().min(1).max(20000), locator: z.string().min(1).max(200) }).strict()).min(1).max(50000),
   warnings: z.array(z.string().max(500)).max(100), processorVersion: z.string().min(1).max(100),
 }).strict()
 export const proposalEnvelope = z.object({

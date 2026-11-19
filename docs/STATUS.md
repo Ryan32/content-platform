@@ -26,9 +26,17 @@ This document captures work completed in the originating Portal conversation. Ve
 
 - **Proposed, not implemented.** Navigation v2, carrier pages, saved views for familiar WordPress pages, how-to articles as a content type, Manage (review windows and expiry), and asset viewers. Brief, seed data, tokens and AXL assets are in [`docs/design/`](design/README.md), reconciled against `85c9fe1`. Visual source: the "AE Library — design" canvas. Open decisions A–G are listed in the brief.
 
+### Sections, review windows and how-to — deployed to dev 2026-11-18 ~18:55 CST
+
+- Commit `f59acd9`, built on this laptop.
+- Images: `dev-platform-sections` (index `sha256:7b20e239…`, amd64 `sha256:85882bfe…`) and `dev-platform-ops-sections` (index `sha256:05dc611a…`, amd64 `sha256:862490dd…`). Verified identical to the local builds.
+- Database: snapshot `aecp-dev-postgres-pre-sections-20261118` taken first. Migration `20261118_234658_review_windows_and_sections` applied (batch 4); the rerun was a no-op.
+- Deploy: smoke test passed; web `aecp-dev-library-web:6` healthy on the target group; worker `aecp-dev-library-worker:4` started and reconciled. The Vimeo token is still not stored.
+- Live checks via the real hostname: health 200, home 200, `/sections/planning` 200, admin login 200. Anonymous `/library-api/suggest` returns only navigation pages (no library items), `private, no-store`.
+- Not yet verified: the signed-in walkthrough (upload → AI tagging → Review → publish), the Ctrl K search with real content, and review-window hiding.
 ### Owner actions pending — 2026-11-18
 
-1. **Internal DNS:** the `advisorsexcel.com` AD zone (primary `gagedc01`) lacks `library-dev`. Add `library-dev` CNAME → `aecp-dev-library-alb-173180842.us-east-1.elb.amazonaws.com` (TTL 300). Public DNS already has it.
+1. ~~**Internal DNS**~~ — done: `library-dev.advisorsexcel.com` now resolves on the corporate network (verified 2026-11-18 18:55 CST).
 2. **Vimeo token → Secrets Manager** (on the laptop holding `.env.local`). Run this with a current `ae-dev-mfa` session; it never displays the token or puts it on a command line:
 
    ```powershell

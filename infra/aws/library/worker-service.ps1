@@ -39,6 +39,8 @@ $modelResources = foreach ($m in $models) { "arn:aws:bedrock:${region}:${account
 $task = @{ Version = '2012-10-17'; Statement = @(
     @{ Sid = 'ReadOriginalsAndProcessingOutput'; Effect = 'Allow'; Action = 's3:GetObject'; Resource = @("arn:aws:s3:::$bucket/content/*", "arn:aws:s3:::$bucket/processing/*") },
     @{ Sid = 'WriteProcessingOutput'; Effect = 'Allow'; Action = 's3:PutObject'; Resource = @("arn:aws:s3:::$bucket/processing/*", "arn:aws:s3:::$bucket/content/*") },
+    # Large Vimeo renditions stream to processing/vimeo/ by multipart upload; failed uploads are aborted.
+    @{ Sid = 'AbortStagedMedia'; Effect = 'Allow'; Action = 's3:AbortMultipartUpload'; Resource = "arn:aws:s3:::$bucket/processing/*" },
     @{ Sid = 'Transcribe'; Effect = 'Allow'; Action = @('transcribe:StartTranscriptionJob', 'transcribe:GetTranscriptionJob'); Resource = '*' },
     @{ Sid = 'ApprovedTaggingModels'; Effect = 'Allow'; Action = @('bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'); Resource = @($modelResources) }) }
 

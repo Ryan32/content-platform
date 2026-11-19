@@ -48,3 +48,25 @@ describe('authorized Vimeo fallback', () => {
     expect(reads).toBe(2)
   })
 })
+
+describe('large Vimeo renditions', () => {
+  it('streams renditions over 50 MB to S3 in parts instead of buffering them', async () => {
+    const { CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand } = await import('@aws-sdk/client-s3')
+    const s3 = { send: vi.fn(async (command: unknown) => {
+      if (command instanceof GetObjectCommand) throw Object.assign(new Error(), { name: 'NoSuchKey' })
+      if (command instanceof CreateMultipartUploadCommand) return { UploadId: 'u1' }
+      if (command instanceof UploadPartCommand) return { ETag: 'e', ChecksumSHA256: 'c' }
+      return {}
+    }) }
+    const big = 60 * 1024 * 1024
+    const fetcher = (async (url: string | URL) => String(url).startsWith('https://api.vimeo.com/')
+      ? Response.json({ download: [{ link: 'https://download.vimeocdn.com/file', size: big, type: 'video/mp4' }] })
+      : new Response(media)) as typeof fetch
+    expect(await stageVimeoMedia('123', 'synthetic', 'private-bucket', key, s3 as unknown as S3Client, fetcher)).toBe(`processing/vimeo/${key}.mp4`)
+    const kinds = s3.send.mock.calls.map(([c]) => (c as object).constructor.name)
+    expect(kinds).toEqual(['GetObjectCommand', 'CreateMultipartUploadCommand', 'UploadPartCommand', 'CompleteMultipartUploadCommand'])
+    expect(s3.send.mock.calls.some(([c]) => c instanceof PutObjectCommand)).toBe(false)
+    const done = s3.send.mock.calls.find(([c]) => c instanceof CompleteMultipartUploadCommand)![0] as InstanceType<typeof CompleteMultipartUploadCommand>
+    expect(done.input.IfNoneMatch).toBe('*')
+  })
+})

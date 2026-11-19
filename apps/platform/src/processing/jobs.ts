@@ -11,6 +11,12 @@ export const inputSchema = z.discriminatedUnion('kind', [
     videoId: z.string().regex(/^\d+$/).optional(),
     taxonomy: z.array(z.object({ id: z.number().int().positive(), label: z.string().max(200), definition: z.string().max(1000), dimension: z.string().max(50) }).strict()).min(1).max(500),
   }).strict(),
+  // One combined analysis of every source of an item. sourceJobIds pins the exact extraction results it reads.
+  z.object({ kind: z.literal('analyze'), modelId: z.string().min(1).max(250), sourceJobIds: z.array(z.number().int().positive()).max(60), sourceDigest: z.string().max(4000),
+    videoId: z.string().regex(/^\d+$/).optional(),
+    taxonomy: z.array(z.object({ id: z.number().int().positive(), label: z.string().max(200), definition: z.string().max(1000), dimension: z.string().max(50) }).strict()).max(500),
+    carriers: z.array(z.object({ id: z.number().int().positive(), name: z.string().max(200) }).strict()).max(500),
+  }).strict(),
 ])
 export type JobInput = z.infer<typeof inputSchema>
 export interface Job { id: number; content_id: number; source_version: string; idempotency_key: string;
@@ -26,7 +32,7 @@ export class JobStore {
   async enqueue(contentId: number, sourceVersion: string, value: unknown) {
     const input = inputSchema.parse(value)
     const key = jobKey(contentId, sourceVersion, input)
-    const stage = input.kind === 'classify' ? 'classify' : input.kind === 'transcribe' ? 'transcribe' : 'extract'
+    const stage = input.kind === 'classify' || input.kind === 'analyze' ? 'classify' : input.kind === 'transcribe' ? 'transcribe' : 'extract'
     // Explicit casts: PostgreSQL cannot infer one type for a parameter used in both the select list and WHERE.
     const { rows } = await this.pool.query(`INSERT INTO processing_jobs
       (idempotency_key,content_id,source_version,stage,state,attempts,input,processor_version,next_run_at,deadline_at)

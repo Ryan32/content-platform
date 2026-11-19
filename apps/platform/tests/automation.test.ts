@@ -5,12 +5,13 @@ import { reconcile } from '../src/processing/reconcile'
 import { DEFAULT_SETTINGS, paidBlock, readSettings } from '../src/processing/settings'
 import { explain } from '../src/processing/messages'
 
-type Rows = { files?: object[]; videos?: object[]; extracted?: object[]; terms?: object[]; paid?: number }
+type Rows = { files?: object[]; videos?: object[]; ready?: object[]; terms?: object[]; carriers?: object[]; paid?: number }
 function fakeDb(rows: Rows) {
   const query = vi.fn(async (sql: string) => {
+    if (sql.includes('WITH items AS')) return { rows: rows.ready ?? [] }
+    if (sql.includes('FROM carriers')) return { rows: rows.carriers ?? [] }
     if (sql.includes('FROM assets a')) return { rows: rows.files ?? [] }
     if (sql.includes('FROM content c')) return { rows: rows.videos ?? [] }
-    if (sql.includes('FROM processing_jobs j')) return { rows: rows.extracted ?? [] }
     if (sql.includes('FROM taxonomy')) return { rows: rows.terms ?? [] }
     if (sql.includes('count(*)')) return { rows: [{ n: rows.paid ?? 0 }] }
     return { rows: [] }
@@ -52,16 +53,21 @@ describe('REQ-AUTO-01: automation settings gate background work', () => {
     expect(allowed.enqueue).toHaveBeenCalledWith(4, 'v4', { kind: 'transcribe', assetId: 9 })
   })
 
-  it('queues AI tagging only with an approved model, existing tags, and room under the daily limit', async () => {
+  it('queues one combined AI analysis per ready item with an approved model and room under the daily limit', async () => {
     vi.stubEnv('ALLOW_PAID_PROCESSING', 'true')
-    const extracted = [{ id: 11, content_id: 2, source_version: 'v1', video_id: null }]
-    expect((await reconcile(fakeDb({ extracted, terms }).db, fakeStore().store, DEFAULT_SETTINGS)).waiting).toEqual({ model_not_approved: 1 })
+    const ready = [{ id: 2, source_hash: 'v1', vimeo_id: '77', job_ids: ['11', '12'], digest: '11:succeeded,12:failed' }]
+    const carriers = [{ id: 8, name: 'Allianz' }]
+    expect((await reconcile(fakeDb({ ready, terms }).db, fakeStore().store, DEFAULT_SETTINGS)).waiting).toEqual({ model_not_approved: 1 })
     vi.stubEnv('BEDROCK_MODEL_IDS', `${DEFAULT_SETTINGS.taggingModel},other`)
-    expect((await reconcile(fakeDb({ extracted, terms: [] }).db, fakeStore().store, DEFAULT_SETTINGS)).waiting).toEqual({ no_tags_defined: 1 })
-    expect((await reconcile(fakeDb({ extracted, terms, paid: 200 }).db, fakeStore().store, DEFAULT_SETTINGS)).waiting).toEqual({ daily_paid_limit_reached: 1 })
+    expect((await reconcile(fakeDb({ ready, terms, paid: 200 }).db, fakeStore().store, DEFAULT_SETTINGS)).waiting).toEqual({ daily_paid_limit_reached: 1 })
+    // An empty tag list no longer blocks analysis: the AI proposes new tags for approval.
     const ok = fakeStore()
-    await reconcile(fakeDb({ extracted, terms }).db, ok.store, DEFAULT_SETTINGS)
-    expect(ok.enqueue).toHaveBeenCalledWith(2, 'v1', { kind: 'classify', extractionJobId: 11, modelId: DEFAULT_SETTINGS.taggingModel, taxonomy: terms })
+    await reconcile(fakeDb({ ready, terms: [], carriers }).db, ok.store, DEFAULT_SETTINGS)
+    expect(ok.enqueue).toHaveBeenCalledWith(2, 'v1', { kind: 'analyze', modelId: DEFAULT_SETTINGS.taggingModel, sourceJobIds: [11, 12],
+      sourceDigest: '11:succeeded,12:failed', videoId: '77', taxonomy: [], carriers })
+    const off = fakeStore()
+    await reconcile(fakeDb({ ready, terms }).db, off.store, { ...DEFAULT_SETTINGS, taggingEnabled: false })
+    expect(off.enqueue).not.toHaveBeenCalled()
   })
 
   it('lets an already-counted job run at the limit but blocks queueing beyond it', async () => {

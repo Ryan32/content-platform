@@ -44,7 +44,7 @@ export function runtimeProcessors(db: Pool): Processors {
     extract: job => wrap(async () => {
       const content = await current(job)
       const input = job.input
-      if (input.kind === 'classify') throw new ProcessingError('wrong_job_stage')
+      if (input.kind === 'classify' || input.kind === 'analyze') throw new ProcessingError('wrong_job_stage')
       if (input.kind === 'vimeo') {
         if (!input.videoId) throw new ProcessingError('vimeo_snapshot_required')
         if (!content.vimeo_id || !/^\d+$/.test(content.vimeo_id)) throw new ProcessingError('vimeo_id_required')
@@ -63,6 +63,12 @@ export function runtimeProcessors(db: Pool): Processors {
       await readOriginal(new S3Client({}), bucket(), file.object_key, file.sha256)
       const result = await transcribeMedia({ bucket: bucket(), inputKey: file.object_key, outputPrefix: 'processing/transcribe/', jobKey: job.idempotency_key })
       return result.status === 'pending' ? null : result.extraction
+    }),
+    analyze: job => wrap(async () => {
+      await current(job); await paid(db, 'tagging')
+      if (job.input.kind !== 'analyze' || !approvedModels().includes(job.input.modelId)) throw new ProcessingError('model_not_approved')
+      const { analyzeItem } = await import('./analyze-runtime')
+      return analyzeItem(db, job)
     }),
     classify: job => wrap(async () => {
       await current(job); await paid(db, 'tagging')

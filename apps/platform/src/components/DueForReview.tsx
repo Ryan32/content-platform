@@ -1,63 +1,72 @@
-import type { AdminViewServerProps } from 'payload'
+import type { AdminViewServerProps, Where } from 'payload'
 import { AdminPage } from './AdminPage'
-import { DUE_SOON_DAYS, REVIEW_WINDOWS, canRenew, reviewStatus } from '../domain/review'
-import { sectionById } from '../domain/navigation'
-import { principalFromUser } from '../domain/access'
+import { Thumbnail } from './Thumbnail'
+import { DUE_SOON_DAYS, REVIEW_WINDOWS, SNOOZE_DAYS, canRenew } from '../domain/review'
+import { Pill, day } from './manage/shared'
 
 const OUTCOMES: Record<string, [string, string]> = {
   renewed: ['ok', 'Renewed. The item is visible again and its next review date is set.'],
   not_owner: ['warn', 'Only the item\'s owner or an administrator can renew it.'],
   date_required: ['warn', 'This item is reviewed on a set date. Choose a new date in the future, then renew.'],
   renew_failed: ['fail', 'Renewal failed. Try again.'], not_found: ['fail', 'Library item not found.'], invalid: ['fail', 'Renewal failed. Try again.'],
+  nothing_selected: ['warn', 'Select at least one item first.'], admin_only: ['warn', 'Only administrators can archive.'],
 }
-const day = (value?: string | null) => value ? new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Chicago' }) : '—'
 const windowLabel = (id?: string | null) => REVIEW_WINDOWS.find(w => w.id === id)?.label ?? 'Every 12 months'
+const CHIPS = [['all', 'All due'], ['hidden', 'Hidden now'], ['7', 'Next 7 days'], ['30', `Next ${DUE_SOON_DAYS} days`], ['snoozed', 'Snoozed']] as const
 
-/** Admin view at /admin/due-for-review: what's hidden because its review lapsed, and what's coming due, with Renew. */
+/** Due for review (design: AdminDue): hidden and soon-due items, renew/snooze/archive one at a time or in bulk. */
 export default async function DueForReview(props: AdminViewServerProps) {
   return AdminPage({ props, title: 'Due for review', children: async ({ isAdmin }) => {
     const { payload, user } = props.initPageResult.req
-    const now = new Date()
-    const soon = new Date(now.getTime() + DUE_SOON_DAYS * 86_400_000).toISOString()
-    const find = (where: object) => payload.find({ collection: 'content', overrideAccess: true, depth: 1, limit: 200, sort: 'reviewDueAt', where: where as never })
-    const [overdue, upcoming] = await Promise.all([
-      find({ and: [{ state: { equals: 'published' } }, { reviewDueAt: { less_than_equal: now.toISOString() } }] }),
-      find({ and: [{ state: { equals: 'published' } }, { reviewDueAt: { greater_than: now.toISOString() } }, { reviewDueAt: { less_than_equal: soon } }] }),
-    ])
+    const now = new Date(); const iso = now.toISOString()
+    const ahead = (d: number) => new Date(now.getTime() + d * 86_400_000).toISOString()
     const params = await props.searchParams
-    const outcome = typeof params?.outcome === 'string' ? OUTCOMES[params.outcome] : undefined
-    const mine = (owner: unknown) => canRenew({ isAdmin: false, userId: user!.id, owner: owner as never })
+    const chip = CHIPS.find(c => c[0] === params?.view)?.[0] ?? 'all'
+    const base: Where = { state: { equals: 'published' } }
+    const filters: Record<string, Where> = {
+      all: { reviewDueAt: { less_than_equal: ahead(DUE_SOON_DAYS) } }, hidden: { reviewDueAt: { less_than_equal: iso } },
+      '7': { and: [{ reviewDueAt: { greater_than: iso } }, { reviewDueAt: { less_than_equal: ahead(7) } }] },
+      '30': { and: [{ reviewDueAt: { greater_than: iso } }, { reviewDueAt: { less_than_equal: ahead(DUE_SOON_DAYS) } }] },
+      snoozed: { snoozedAt: { exists: true } },
+    }
+    const count = (w: Where) => payload.count({ collection: 'content', overrideAccess: true, where: { and: [base, w] } }).then(r => r.totalDocs)
+    const [docs, counts] = await Promise.all([
+      payload.find({ collection: 'content', overrideAccess: true, depth: 1, limit: 200, sort: 'reviewDueAt', where: { and: [base, filters[chip]] } }),
+      Promise.all(CHIPS.map(c => count(filters[c[0]]))),
+    ])
+    const outcomeKey = typeof params?.outcome === 'string' ? params.outcome : ''
+    const bulk = /^bulk_(renew|snooze|archive)$/.exec(outcomeKey)
+    const outcome = bulk ? ['ok', `${params?.done ?? 0} ${bulk[1] === 'renew' ? 'renewed' : bulk[1] === 'snooze' ? `snoozed ${SNOOZE_DAYS} days` : 'archived'}${Number(params?.skipped) ? `; ${params?.skipped} skipped (not yours, set-date, or already snoozed)` : ''}.`] : OUTCOMES[outcomeKey]
+    const hint = (d: { updatedAt: string; lastReviewedAt?: string | null; snoozedAt?: string | null }) => d.snoozedAt ? `Snoozed ${day(d.snoozedAt)}` : `Not changed since ${day(d.updatedAt)}`
 
-    const table = (docs: typeof overdue.docs, empty: string) => docs.length === 0 ? <p className="ae-muted">{empty}</p> : <table className="ae-table">
-      <thead><tr><th>Item</th><th>Section</th><th>Review every</th><th>Owner</th><th>Due</th><th /></tr></thead>
-      <tbody>{docs.map(doc => {
-        const owner = typeof doc.owner === 'object' && doc.owner ? doc.owner : null
-        const status = reviewStatus(doc.reviewDueAt, now)
-        const allowed = canRenew({ isAdmin, userId: user!.id, owner: doc.owner as never })
-        return <tr key={doc.id} id={`item-${doc.id}`}>
-          <td><a href={`/admin/collections/content/${doc.id}`}><strong>{doc.title}</strong></a>{mine(doc.owner) && <> <span className="ae-pill ae-pill--info">Yours</span></>}</td>
-          <td>{doc.section ? sectionById(doc.section)?.label : <span className="ae-muted">Not filed</span>}</td>
-          <td>{windowLabel(doc.reviewWindow)}</td>
-          <td>{owner ? owner.name || owner.email : <span className="ae-muted">No owner</span>}</td>
-          <td><span className={`ae-pill ${status === 'overdue' ? 'ae-pill--fail' : 'ae-pill--warn'}`}>{status === 'overdue' ? `Hidden since ${day(doc.reviewDueAt)}` : day(doc.reviewDueAt)}</span></td>
-          <td style={{ textAlign: 'right' }}>{allowed ? <form method="post" action={`/library-api/content/${doc.id}/review`} style={{ display: 'inline-flex', gap: 6 }}>
-            {doc.reviewWindow === 'fixedDate' && <input type="date" name="reviewOn" required aria-label="New review date" min={new Date(now.getTime() + 86_400_000).toISOString().slice(0, 10)} />}
-            <button type="submit" className="ae-btn ae-btn--primary ae-btn--small">Renew</button></form>
-            : <span className="ae-muted">Owner renews</span>}</td>
-        </tr>
-      })}</tbody></table>
-
-    return <>
-      <h1>Due for review</h1>
-      <p style={{ maxWidth: 820 }}>Every published item has a review window. When the review date passes, the item is hidden from readers, search and AI assistants until its owner or an administrator renews it. Renewing confirms the item is still accurate; edit or replace it first if it isn&apos;t. Set the window and owner in each item&apos;s <em>Review schedule</em>.</p>
+    return <div className="ae-manage">
+      <div className="ae-head"><div><h1>Due for review</h1><p className="ae-muted">Confirm content is still accurate before its window ends.</p></div><a className="ae-btn ae-btn--secondary" href="/admin/review-policies">Review policies</a></div>
+      <p className="ae-notice"><strong>How this works:</strong> every item has a review window. If nobody confirms it by the due date, it&apos;s hidden from advisors, search and AI assistants. Editors can still see it, and one click brings it back.</p>
       {outcome && <p role="status" className={`ae-notice ae-notice--${outcome[0]}`}>{outcome[1]}</p>}
-      <div className="ae-stats">
-        <div className="ae-stat"><strong style={overdue.totalDocs ? { color: '#c2414b' } : undefined}>{overdue.totalDocs}</strong><span className="ae-muted">Hidden — review lapsed</span></div>
-        <div className="ae-stat"><strong>{upcoming.totalDocs}</strong><span className="ae-muted">Due in the next {DUE_SOON_DAYS} days</span></div>
-      </div>
-      <section className="ae-card"><h2>Hidden — review lapsed</h2>{table(overdue.docs, 'Nothing is hidden. Every published item is within its review window.')}</section>
-      <section className="ae-card"><h2>Due in the next {DUE_SOON_DAYS} days</h2>{table(upcoming.docs, 'Nothing is due soon.')}</section>
-      {!principalFromUser(user)?.roles.includes('admin') && <p className="ae-muted">You can renew items you own. Ask an administrator to change an item&apos;s owner.</p>}
-    </>
+      <nav className="ae-chips" aria-label="Show">{CHIPS.map(([id, label], i) => <a key={id} href={`/admin/due-for-review${id === 'all' ? '' : `?view=${id}`}`} aria-current={chip === id ? 'page' : undefined}>{label} · {counts[i]}</a>)}</nav>
+      <form method="post" action="/library-api/review-bulk" className="ae-card" style={{ padding: 0 }}>
+        <div className="ae-bulkbar"><span className="ae-muted">Select items, then</span>
+          <button className="ae-btn ae-btn--primary ae-btn--small" name="action" value="renew">Still accurate — renew</button>
+          <button className="ae-btn ae-btn--secondary ae-btn--small" name="action" value="snooze">Snooze {SNOOZE_DAYS} days</button>
+          {isAdmin && <button className="ae-btn ae-btn--secondary ae-btn--small" name="action" value="archive">Archive</button>}</div>
+        {docs.docs.length === 0 ? <p className="ae-muted" style={{ padding: 20 }}>Nothing here. Every published item is within its review window.</p>
+          : <ul className="ae-due">{docs.docs.map(d => {
+            const owner = typeof d.owner === 'object' && d.owner ? d.owner : null
+            const allowed = canRenew({ isAdmin, userId: user!.id, owner: d.owner as never })
+            return <li key={d.id} id={`item-${d.id}`}>
+              <input type="checkbox" name="ids" value={d.id} disabled={!allowed} aria-label={`Select ${d.title}`} />
+              <span className="ae-thumb"><Thumbnail id={d.id} version={d.thumbnailVersion} format={d.format} title={d.title} rounded={6} compact /></span>
+              <span className="ae-list-main"><a href={`/admin/collections/content/${d.id}`}><strong>{d.title}</strong></a>
+                <span className="ae-muted">{windowLabel(d.reviewWindow)} · Owner: {owner ? owner.name || owner.email : 'none'}</span>
+                <span className="ae-muted small">{hint(d)}</span></span>
+              <Pill doc={d} />
+              <span className="ae-row-actions">{allowed && d.reviewWindow !== 'fixedDate' && <button className="ae-btn ae-btn--primary ae-btn--small" formAction={`/library-api/content/${d.id}/review`} formMethod="post">Still accurate</button>}
+                {allowed && d.reviewWindow === 'fixedDate' && <a className="ae-btn ae-btn--primary ae-btn--small" href={`/admin/collections/content/${d.id}`}>Set new date</a>}
+                <a className="ae-btn ae-btn--secondary ae-btn--small" href={`/admin/collections/content/${d.id}`}>Upload new version</a>
+                {!allowed && <span className="ae-muted">Owner renews</span>}</span>
+            </li> })}</ul>}
+      </form>
+      {!isAdmin && <p className="ae-muted">You can renew and snooze items you own. Ask an administrator to change an item&apos;s owner.</p>}
+    </div>
   } })
 }

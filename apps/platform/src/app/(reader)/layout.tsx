@@ -15,8 +15,8 @@ export default async function Layout({ children }: { children: React.ReactNode }
   // Same cookie as the Payload admin; absent means follow the device setting (handled in CSS).
   const saved = jar.get('payload-theme')?.value
   const theme = saved === 'light' || saved === 'dark' ? saved : undefined
-  const menu: MenuLink[] = []
-  if (profile?.isStaff) menu.push({ href: '/admin', label: 'Admin', icon: 'admin' }, { href: '/admin/review', label: 'Review suggestions', icon: 'review' })
+  const menu: MenuLink[] = profile ? [{ href: '/saved', label: 'Saved items', icon: 'bookmark' }, { href: '/news', label: 'News', icon: 'news' }] : []
+  if (profile?.isStaff) menu.push({ href: '/admin', label: 'Manage', icon: 'admin' }, { href: '/admin/review', label: 'Review suggestions', icon: 'review' })
   if (profile?.isAdmin) menu.push({ href: '/admin/collections/users', label: 'Manage people', icon: 'people' })
   return <html lang="en" data-theme={theme}><body>
     <a className="skip" href="#main">Skip to content</a>

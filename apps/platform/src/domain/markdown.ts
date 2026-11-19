@@ -1,5 +1,5 @@
 /**
- * Small, safe Markdown subset for how-to articles: headings (#, ##, ###), paragraphs, bullet and numbered lists,
+ * Small, safe Markdown subset for how-to articles: headings (#, ##, ###), paragraphs, bullet and numbered lists, > callouts,
  * **bold**, *italic*, `code`, links and images. No raw HTML is ever passed through. Links must be http(s), mailto or
  * site-relative; images must come from this site's authorized /files/ route.
  */
@@ -9,6 +9,7 @@ export type Block =
   | { type: 'paragraph'; content: Inline[] }
   | { type: 'list'; ordered: boolean; items: Inline[][] }
   | { type: 'image'; alt: string; src: string }
+  | { type: 'callout'; content: Inline[] }
 
 export const anchorId = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'section'
 
@@ -40,6 +41,7 @@ export function parseMarkdown(source: string): Block[] {
   const used = new Map<string, number>()
   let paragraph: string[] = []
   let list: { ordered: boolean; items: Inline[][] } | null = null
+  let lastWasQuote = false
   const flush = () => {
     if (paragraph.length) blocks.push({ type: 'paragraph', content: parseInline(paragraph.join(' ')) })
     if (list) blocks.push({ type: 'list', ...list })
@@ -51,13 +53,22 @@ export function parseMarkdown(source: string): Block[] {
     const image = /^!\[([^\]]*)\]\((\/files\/\d+)\)\s*$/.exec(line.trim())
     const bullet = /^\s*[-*]\s+(.+)$/.exec(line)
     const numbered = /^\s*\d+[.)]\s+(.+)$/.exec(line)
-    if (!line.trim()) { flush(); continue }
+    const quote = /^>\s?(.*)$/.exec(line)
+    if (!line.trim()) { flush(); lastWasQuote = false; continue }
+    if (!/^>/.test(line)) lastWasQuote = false
     if (heading) {
       flush()
       const text = heading[2].trim()
       let id = anchorId(text); const n = used.get(id) ?? 0; used.set(id, n + 1); if (n) id = `${id}-${n + 1}`
       blocks.push({ type: 'heading', level: heading[1].length === 3 ? 3 : 2, text, id })
     } else if (image) { flush(); blocks.push({ type: 'image', alt: image[1], src: image[2] }) }
+    else if (quote) {
+      flush()
+      const last = blocks[blocks.length - 1]
+      if (last?.type === 'callout' && lastWasQuote) last.content.push({ t: 'text', v: ' ' }, ...parseInline(quote[1]))
+      else blocks.push({ type: 'callout', content: parseInline(quote[1]) })
+      lastWasQuote = true; continue
+    }
     else if (bullet || numbered) {
       const ordered = Boolean(numbered)
       if (paragraph.length || (list && list.ordered !== ordered)) flush()

@@ -22,7 +22,7 @@ describe('REQ-NAV-01: reader navigation follows the design handoff', () => {
     expect(new Set(TOPIC_OPTIONS.map(o => o.value)).size).toBe(TOPIC_OPTIONS.length)
   })
   it('turns topic names into clean search links', () => {
-    expect(searchHref('Tax, RMDs & IRAs')).toBe('/?q=Tax+RMDs+IRAs')
+    expect(searchHref('Tax, RMDs & IRAs')).toBe('/search?q=Tax+RMDs+IRAs')
   })
 })
 

@@ -6,8 +6,11 @@ import { default as default_afd0d3c250076af2bc13ff5497e541bf } from '../../../co
 import { default as default_3fb95960a634c54feab2fff25668f94c } from '../../../components/AudienceSelect'
 import { default as default_5f5630f17449269571d14a7818f263c2 } from '../../../components/AdminUserMenu'
 import { default as default_9ad9eb625239f4fe73572ac8bfa6ec67 } from '../../../components/AdminNavLinks'
-import { default as default_fa7a133899afeeaa5f837f30561636f3 } from '../../../components/LibraryAdminLinks'
 import { default as default_d3392df45e45e44979b0b22325863226 } from '../../../components/AdminSignIn'
+import { default as default_37013ad26ed379f7c8ce37a295133a98 } from '../../../components/manage/ManageHome'
+import { default as default_44886865a5be122c9074d195974ea1c2 } from '../../../components/manage/LibraryList'
+import { default as default_5a5c5f133d8e47e3dcc7408e35506fea } from '../../../components/manage/AddContent'
+import { default as default_0325901e5eec31a3dc8d169bf3db5269 } from '../../../components/manage/ReviewPolicies'
 import { default as default_f77dc98158034f0df43ee589ca5a1d10 } from '../../../components/AutomationStatus'
 import { default as default_726120f9bd502ed758a233d6ae282eeb } from '../../../components/ReviewView'
 import { default as default_320afdf58b23f17a3457e49bdf0654d3 } from '../../../components/BulkAddView'
@@ -24,8 +27,11 @@ export const importMap = {
   "/components/AudienceSelect#default": default_3fb95960a634c54feab2fff25668f94c,
   "/components/AdminUserMenu#default": default_5f5630f17449269571d14a7818f263c2,
   "/components/AdminNavLinks#default": default_9ad9eb625239f4fe73572ac8bfa6ec67,
-  "/components/LibraryAdminLinks#default": default_fa7a133899afeeaa5f837f30561636f3,
   "/components/AdminSignIn#default": default_d3392df45e45e44979b0b22325863226,
+  "/components/manage/ManageHome#default": default_37013ad26ed379f7c8ce37a295133a98,
+  "/components/manage/LibraryList#default": default_44886865a5be122c9074d195974ea1c2,
+  "/components/manage/AddContent#default": default_5a5c5f133d8e47e3dcc7408e35506fea,
+  "/components/manage/ReviewPolicies#default": default_0325901e5eec31a3dc8d169bf3db5269,
   "/components/AutomationStatus#default": default_f77dc98158034f0df43ee589ca5a1d10,
   "/components/ReviewView#default": default_726120f9bd502ed758a233d6ae282eeb,
   "/components/BulkAddView#default": default_320afdf58b23f17a3457e49bdf0654d3,

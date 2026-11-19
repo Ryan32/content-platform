@@ -27,7 +27,9 @@ export function reviewPatch(value: unknown, current: { sourceHash?: string | nul
   const version = createHash('sha256').update(JSON.stringify({ sourceVersion, extraction: envelope.extraction })).digest('hex')
   return { description: input.summary, acceptedTags: [...new Set(input.tags)], state: 'draft' as const,
     body: envelope.extraction.passages.map(p => p.text).join('\n\n'), evidenceVersion: version,
-    passages: envelope.extraction.passages.map(p => ({ citationId: `${version.slice(0, 16)}-${p.id}`, version, text: p.text, locator: p.locator })) }
+    passages: envelope.extraction.passages.map(p => ({ citationId: `${version.slice(0, 16)}-${p.id}`, version, text: p.text, locator: p.locator })),
+    // Evidence-backed takeaways become the reader's "Key takeaways" (reviewed by the editor accepting them).
+    takeaways: envelope.proposal.takeaways.slice(0, 6).map(t => ({ text: t.text.slice(0, 300) })) }
 }
 
 export function taxonomyUnchanged(value: z.infer<typeof proposalEnvelope>, current: { id: number; label: string; definition?: string | null; dimension?: string | null }[], selected: number[]) {

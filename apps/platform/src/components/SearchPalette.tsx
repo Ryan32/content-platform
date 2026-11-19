@@ -52,7 +52,7 @@ export default function SearchPalette() {
   }, [query, open])
 
   const view = useMemo(() => groupSuggestions(results, selected), [results, selected])
-  const allHref = `/?${new URLSearchParams({ q: query.trim() })}`
+  const allHref = `/search?${new URLSearchParams({ q: query.trim() })}`
   const rows = view.flat.length + (query.trim() ? 1 : 0)
   const close = useCallback(() => { setOpen(false); setActive(0) }, [])
   const go = (href: string) => { close(); router.push(href) }

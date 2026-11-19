@@ -29,7 +29,7 @@ export const SECTIONS: readonly Section[] = [
 
 export const sectionHref = (id: SectionId) => `/sections/${id}`
 /** Interim destination for a topic or familiar page: a ranked library search for its name. */
-export const searchHref = (term: string) => `/?${new URLSearchParams({ q: term.replace(/[–&,]/g, ' ').replace(/\s+/g, ' ').trim() })}`
+export const searchHref = (term: string) => `/search?${new URLSearchParams({ q: term.replace(/[–&,]/g, ' ').replace(/\s+/g, ' ').trim() })}`
 
 export function sectionById(id: string): Section | undefined {
   return SECTIONS.find(s => s.id === id)
@@ -50,7 +50,8 @@ export const slugify = (label: string) => label.toLowerCase().replace(/&/g, ' ')
 /** Stored value for a topic or familiar page: "<section>:<slug>". Section is part of the key so names can repeat across sections. */
 export const tagValue = (section: SectionId, label: string) => `${section}:${slugify(label)}`
 
-export const topicHref = (section: SectionId, label: string) => `${sectionHref(section)}?${new URLSearchParams({ topic: slugify(label) })}`
+/** Carriers A–Z is its own page; every other topic is a filtered section listing. */
+export const topicHref = (section: SectionId, label: string) => slugify(label) === 'carriers-a-z' ? '/carriers' : `${sectionHref(section)}?${new URLSearchParams({ topic: slugify(label) })}`
 export const pageHref = (section: SectionId, label: string) => `${sectionHref(section)}?${new URLSearchParams({ page: slugify(label) })}`
 
 /** Options for the content fields that file an item into topics and familiar pages, labelled "Section — Name". */
@@ -63,5 +64,17 @@ export function topicName(section: Section, slug: string | undefined) { return s
 export function pageName(section: Section, slug: string | undefined) { return slug ? section.familiar.find(f => slugify(f) === slug) ?? null : null }
 
 /** Content type shown as a badge and filter. How-to articles live in the normal sections; they have no section of their own. */
-export const CONTENT_KINDS = [{ value: 'resource', label: 'Resource' }, { value: 'howto', label: 'How-to article' }] as const
+export const CONTENT_KINDS = [{ value: 'resource', label: 'Resource' }, { value: 'howto', label: 'How-to article' },
+  { value: 'news', label: 'AE Today story' }, { value: 'bulletin', label: 'Bulletin' }] as const
+
+/** Descriptive filters (design handoff). They help people find things; they never grant access. */
+export const AUDIENCES = [{ value: 'advisor', label: 'Advisor-facing' }, { value: 'client', label: 'Client-ready' }] as const
+export const LICENSING = [{ value: 'insurance', label: 'Insurance' }, { value: 'investment', label: 'Investment (IAR-RIA)' }] as const
+export const LINES = [{ value: 'annuity', label: 'Annuity' }, { value: 'life', label: 'Life Insurance' }, { value: 'wealth', label: 'Wealth (AEWM)' },
+  { value: 'medicare', label: 'Medicare' }, { value: 'hnw', label: 'High Net Worth' }] as const
+export const PROGRAMS = [{ value: 'seminar-success', label: 'Seminar Success' }, { value: 'real-wins', label: 'Real Wins' },
+  { value: 'second-half-playbook', label: 'Second Half Playbook' }, { value: 'ae-marketing-hub', label: 'AE Marketing Hub' },
+  { value: 'express-lane', label: 'Express Lane' }, { value: 'the-journey', label: 'The Journey' },
+  { value: 'advisor-talent-solutions', label: 'Advisor Talent Solutions' }, { value: 'next-gen-coaching', label: 'Next Gen Coaching' }] as const
+export const labelOf = (list: readonly { value: string; label: string }[], value?: string | null) => list.find(o => o.value === value)?.label ?? value ?? ''
 export type ContentKind = typeof CONTENT_KINDS[number]['value']

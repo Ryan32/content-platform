@@ -1,5 +1,6 @@
 import type { Block, Inline } from '../domain/markdown'
 import CopyLink from './CopyLink'
+import Icon from './Icon'
 
 function Text({ parts }: { parts: Inline[] }) {
   return <>{parts.map((p, i) => p.t === 'strong' ? <strong key={i}>{p.v}</strong> : p.t === 'em' ? <em key={i}>{p.v}</em>
@@ -18,7 +19,8 @@ export function Article({ blocks, path }: { blocks: Block[]; path: string }) {
       if (b.type === 'image') return <figure key={i} className="wiki-shot"><a href={b.src} target="_blank" rel="noopener">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={b.src} alt={b.alt} loading="lazy" /></a>{b.alt && <figcaption>{b.alt}</figcaption>}</figure>
-      if (b.type === 'list') { const L = b.ordered ? 'ol' : 'ul'; return <L key={i}>{b.items.map((item, j) => <li key={j}><Text parts={item} /></li>)}</L> }
+      if (b.type === 'callout') return <aside key={i} className="wiki-callout"><Icon name="info" size={16} /><p><Text parts={b.content} /></p></aside>
+      if (b.type === 'list') { const L = b.ordered ? 'ol' : 'ul'; return <L key={i} className={b.ordered ? 'wiki-steps' : undefined}>{b.items.map((item, j) => <li key={j}><Text parts={item} /></li>)}</L> }
       return <p key={i}><Text parts={b.content} /></p>
     })}
   </article>

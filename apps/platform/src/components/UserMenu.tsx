@@ -14,6 +14,8 @@ const ICONS = {
   moon: 'M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z',
   logout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
   updown: 'M7 15l5 5 5-5M7 9l5-5 5 5',
+  bookmark: 'M6 3h12v18l-6-4-6 4z',
+  news: 'M4 5h13v14H6a2 2 0 0 1-2-2zM17 9h3v8a2 2 0 0 1-2 2M8 9h5M8 13h5',
 }
 const Glyph = ({ name, size = 18 }: { name: keyof typeof ICONS; size?: number }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
   stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden focusable="false"><path d={ICONS[name]} /></svg>

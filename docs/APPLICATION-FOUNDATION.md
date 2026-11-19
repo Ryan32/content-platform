@@ -37,6 +37,9 @@ These IDs are implementation traceability anchors, not a claim that the full bus
 | REQ-AI-01: suggested tags separate from manual decisions | Suggestions collection | Schema only; model pipeline not implemented |
 | REQ-SEARCH-01: lexical/vector retrieval | Permission-filtered keyword query | Keyword foundation only; full-text ranking/embeddings pending |
 | REQ-ASSET-01: protected previews/downloads | Private asset metadata collection | Delivery deliberately unavailable until implemented |
+| REQ-CARRIER-01: carrier pages | `carriers` collection, `/carriers`, `/carriers/[slug]`, `src/domain/carriers.ts`, `tests/library-pages.test.ts` | Implemented; groups derive from type, audience and topics |
+| REQ-GOV-03: snooze, default windows, approval routing, Manage screens | `src/domain/review.ts`, `/admin`, `/admin/add-content`, `/admin/library`, `/admin/review-policies`, `/library-api/review-bulk` | Implemented; routing is shown, publishing stays an administrator action |
+| REQ-HOME-01: Home, news, saved items, most used | `/`, `/news`, `/saved`, `content_views`, `saved` | Implemented; view counts are per person per day, shown only as counts |
 | REQ-AWS-01: deployable app and versioned schema | Linux/amd64 runtime and operations images, versioned migrations, `infra/aws/library` tasks | Migrated and smoke-tested on dev RDS (`aecp_library`); serving via HTTPS ALB in dev |
 | REQ-NAV-01/02: section menu and Ctrl K search | `src/domain/navigation.ts`, `suggest.ts`, `/library-api/suggest`, `tests/navigation.test.ts` | Implemented; live results use the authorized ranked search |
 | REQ-NAV-03: section, topic, familiar-page and how-to listings | `section`/`topics`/`pages`/`kind` fields, `/sections/[id]`, `permission-matrix.test.ts` | Implemented; filters never widen authorization. Content still needs filing (migration wave) |

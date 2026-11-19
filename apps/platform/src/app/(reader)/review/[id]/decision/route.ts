@@ -2,8 +2,12 @@ import { createLocalReq } from 'payload'
 import { editorContext } from '../../../../../server/editor'
 import { reviewInput, reviewPatch, proposalEnvelope, taxonomyUnchanged } from '../../../../../processing/review'
 import { randomUUID } from 'node:crypto'
-const back = (id: string, error?: string) => new Response(null, { status: 303, headers: { Location: `/admin/review/${id}${error ? `?error=${error}` : ''}`, 'Cache-Control': 'no-store' } })
+/** Returns to the review page, or to the Add content wizard when the decision was made there. */
+const location = (id: string, error?: string, returnTo?: string | null) => returnTo
+  ? `${returnTo}${error ? `&error=${error}` : ''}` : `/admin/review/${id}${error ? `?error=${error}` : ''}`
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  let returnTo: string | null = null
+  const back = (id: string, error?: string) => new Response(null, { status: 303, headers: { Location: location(id, error, returnTo), 'Cache-Control': 'no-store' } })
   const origin = process.env.PLATFORM_ORIGIN
   if (!origin || request.headers.get('origin') !== new URL(origin).origin) return new Response('Forbidden', { status: 403 })
   if (Number(request.headers.get('content-length') ?? 0) > 20000) return new Response('Request too large', { status: 413 })
@@ -19,6 +23,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (size > 20000) { await reader.cancel(); return new Response('Request too large', { status: 413 }) }; text += decoder.decode(next.value, { stream: true }) }
   text += decoder.decode()
   const form = new URLSearchParams(text)
+  const requested = form.get('returnTo')
+  returnTo = requested && /^\/admin\/add-content\?id=\d+&step=\d$/.test(requested) ? requested : null
   const input = reviewInput.safeParse({ decision: form.get('decision'), summary: form.get('summary'), tags: form.getAll('tags').map(Number), note: form.get('note'), expectedUpdatedAt: form.get('expectedUpdatedAt') })
   if (!input.success) return back(id, 'invalid')
   const tx = await ctx.payload.db.beginTransaction({ isolationLevel: 'serializable' })

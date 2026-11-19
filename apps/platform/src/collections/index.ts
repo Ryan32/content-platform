@@ -3,7 +3,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { admin, deny, editor, readContent } from './access'
 import { allowsBrowserSession, readSession } from '../auth/browser'
 import { isAdminUser, isStaffUser } from './visibility'
-import { CONTENT_KINDS, PAGE_OPTIONS, SECTION_OPTIONS, TOPIC_OPTIONS } from '../domain/navigation'
+import { AUDIENCES, CONTENT_KINDS, LICENSING, LINES, PAGE_OPTIONS, PROGRAMS, SECTION_OPTIONS, TOPIC_OPTIONS } from '../domain/navigation'
 import { REVIEW_WINDOWS, applyReviewSchedule } from '../domain/review'
 
 export const vimeoSourceHash = (id: unknown) => id ? createHash('sha256').update(`vimeo:${id}`).digest('hex') : undefined
@@ -153,7 +153,19 @@ export const Content: CollectionConfig = {
         admin: { description: 'Pick topics from the item\'s section. An item can sit in more than one topic.' } },
       { name: 'pages', type: 'select', hasMany: true, label: 'Pages you know', options: PAGE_OPTIONS,
         admin: { description: 'Familiar pages from the old resource site (for example Commission Schedules) that should list this item.' } },
+      { name: 'carriers', type: 'relationship', relationTo: 'carriers', hasMany: true, label: 'Carriers', admin: { description: 'Lists this item on each carrier\'s page.' } },
     ] },
+    { type: 'collapsible', label: 'Filters', admin: { description: 'Descriptive filters readers use to narrow a section. They never change who can see the item.' }, fields: [
+      { type: 'row', fields: [
+        { name: 'audience', type: 'select', label: 'Who it\'s for', defaultValue: 'advisor', options: AUDIENCES.map(o => ({ ...o })) },
+        { name: 'program', type: 'select', label: 'Program', options: PROGRAMS.map(o => ({ ...o })) },
+      ] },
+      { name: 'licensing', type: 'select', hasMany: true, label: 'Licensing', options: LICENSING.map(o => ({ ...o })) },
+      { name: 'lines', type: 'select', hasMany: true, label: 'Line of business', options: LINES.map(o => ({ ...o })) },
+    ] },
+    { name: 'takeaways', type: 'array', label: 'Key takeaways', labels: { singular: 'Takeaway', plural: 'Takeaways' }, maxRows: 6,
+      admin: { description: 'Two to four short points readers see at the top of the item. Reviewed by an editor.' },
+      fields: [{ name: 'text', type: 'text', required: true, label: 'Takeaway' }] },
     { name: 'vimeoId', type: 'text', label: 'Vimeo video ID', validate: (value: unknown) => !value || /^\d+$/.test(String(value)) || 'Use the number at the end of the Vimeo link, e.g. 123456789.',
       admin: { condition: data => ['video', 'audio'].includes(data?.format), description: 'The number from the Vimeo link. Captions are used when available; otherwise the audio is transcribed.' } },
     { name: 'processing', type: 'ui', label: 'Processing', admin: { components: { Field: '/components/ContentProcessing' } } },
@@ -185,6 +197,8 @@ export const Content: CollectionConfig = {
         admin: { readOnly: true, description: 'Set automatically from the schedule and the last review.' } },
       { name: 'lastReviewedAt', type: 'date', label: 'Last reviewed', access: { create: () => false, update: () => false },
         admin: { readOnly: true, description: 'Publishing and renewing count as a review.' } },
+      { name: 'snoozedAt', type: 'date', label: 'Snoozed', access: { create: () => false, update: () => false },
+        admin: { readOnly: true, condition: data => Boolean(data?.snoozedAt), description: 'One 7-day snooze is allowed per review.' } },
     ] },
     { type: 'collapsible', label: 'Source and citations (technical)', admin: { initCollapsed: true, condition: (_data, _sibling, { user }) => isStaffUser(user) }, fields: [
       { name: 'sourceKey', type: 'text', unique: true, index: true, label: 'Source record', access: { create: admin, update: admin, read: editor },
@@ -231,7 +245,7 @@ export const Content: CollectionConfig = {
       }
     }
     if (data.state === 'published' && !(data.accessProfile ?? originalDoc?.accessProfile)) throw new Error('Publication requires an access profile')
-    applyReviewSchedule(data, originalDoc, { renewal: Boolean(context?.reviewRenewal) })
+    applyReviewSchedule(data, originalDoc, { renewal: Boolean(context?.reviewRenewal), snooze: Boolean(context?.reviewSnooze) })
     return data
   }] },
 }
@@ -285,5 +299,58 @@ export const Jobs: CollectionConfig = {
       { name: 'leaseUntil', type: 'date', label: 'Lease until' }, { name: 'nextRunAt', type: 'date', label: 'Next run' },
       { name: 'deadlineAt', type: 'date', label: 'Deadline' },
     ] },
+  ],
+}
+
+const slugField: Field = { name: 'slug', type: 'text', required: true, unique: true, index: true, label: 'URL name',
+  validate: (value: unknown) => typeof value === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) || 'Lowercase letters, numbers and hyphens, e.g. allianz.' }
+
+export const Carriers: CollectionConfig = {
+  slug: 'carriers', labels: { singular: 'Carrier', plural: 'Carriers' },
+  access: { read: () => true, create: editor, update: editor, delete: admin },
+  admin: { group: 'Library', useAsTitle: 'name', defaultColumns: ['name', 'lines', 'slug'],
+    description: 'Insurance carriers and partners. Each gets a page in Products & Carriers listing the items tagged with it.' },
+  fields: [
+    { name: 'name', type: 'text', required: true, label: 'Name' }, slugField,
+    { name: 'lines', type: 'select', hasMany: true, label: 'Lines of business', options: LINES.map(o => ({ ...o })) },
+    { name: 'summary', type: 'textarea', label: 'Summary' },
+    { name: 'logoText', type: 'text', label: 'Logo initials', admin: { description: 'Shown until a logo is added, e.g. "AZ".' } },
+  ],
+}
+
+export const Kits: CollectionConfig = {
+  slug: 'kits', labels: { singular: 'Kit', plural: 'Ready-made kits' },
+  access: { read: editor, create: editor, update: editor, delete: admin },
+  admin: { group: 'Library', useAsTitle: 'title', defaultColumns: ['title', 'section', 'published'],
+    description: 'Bundles of everything for one job (for example "Host a retirement income seminar"). Readers only see the items in a kit they are allowed to open.' },
+  fields: [
+    { name: 'title', type: 'text', required: true, label: 'Title' },
+    { name: 'description', type: 'textarea', label: 'What it\'s for' },
+    { name: 'section', type: 'select', label: 'Section', options: SECTION_OPTIONS, index: true },
+    { name: 'items', type: 'relationship', relationTo: 'content', hasMany: true, label: 'Items, in order' },
+    { name: 'published', type: 'checkbox', defaultValue: false, label: 'Show to readers', admin: { position: 'sidebar' } },
+  ],
+}
+
+export const Saved: CollectionConfig = {
+  slug: 'saved', labels: { singular: 'Saved item', plural: 'Saved items' },
+  access: { create: deny, read: admin, update: deny, delete: deny },
+  admin: { hidden: true },
+  fields: [
+    { name: 'user', type: 'relationship', relationTo: 'users', required: true, index: true },
+    { name: 'content', type: 'relationship', relationTo: 'content', required: true },
+  ], indexes: [{ fields: ['user', 'content'], unique: true }],
+}
+
+export const Feedback: CollectionConfig = {
+  slug: 'feedback', labels: { singular: 'Reader feedback', plural: 'Reader feedback' },
+  access: { create: deny, read: editor, update: deny, delete: deny },
+  admin: { group: 'Review & automation', useAsTitle: 'kind', defaultColumns: ['content', 'kind', 'comment', 'createdAt'],
+    description: '"Was this helpful?" answers and "Suggest an edit" notes from readers.' },
+  fields: [
+    { name: 'content', type: 'relationship', relationTo: 'content', required: true, label: 'Library item' },
+    { name: 'user', type: 'relationship', relationTo: 'users', label: 'From' },
+    { name: 'kind', type: 'select', required: true, label: 'Type', options: [option('helpful', 'Helpful'), option('not-helpful', 'Not helpful'), option('edit', 'Suggested edit')] },
+    { name: 'comment', type: 'textarea', label: 'Comment' },
   ],
 }

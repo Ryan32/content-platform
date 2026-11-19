@@ -68,10 +68,14 @@ export interface Config {
   blocks: {};
   collections: {
     content: Content;
+    carriers: Carrier;
+    kits: Kit;
     taxonomy: Taxonomy;
     assets: Asset;
     suggestions: Suggestion;
     'processing-jobs': ProcessingJob;
+    feedback: Feedback;
+    saved: Saved;
     users: User;
     audiences: Audience;
     'access-profiles': AccessProfile;
@@ -88,10 +92,14 @@ export interface Config {
   collectionsJoins: {};
   collectionsSelect: {
     content: ContentSelect<false> | ContentSelect<true>;
+    carriers: CarriersSelect<false> | CarriersSelect<true>;
+    kits: KitsSelect<false> | KitsSelect<true>;
     taxonomy: TaxonomySelect<false> | TaxonomySelect<true>;
     assets: AssetsSelect<false> | AssetsSelect<true>;
     suggestions: SuggestionsSelect<false> | SuggestionsSelect<true>;
     'processing-jobs': ProcessingJobsSelect<false> | ProcessingJobsSelect<true>;
+    feedback: FeedbackSelect<false> | FeedbackSelect<true>;
+    saved: SavedSelect<false> | SavedSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     audiences: AudiencesSelect<false> | AudiencesSelect<true>;
     'access-profiles': AccessProfilesSelect<false> | AccessProfilesSelect<true>;
@@ -160,7 +168,7 @@ export interface Content {
   /**
    * How-to articles are instructional pages written here. They appear in their section like any other item, with a How-to badge and filter.
    */
-  kind: 'resource' | 'howto';
+  kind: 'resource' | 'howto' | 'news' | 'bulletin';
   section?: ('products' | 'operations' | 'marketing' | 'planning' | 'coaching' | 'events') | null;
   /**
    * Pick topics from the item's section. An item can sit in more than one topic.
@@ -237,6 +245,34 @@ export interface Content {
       )[]
     | null;
   /**
+   * Lists this item on each carrier's page.
+   */
+  carriers?: (number | Carrier)[] | null;
+  audience?: ('advisor' | 'client') | null;
+  program?:
+    | (
+        | 'seminar-success'
+        | 'real-wins'
+        | 'second-half-playbook'
+        | 'ae-marketing-hub'
+        | 'express-lane'
+        | 'the-journey'
+        | 'advisor-talent-solutions'
+        | 'next-gen-coaching'
+      )
+    | null;
+  licensing?: ('insurance' | 'investment')[] | null;
+  lines?: ('annuity' | 'life' | 'wealth' | 'medicare' | 'hnw')[] | null;
+  /**
+   * Two to four short points readers see at the top of the item. Reviewed by an editor.
+   */
+  takeaways?:
+    | {
+        text: string;
+        id?: string | null;
+      }[]
+    | null;
+  /**
    * The number from the Vimeo link. Captions are used when available; otherwise the audio is transcribed.
    */
   vimeoId?: string | null;
@@ -289,6 +325,10 @@ export interface Content {
    */
   lastReviewedAt?: string | null;
   /**
+   * One 7-day snooze is allowed per review.
+   */
+  snoozedAt?: string | null;
+  /**
    * Where this item came from, e.g. wordpress:dbr:post:1 or manual:42.
    */
   sourceKey?: string | null;
@@ -306,6 +346,25 @@ export interface Content {
         id?: string | null;
       }[]
     | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Insurance carriers and partners. Each gets a page in Products & Carriers listing the items tagged with it.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "carriers".
+ */
+export interface Carrier {
+  id: number;
+  name: string;
+  slug: string;
+  lines?: ('annuity' | 'life' | 'wealth' | 'medicare' | 'hnw')[] | null;
+  summary?: string | null;
+  /**
+   * Shown until a logo is added, e.g. "AZ".
+   */
+  logoText?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -427,6 +486,22 @@ export interface User {
   collection: 'users';
 }
 /**
+ * Bundles of everything for one job (for example "Host a retirement income seminar"). Readers only see the items in a kit they are allowed to open.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "kits".
+ */
+export interface Kit {
+  id: number;
+  title: string;
+  description?: string | null;
+  section?: ('products' | 'operations' | 'marketing' | 'planning' | 'coaching' | 'events') | null;
+  items?: (number | Content)[] | null;
+  published?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * Original files attached to library items, stored privately and never changed once uploaded. Upload files from a library item's Processing panel; this list is for reference.
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -509,6 +584,32 @@ export interface ProcessingJob {
   leaseUntil?: string | null;
   nextRunAt?: string | null;
   deadlineAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * "Was this helpful?" answers and "Suggest an edit" notes from readers.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "feedback".
+ */
+export interface Feedback {
+  id: number;
+  content: number | Content;
+  user?: (number | null) | User;
+  kind: 'helpful' | 'not-helpful' | 'edit';
+  comment?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "saved".
+ */
+export interface Saved {
+  id: number;
+  user: number | User;
+  content: number | Content;
   updatedAt: string;
   createdAt: string;
 }
@@ -716,6 +817,14 @@ export interface PayloadLockedDocument {
         value: number | Content;
       } | null)
     | ({
+        relationTo: 'carriers';
+        value: number | Carrier;
+      } | null)
+    | ({
+        relationTo: 'kits';
+        value: number | Kit;
+      } | null)
+    | ({
         relationTo: 'taxonomy';
         value: number | Taxonomy;
       } | null)
@@ -730,6 +839,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'processing-jobs';
         value: number | ProcessingJob;
+      } | null)
+    | ({
+        relationTo: 'feedback';
+        value: number | Feedback;
+      } | null)
+    | ({
+        relationTo: 'saved';
+        value: number | Saved;
       } | null)
     | ({
         relationTo: 'users';
@@ -817,6 +934,17 @@ export interface ContentSelect<T extends boolean = true> {
   section?: T;
   topics?: T;
   pages?: T;
+  carriers?: T;
+  audience?: T;
+  program?: T;
+  licensing?: T;
+  lines?: T;
+  takeaways?:
+    | T
+    | {
+        text?: T;
+        id?: T;
+      };
   vimeoId?: T;
   thumbnailVersion?: T;
   thumbnailKey?: T;
@@ -833,6 +961,7 @@ export interface ContentSelect<T extends boolean = true> {
   owner?: T;
   reviewDueAt?: T;
   lastReviewedAt?: T;
+  snoozedAt?: T;
   sourceKey?: T;
   sourceHash?: T;
   evidenceVersion?: T;
@@ -845,6 +974,32 @@ export interface ContentSelect<T extends boolean = true> {
         locator?: T;
         id?: T;
       };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "carriers_select".
+ */
+export interface CarriersSelect<T extends boolean = true> {
+  name?: T;
+  slug?: T;
+  lines?: T;
+  summary?: T;
+  logoText?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "kits_select".
+ */
+export interface KitsSelect<T extends boolean = true> {
+  title?: T;
+  description?: T;
+  section?: T;
+  items?: T;
+  published?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -910,6 +1065,28 @@ export interface ProcessingJobsSelect<T extends boolean = true> {
   leaseUntil?: T;
   nextRunAt?: T;
   deadlineAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "feedback_select".
+ */
+export interface FeedbackSelect<T extends boolean = true> {
+  content?: T;
+  user?: T;
+  kind?: T;
+  comment?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "saved_select".
+ */
+export interface SavedSelect<T extends boolean = true> {
+  user?: T;
+  content?: T;
   updatedAt?: T;
   createdAt?: T;
 }

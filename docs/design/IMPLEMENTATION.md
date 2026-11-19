@@ -4,7 +4,7 @@ Hand this file to the implementing agent along with [`README.md`](README.md) (de
 
 **Visual source of truth:** `mockups/screens/*.jpg` (rendered at 1440 px wide) and `mockups/html/*.html` (the mockup markup, for exact spacing, sizes and colors; content thumbnails don't load in these files, so use the screenshots for imagery). Board titles and sizes are listed below. Mockup counts, takeaways, transcripts and spreadsheet values are sample data. Titles, thumbnails and view counts come from the real WordPress scan.
 
-**State of the code at `f59acd9`:** the items marked ✅ are in `main` but **not yet deployed to dev** (dev runs `657e4d0`). Everything marked ⬜ is not built. Read `AGENTS.md` first: permissions are enforced server-side, AI never grants access, approves, renews or deletes, and secrets never appear in code, logs or chat.
+**State of the code:** see the status columns below. Sections and review windows are deployed to dev (`904c261`); the Library pages commit needs the deploy steps in `docs/STATUS.md`. Read `AGENTS.md` first: permissions are enforced server-side, AI never grants access, approves, renews or deletes, and secrets never appear in code, logs or chat.
 
 ## Decisions already made (do not re-open)
 
@@ -16,58 +16,51 @@ Hand this file to the implementing agent along with [`README.md`](README.md) (de
 
 ## Screen-by-screen
 
+Status at the commit after `c359282` ("Library pages"): ✅ built, 🟨 built with a stated gap, ⬜ not built.
+
 ### Reader
 
-| Board | Screen | Status | What's left |
+| Board | Screen | Status | Route / notes |
 |---|---|---|---|
-| `Main`, `HomeLight` | Home | ⬜ | Current `/` is still the old "Content library" grid. Build: floating AXL (`assets/axl-books.png`, gentle float animation, respects `prefers-reduced-motion`), "What can we help you find, {first name}?", 3 suggested-question chips that open search, **AE Today** (news: needs a `news`/bulletin flag or kind + published date), **Most used** (needs view counting, see Data below), **Bulletins**, **Picked for you** (start with recent items in the reader's sections; AI later). Move the existing full list to `/browse` or drop it. |
-| `Typeahead` | Ctrl K window | ✅ | Built: live authorized results, chips All/Documents/Videos/Slides/How-to/Pages, keyboard nav. Left: "Ask AXL" row (Tab) once AXL answers exist; "in {section}" scope pill when opened from a section. |
-| `Hub`, `HubLight` | Section page | 🟨 partial | Built: header, topic pills, type tabs, card grid, Pages you know, pagination. Left: **left filter rail** (Type: Resources/How-to; Audience: Advisor-facing/Client-ready; Format; Line of business; Program; Updated) — needs `audience`, `lineOfBusiness`, `program` fields; **Ready-made kits** row (needs a `kits` collection: a named bundle of items); sort (Most useful/Newest); grid/list toggle; save (bookmark) button on cards; item count "1,786 resources · showing what your licenses allow". |
-| `Category`, `CategoryLight` | Familiar page ("Recorded Seminars") | 🟨 partial | Built as `/sections/[id]?page=`. Left: hero header with "Part of {section}" note, sub-type pills (Full seminars/Intros/Openings/Main content/Closings → a per-page `subtype` tag or topic children), sort, "Show more". |
-| `Carriers`, `CarriersLight` | Carrier page (Allianz) | ⬜ | Needs a `carriers` collection (name, logo, lines of business, slug) and a `carriers` relationship on content. Page `/carriers/[slug]`: logo header, quick actions (Commission schedule, Sample application), groups: Pay & product, Apply & submit, Service in-force business, Life underwriting, How-to articles, For clients & planning, Related updates. Left rail: carrier list with counts + line-of-business tabs (All/Annuity/Life/Medicare/AEWM partners). "Carriers A–Z" topic links here. |
-| `Search` | Full results + AI answer | 🟨 partial | `/?q=` gives ranked results. Left: AXL answer panel with numbered citations and follow-up box (P5, behind human-reviewed evidence only), "Turn into a kit", tabs All/Videos/Scripts & templates/Guides/Client-ready, Everything/Resources/How-to toggle, result rows with thumbnail + section chip + meta. |
-| `Resource` | Resource detail | 🟨 partial | Built: header with section eyebrow, copy link, viewer, summary, full text, info, files, More in section. Left: **Key takeaways** ("Reviewed by an editor" — from accepted AI suggestion), Save, Add to kit, "Also in" breadcrumb, **Part of these kits**, **Ask about this** panel (AXL, P5), Details list (Audience, Licensing, Program, Format, Owner) once those fields exist. |
-| `KB`, `KBLight` | How-to article | 🟨 partial | Built: Markdown body, heading anchors with copy link, On this page, More in section, copy page link. Left: left rail "More in {topic}" with All/How-to/Resources tabs; callout boxes (`> **Note**` style); numbered step blocks; inline screenshot upload in the editor (paste/drag → asset → `![](/files/id)`); annotated screenshot markers (1, 2, 3); Save, Print; Page details (Owner, Last reviewed, Review, Audience); "Was this helpful? Yes/No" + "Suggest an edit"; toast "Link copied". Consider replacing the textarea with Payload's Lexical rich text for authors. |
-| `ViewerPDF`, `ViewerPDFLight` | PDF viewer | 🟨 partial | Built: PDF.js, page nav, zoom, opens at cited page, open in new tab. Left: thumbnail strip, in-document find, highlight the cited passage ("AXL cited this row"), side panel tabs Ask AXL / Takeaways / Details, light watermark "Viewed by {name} · {date}" for view-only readers, **view-only rendered copy** so view-only users never receive the original (ADR-026; today inline view still requires download permission). |
-| `ViewerVideo` | Video | 🟨 partial | Built: Vimeo embed starting at a cited time. Left: chapters row, transcript panel synced to playback (Vimeo Player SDK `@vimeo/player`), "Link at 05:48" copy, transcript search. Transcripts already come from captions/Transcribe in the worker. |
-| `ViewerSlides` | Slides | ⬜ | Gotenberg (LibreOffice) in the processing worker converts PPTX/DOCX → PDF; render slides one at a time with notes, grid view, filmstrip, Present (full screen). |
-| `ViewerOther` | Spreadsheet, audio, image | 🟨 partial | Built: image zoom, native audio/video players. Left: read-only spreadsheet grid (SheetJS; check the package source and license before adding, the npm registry copy is outdated), audio waveform (wavesurfer.js) with transcript, image "Customize in Print on Demand" link. |
-| `ViewerStack` | Viewer rules | reference | The library choices and access rules for all viewers. |
-| `IA` | Navigation evidence | reference | Why the six sections exist; top-10 items and where they live. |
+| `Main`, `HomeLight` | Home | ✅ | `/`. Floating AXL, greeting, prompt chips, AE Today (items of type *AE Today story*), Most used (30-day view counts; falls back to familiar pages until there are views), Bulletins (type *Bulletin*), **New in the Library** (newest items; the AI "Picked for you" ranking is P5). Old `/?q=` links redirect to `/search`. |
+| `Typeahead` | Ctrl K window | ✅ | Chips All/Documents/Videos/Slides/How-to/Pages. 🟨 "Ask AXL" row waits for AXL answers (P5). |
+| `Hub`, `HubLight` | Section page | ✅ | `/sections/[id]`: topic pills, Ready-made kits row, filter rail (Type, Audience, Format, Line of business, Program, Updated), Most useful/Newest sort, grid/list, save on cards, item count. |
+| `Category`, `CategoryLight` | Familiar page | ✅ | `/sections/[id]?page=…` with its own header. 🟨 page-specific sub-type pills (Intros/Openings/…) would need sub-topics. |
+| `Carriers`, `CarriersLight` | Carrier page | ✅ | `/carriers` (A–Z with line-of-business filter) and `/carriers/[slug]`: logo tile, quick actions, groups (How-to, For clients, Pay & product, Apply & submit, Service, Life underwriting, More), related updates, carrier rail. 🟨 logo images (initials tile for now). |
+| `Search` | Results | ✅ | `/search`: tabs All/Documents/Videos/Slides/Client-ready, Everything/Resources/How-to toggle, result rows with thumbnail, chips and save. 🟨 AXL answer panel is P5. |
+| `Resource` | Resource detail | ✅ | Header with image, chips, Download/Save/Copy link; Key takeaways (from accepted AI suggestions, "Reviewed by an editor"); Part of these kits; More in topic; Details (audience, licensing, line, program, owner, last reviewed, review window). 🟨 "Ask about this" is P5. |
+| `KB`, `KBLight` | How-to article | ✅ | Left rail "More in topic" with type tabs, callouts (`>`), numbered step badges, heading anchors with copy link, Copy link/Save/Print, On this page, Page details, "Was this helpful?" and "Suggest an edit" (stored in Reader feedback). 🟨 pasting screenshots in the editor. |
+| `ViewerPDF`, `ViewerPDFLight` | PDF | ✅ | PDF.js: page nav, zoom, thumbnails, find in document, opens at the cited page. 🟨 view-only rendered copies and watermark (ADR-026); inline view still needs download permission. |
+| `ViewerVideo` | Video | ✅ | Vimeo with transcript that follows playback (Vimeo postMessage API), click to jump, transcript search, "Link at mm:ss". 🟨 chapters. |
+| `ViewerSlides` | Slides | ⬜ | Needs Gotenberg (Office → PDF) in the worker; then slides reuse the PDF viewer. |
+| `ViewerOther` | Sheet, audio, image | 🟨 | Image zoom; audio/video with speed, skip and synced transcript. Spreadsheet grid needs SheetJS (verify package source/licence) or a Gotenberg PDF. |
+
+Also built: `/saved`, `/news`, `/kits/[id]`; Saved items and News in the account menu.
 
 ### Manage (admin)
 
-The Manage boards use their own left menu (Home, Content, Due for review, AI suggestions, Review policies, Sections & tags, People & access, Processing) and an **Add content** button. Build them as Payload custom admin views (decision A in the README), restyled with `custom.css`.
-
-| Board | Screen | Status | What's left |
+| Board | Screen | Status | Route / notes |
 |---|---|---|---|
-| `AdminDashboard` | Manage home | ⬜ | "Good morning, {name}" + three cards (items reaching review in 30 days / new uploads ready to approve / uploads needing attention), Coming up for review with **Still accurate** buttons, Recently added by your team, Library at a glance counts, AI clean-up progress. All counts are queries on existing data. |
-| `AdminCreate` | Add content wizard | ⬜ | 4 steps: Upload → Check AI details → Access & review → Publish. Step 2 shows each field with an "AI suggested" marker (title, summary, section, format, who it's for, licensing, topics, search keywords) and a "What AI did" checklist. Reuse the existing upload + processing + suggestion pipeline; the wizard just presents the pending suggestion inline instead of on `/admin/review`. Approval routing from `ia-and-governance.json` (client-ready → Compliance then Creative Services, etc.). |
-| `AdminContent` | Content list | ⬜ | Table: thumbnail, title, section, status pill (Live / Needs approval / Hidden — review due / Due in N days / AI is transcribing / Draft), review window, next review, owner. Filter chips All/Live/Needs approval/Due soon/Hidden/Drafts/Mine; Section/Owner/Format dropdowns; Bulk edit. |
-| `AdminDue` | Due for review | 🟨 partial | Built: `/admin/due-for-review` with hidden + due-in-30-days tables and Renew (owner/admin only, set-date items need a new date). Left: chips All due / Hidden now / Next 7 days / Next 30 days / Snoozed; checkbox **bulk renew**; **Upload new version** and **Archive** actions; **Snooze 7 days**; AI hint per row ("Not changed since Oct 2026", "A newer version may exist") — AI only flags, never renews; **email reminders 30/14/3 days before** (needs SES or the existing mail path; none configured today). |
-| `AdminPolicies` | Review policies & AI settings | ⬜ | Cards for each window with the content types it applies to (from `reviewWindows[].defaultFor`), "When a window ends" rules, "Who approves" routing, "What AI handles" toggles (map to existing Automation settings; "Publish without human approval" is shown **off and locked**). New content gets its default window from its format/type automatically. |
-| `Review` | Approve AI suggestion | ✅ exists | `/admin/review` already does this; restyle to match (proposed vs current summary, tag evidence bars with page refs, source evidence accordions). |
+| `AdminDashboard` | Manage home | ✅ | `/admin` (replaces Payload's dashboard): need cards, Coming up for review with Still accurate, Library at a glance, Recently added. |
+| `AdminCreate` | Add content | ✅ | `/admin/add-content`: 1 Upload (file, Vimeo, or write a how-to) → 2 Check AI details (accept AI summary/takeaways/tags; section, topics, pages, audience, licensing, line, program, carriers) → 3 Access & review (access profile admin-only, window suggested from filing, owner, approval route) → 4 Publish (checklist; administrators publish). |
+| `AdminContent` | Content list | ✅ | `/admin/library`: status chips, title/section/format filters, status pills, window, next review, owner. Bulk edit links to the full Payload table. |
+| `AdminDue` | Due for review | ✅ | `/admin/due-for-review`: chips with counts, bulk renew/snooze 7 days/archive (admin), per-row Still accurate and Upload new version. 🟨 email reminders 30/14/3 days (no mail service configured). |
+| `AdminPolicies` | Review policies | ✅ | `/admin/review-policies`: windows with counts and default content, end-of-window rules, approval routing, AI switches (read from Automation settings; "Publish without human approval" always off). |
+| `Review` | Approve AI suggestion | ✅ | Existing `/admin/review`; accepting now also installs Key takeaways. |
 
-## Data model still needed
+## Data model (added in migration `20261119_011841_library_pages`)
 
-All additive Payload fields + one migration per slice. Keep `publishedWhere` as the single visibility filter.
+- Content: `kind` gains *AE Today story* and *Bulletin*; descriptive filters `audience`, `licensing`, `lines`, `program`; `carriers`; `takeaways`; `snoozedAt`. Filters never grant access; access stays in access profiles and `publishedWhere`.
+- Collections: `carriers`, `kits`, `saved` (hidden), `feedback` (Reader feedback).
+- Table `content_views (content_id, user_id, day)`: one row per person, item and day, for Most used and the Most useful sort. Counts only are shown.
 
-- `audience` select: advisor-facing / client-ready. `licensing` select hasMany: insurance / investment (IAR-RIA). `lineOfBusiness` hasMany: annuity, life, wealth, medicare, high-net-worth. `program` relationship or select. These are **descriptive filters, not access** — access stays in access profiles.
-- `carriers` collection + `content.carriers` relationship.
-- `kits` collection: title, description, ordered items, section, owner, review window.
-- `news` flag or `kind: 'bulletin'` with a publish date for AE Today / Bulletins.
-- `keyTakeaways` (array of text) accepted from AI suggestions in Review.
-- View counting: an append-only `views` table (content id, user id, day) written by the resource page; "Most used" = 30-day counts filtered by the reader's authorization.
-- Saved items: `saved` (user, content) for the bookmark buttons and the Saved menu entry.
+## Still to build
 
-## Build order (suggested)
-
-1. Home (with AE Today/Bulletins/Most used/Picked for you) + `news` + views + saved.
-2. Section filter rail fields (audience, licensing, line of business, program) + sort + list view.
-3. Carriers collection and carrier pages.
-4. Manage: dashboard, content list, add-content wizard, policies, due-for-review bulk actions and reminders.
-5. Viewers: Gotenberg conversions + slides, transcript sync, spreadsheet, waveform, view-only rendered copies.
-6. How-to authoring (Lexical, screenshot paste), kits.
-7. AXL answers and "Ask about this" (P5), only over reviewed, authorized evidence.
+1. Gotenberg conversion in the worker (Office → PDF) for slides, Word and spreadsheets; then a slides presenter view.
+2. View-only rendered copies and watermark, so view-only readers can see previews (ADR-026).
+3. Review reminder emails at 30, 14 and 3 days (needs SES or the existing mail path).
+4. Screenshot paste/upload in the how-to editor; consider Payload Lexical rich text.
+5. Carrier logo images; page-specific sub-type pills on familiar pages; video chapters.
+6. AXL (P5): answers with citations in search and the Ctrl K window, "Ask about this" on resources, AI "Picked for you", over reviewed and authorized evidence only.
 
 Each step ends with `npm run typecheck`, `npm test`, `npm run build`, a migration rehearsal on PostgreSQL 16, updates to `infra/aws/library/migrate.js` `EXPECTED` and the web/worker/smoke schema checks, and a `docs/STATUS.md` entry.

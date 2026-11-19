@@ -4,6 +4,15 @@ This document captures work completed in the originating Portal conversation. Ve
 
 ## Active priority — core platform and general MCP
 
+### Library pages from the design — 2026-11-18
+
+- **Implemented, not deployed.** Builds every reader and Manage screen in `docs/design/mockups` except slides/spreadsheet previews (need Gotenberg) and AXL answers (P5). Screen-by-screen status: [`docs/design/IMPLEMENTATION.md`](design/IMPLEMENTATION.md).
+- Reader: new Home (`/`, AXL hero, AE Today, Most used, Bulletins, New in the Library), `/search`, section pages with filter rail, kits, sort and list view, `/carriers` and `/carriers/[slug]`, `/kits/[id]`, `/saved`, `/news`; resource page with key takeaways, kits, related and details; how-to layout with callouts, steps, print, helpful/suggest-an-edit; PDF thumbnails and find; Vimeo transcript that follows playback; audio/video speed, skip and transcript.
+- Manage: `/admin` home (replaces the Payload dashboard), `/admin/add-content` 4-step wizard, `/admin/library`, `/admin/due-for-review` with bulk renew/snooze/archive, `/admin/review-policies`. Accepting an AI suggestion now also installs its key takeaways.
+- Migration `20261119_011841_library_pages` (additive: content filters, carriers, kits, saved, feedback, `content_views`). Rehearsed on local TLS PostgreSQL 16; rerun is a no-op. Deploy scripts expect it. The runtime image now copies `public/` (AXL artwork).
+- Validation: typecheck, 125 tests (21 files), production build (7 indexed migrations). Local browser check with seeded synthetic data of Home, section, carrier, search, resource, how-to, Manage home, content list, add content steps 1–3, due for review and review policies.
+- **Deploy (AWS laptop):** pull; build and push web and operations images; RDS snapshot; `run-task.ps1 -Step migrate` with the new digests; `web-service.ps1` and `worker-service.ps1` with the new digests; `run-task.ps1 -Step smoke`.
+
 ### Library app pieces (no content yet) — 2026-11-18
 
 - **Implemented, not deployed.** Migration `20261118_234658_review_windows_and_sections` (additive; backfills already-published items to a 12-month window from their last update). Rehearsed on local TLS PostgreSQL 16: applies cleanly, rerun is a no-op.

@@ -1344,6 +1344,10 @@ export interface AutomationSetting {
    * The AI reads the extracted text and proposes a summary, key takeaways, and tags chosen only from Tags & topics. Editors accept, edit, or reject each suggestion in Review.
    */
   taggingEnabled?: boolean | null;
+  /**
+   * For items imported from the old site only: keeps every value your team set, fills in what is missing, sets the audience from the WordPress access mapping and moves the item to Draft. Nothing is published; approve drafts in bulk under Approve drafts. New tags the AI proposes are never created automatically. Turn off to review each suggestion in Review instead.
+   */
+  migrationAutopilot?: boolean | null;
   taggingModel: 'us.anthropic.claude-haiku-5-5' | 'us.anthropic.claude-sonnet-5-5';
   /**
    * Only tags in these categories are offered to the AI. At least one tag must exist in Tags & topics.
@@ -1367,6 +1371,7 @@ export interface AutomationSettingsSelect<T extends boolean = true> {
   thumbnailsEnabled?: T;
   transcriptionEnabled?: T;
   taggingEnabled?: T;
+  migrationAutopilot?: T;
   taggingModel?: T;
   taggingDimensions?: T;
   dailyPaidJobLimit?: T;

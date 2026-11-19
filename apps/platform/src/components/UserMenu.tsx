@@ -39,7 +39,7 @@ const CSS = `
 .ae-um .ae-um-who span{font-size:12px;color:rgba(255,255,255,.65)}
 .ae-um .ae-um-chevron{color:rgba(255,255,255,.65);flex:none}
 .ae-um .ae-um-pop{position:absolute;z-index:60;width:292px;background:var(--um-bg);color:var(--um-text);border:1px solid var(--um-border);border-radius:12px;box-shadow:0 14px 36px rgba(16,24,40,.22);padding:6px;font-size:14px;line-height:1.3;text-align:left}
-.ae-um .ae-um-pop[data-placement=right]{left:calc(100% + 14px);bottom:0}
+.ae-um .ae-um-pop[data-placement=right]{position:fixed}
 .ae-um .ae-um-pop[data-placement=up]{left:0;right:0;bottom:calc(100% + 8px);width:auto}
 .ae-um .ae-um-head{display:flex;gap:10px;align-items:center;padding:8px 10px 10px}
 .ae-um .ae-um-head .ae-um-avatar{background:var(--um-soft);color:var(--um-text)}
@@ -61,6 +61,7 @@ export default function UserMenu({ name, email, links, theme, onTheme, dark, pla
   name: string; email: string; links: MenuLink[]; theme: ThemeChoice; onTheme: (choice: ThemeChoice) => void; dark: boolean; placement?: 'right' | 'up'
 }) {
   const [open, setOpen] = useState(false)
+  const [spot, setSpot] = useState<React.CSSProperties>({})
   const root = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
   const panel = useId()
@@ -68,9 +69,14 @@ export default function UserMenu({ name, email, links, theme, onTheme, dark, pla
     if (!open) return
     const click = (event: MouseEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false) }
     const key = (event: KeyboardEvent) => { if (event.key === 'Escape') { setOpen(false); trigger.current?.focus() } }
+    // 'right' opens beside a scrolling sidebar, which would clip it (and show a sideways scrollbar), so it is placed against
+    // the window instead: to the right of the trigger, or below it on narrow screens where the sidebar becomes a top bar.
+    const place = () => { const r = trigger.current?.getBoundingClientRect(); if (!r || placement !== 'right') return
+      setSpot(window.innerWidth <= 800 ? { top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) } : { left: r.right + 14, bottom: Math.max(8, window.innerHeight - r.bottom) }) }
+    place(); window.addEventListener('resize', place)
     document.addEventListener('mousedown', click); document.addEventListener('keydown', key)
-    return () => { document.removeEventListener('mousedown', click); document.removeEventListener('keydown', key) }
-  }, [open])
+    return () => { window.removeEventListener('resize', place); document.removeEventListener('mousedown', click); document.removeEventListener('keydown', key) }
+  }, [open, placement])
 
   return <div className="ae-um" ref={root}>
     <style>{CSS}</style>
@@ -81,7 +87,7 @@ export default function UserMenu({ name, email, links, theme, onTheme, dark, pla
       <span className="ae-um-chevron"><Glyph name="updown" size={16} /></span>
       <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Account menu</span>
     </button>
-    {open && <div id={panel} className="ae-um-pop" data-placement={placement} style={PALETTE[dark ? 'dark' : 'light'] as React.CSSProperties}>
+    {open && <div id={panel} className="ae-um-pop" data-placement={placement} style={{ ...(PALETTE[dark ? 'dark' : 'light'] as React.CSSProperties), ...(placement === 'right' ? spot : {}) }}>
       <div className="ae-um-head"><span className="ae-um-avatar" aria-hidden>{initials(name)}</span>
         <div><strong>{name}</strong>{email && <span>{email}</span>}</div></div>
       {links.length > 0 && <><div className="ae-um-sep" />

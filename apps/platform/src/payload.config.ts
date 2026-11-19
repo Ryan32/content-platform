@@ -13,7 +13,7 @@ export default buildConfig({
   admin: { user: 'users', importMap: { baseDir, importMapFile: path.join(baseDir, 'app/(payload)/admin/importMap.ts') },
     meta: { titleSuffix: ' · AE Library admin' },
     components: { beforeLogin: ['/components/AdminSignIn'],
-      afterNavLinks: ['/components/AdminNavLinks'], logout: { Button: '/components/AdminUserMenu' },
+      beforeNavLinks: ['/components/AdminNav'], logout: { Button: '/components/AdminUserMenu' },
       views: {
         dashboard: { Component: '/components/manage/ManageHome' },
         library: { Component: '/components/manage/LibraryList', path: '/library', exact: true, meta: { title: 'Content' } },
@@ -23,6 +23,7 @@ export default buildConfig({
         review: { Component: '/components/ReviewView', path: '/review', meta: { title: 'Review AI suggestions' } },
         bulkAdd: { Component: '/components/BulkAddView', path: '/bulk-add', exact: true, meta: { title: 'Add many files' } },
         dueForReview: { Component: '/components/DueForReview', path: '/due-for-review', exact: true, meta: { title: 'Due for review' } },
+        approve: { Component: '/components/ApproveDrafts', path: '/approve', exact: true, meta: { title: 'Approve drafts' } },
       } } },
   // Order sets the admin menu: Library first, then review and automation, then people and access.
   collections: [Content, Carriers, Kits, Taxonomy, Assets, Suggestions, Jobs, Feedback, Saved, Users, Audiences, AccessProfiles, ImportArtifacts, SourceSnapshots, SourceRelations, ImportReviews, ImportRuns],

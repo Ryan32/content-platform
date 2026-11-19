@@ -22,7 +22,7 @@ async function main() {
       has_schema_privilege(current_user, 'public', 'CREATE') AS ddl,
       has_database_privilege(current_user, current_database(), 'CREATE') AS dbcreate,
       has_table_privilege(current_user, 'public.users', 'SELECT') AS read,
-      EXISTS(SELECT 1 FROM payload_migrations WHERE name='20261119_040000_search_and_evidence') AS processing_schema,
+      EXISTS(SELECT 1 FROM payload_migrations WHERE name='20261119_051724_migration_autopilot') AS processing_schema,
       (SELECT count(*)::int FROM payload_migrations) AS migrations
       FROM pg_stat_ssl WHERE pid = pg_backend_pid()`)
     console.log('Runtime database check: ' + JSON.stringify(state))

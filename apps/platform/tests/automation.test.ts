@@ -81,9 +81,9 @@ describe('REQ-AUTO-01: automation settings gate background work', () => {
   it('reads saved settings, including PostgreSQL numeric limits, and falls back to defaults', async () => {
     const saved = { query: vi.fn(async (sql: string) => sql.includes('tagging_dimensions')
       ? { rows: [{ value: 'topic' }] }
-      : { rows: [{ id: 1, paused: true, documents_enabled: false, vimeo_enabled: true, thumbnails_enabled: false, transcription_enabled: false, tagging_enabled: true, tagging_model: 'm', daily_paid_job_limit: '25' }] }) }
+      : { rows: [{ id: 1, paused: true, documents_enabled: false, vimeo_enabled: true, thumbnails_enabled: false, transcription_enabled: false, tagging_enabled: true, tagging_model: 'm', daily_paid_job_limit: '25', migration_autopilot: false }] }) }
     expect(await readSettings(saved as unknown as Pool)).toEqual({ paused: true, documentsEnabled: false, vimeoEnabled: true, thumbnailsEnabled: false, transcriptionEnabled: false,
-      taggingEnabled: true, taggingModel: 'm', taggingDimensions: ['topic'], dailyPaidJobLimit: 25 })
+      taggingEnabled: true, taggingModel: 'm', taggingDimensions: ['topic'], dailyPaidJobLimit: 25, migrationAutopilot: false })
     expect(await readSettings({ query: async () => ({ rows: [] }) } as unknown as Pool)).toEqual(DEFAULT_SETTINGS)
   })
 

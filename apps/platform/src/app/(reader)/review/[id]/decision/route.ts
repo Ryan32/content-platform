@@ -2,9 +2,10 @@ import { inTransaction, optionalSqlPool, TransactionUnavailable } from '../../..
 import { editorContext } from '../../../../../server/editor'
 import { reviewInput, reviewPatch, proposalEnvelope, taxonomyUnchanged } from '../../../../../processing/review'
 import { randomUUID } from 'node:crypto'
-import { analysisPatch, fileDescriptionUpdates, newTagKey, readAnalysisForm, reviewLabels } from '../../../../../processing/analysis-review'
+import { readAnalysisForm } from '../../../../../processing/analysis-review'
 import { actorOf, emit } from '../../../../../processing/analytics'
-import { analysisEnvelope, ANALYSIS_VERSION } from '../../../../../processing/analysis'
+import { ANALYSIS_VERSION } from '../../../../../processing/analysis'
+import { applyAnalysisDecision } from '../../../../../server/analysis-decision'
 /** Returns to the review page, or to the Add content wizard when the decision was made there. */
 const location = (id: string, error?: string, returnTo?: string | null) => returnTo
   ? `${returnTo}${error ? `&error=${error}` : ''}` : `/admin/review/${id}${error ? `?error=${error}` : ''}`
@@ -44,41 +45,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const content = await ctx.payload.findByID({ collection: 'content', id: contentId, req, overrideAccess: false, depth: 0 })
       if (combined) {
         if (!v2.success || (suggestion.proposal as { analysisVersion?: string })?.analysisVersion !== ANALYSIS_VERSION) throw new Error('format_mismatch')
-        const envelope = analysisEnvelope.parse(suggestion.proposal)
-        const newTagIds: number[] = []
-        if (v2.data.decision === 'accepted') {
-          // Suggested existing tags must be unchanged since the AI saw them; current tags are the team's own.
-          const offered = v2.data.tags.filter(t => envelope.taxonomyIds.includes(t))
-          const terms = await ctx.payload.find({ collection: 'taxonomy', where: { id: { in: offered } }, pagination: false, req, overrideAccess: false })
-          if (terms.docs.length !== offered.length || !taxonomyUnchanged(envelope as never, terms.docs, offered)) throw new Error('taxonomy_changed')
-          const carriers = envelope.analysis.carriers?.ids ?? []
-          if (carriers.length && (await ctx.payload.find({ collection: 'carriers', where: { id: { in: carriers } }, pagination: false, req, overrideAccess: false })).docs.length !== carriers.length) throw new Error('carriers_changed')
-          // Approved new vocabulary: reuse a tag with the same key, otherwise create it as the reviewing editor.
-          for (const index of v2.data.newTags) {
-            const t = envelope.analysis.newTags[index], key = newTagKey(t)
-            const found = await ctx.payload.find({ collection: 'taxonomy', where: { key: { equals: key } }, limit: 1, req, overrideAccess: false })
-            newTagIds.push(found.docs[0]?.id ?? (await ctx.payload.create({ collection: 'taxonomy', req, overrideAccess: false,
-              data: { label: t.label, dimension: t.dimension, definition: t.definition, key } as never })).id)
-          }
-        }
-        const patch = analysisPatch(suggestion.proposal, content, suggestion.sourceVersion, v2.data, newTagIds)
-        if (patch) await ctx.payload.update({ collection: 'content', id: contentId, data: patch as never, req, overrideAccess: true, context: { reviewedEvidence: true } })
-        let fileUpdates: { assetId: number; description: string }[] = []
-        if (patch) {
-          // Per-file descriptions: only this item's files of the reviewed source version.
-          const files = await ctx.payload.find({ collection: 'assets', req, overrideAccess: true, depth: 0, pagination: false,
-            where: { and: [{ content: { equals: contentId } }, { version: { equals: suggestion.sourceVersion } }] } })
-          const current = new Map(files.docs.map(f => [Number(f.id), (f as { description?: string | null }).description]))
-          fileUpdates = fileDescriptionUpdates(envelope, v2.data, current)
-          for (const update of fileUpdates)
-            await ctx.payload.update({ collection: 'assets', id: update.assetId, data: { description: update.description } as never, req, overrideAccess: true })
-        }
-        await ctx.payload.update({ collection: 'suggestions', id: Number(id), req, overrideAccess: true,
-          data: { decision: v2.data.decision, reviewNote: v2.data.note, reviewedBy: ctx.user.id, reviewedAt: new Date().toISOString(), reviewAttempt } })
+        const applied = await applyAnalysisDecision(ctx.payload, req, Number(id), v2.data, { asUser: ctx.user, reviewAttempt })
         // Human decisions as ML labels, recorded after the confirmed commit; never blocks the reviewer.
         const pool = optionalSqlPool(ctx.payload)
-        if (pool) recordLabels = () => emit(pool, { stream: 'events', event: 'review.decision', contentId, actor: actorOf(ctx.user),
-          data: { suggestion_id: Number(id), model: suggestion.model, ...reviewLabels(envelope, v2.data, patch, fileUpdates, newTagIds) } }).catch(() => undefined)
+        if (pool) recordLabels = () => emit(pool, { stream: 'events', event: 'review.decision', contentId: applied.contentId, actor: actorOf(ctx.user),
+          data: { suggestion_id: Number(id), model: applied.model, ...applied.labels } }).catch(() => undefined)
         return
       }
       if (!input.success) throw new Error('invalid')

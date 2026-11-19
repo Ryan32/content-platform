@@ -33,7 +33,7 @@ export default async function ManageHome(props: AdminViewServerProps) {
       <div className="ae-needs">
         {card('⏱', `${due} ${due === 1 ? 'item reaches' : 'items reach'} the review date in the next ${DUE_SOON_DAYS} days`, hidden ? `${hidden} already hidden from advisors until someone checks ${hidden === 1 ? 'it' : 'them'}.` : 'Nothing is hidden right now.', '/admin/due-for-review', 'Review now', hidden ? 'warn' : '')}
         {card('✦', `${pendingAi} ${pendingAi === 1 ? 'upload is' : 'uploads are'} ready to check`, 'AI has written summaries, takeaways and tags. You check and accept them.', '/admin/review', 'Check suggestions')}
-        {card('✓', `${drafts} ${drafts === 1 ? 'item needs' : 'items need'} approval`, 'Reviewed and waiting for an administrator to publish.', '/admin/library?status=approval', 'Open drafts')}
+        {card('✓', `${drafts} ${drafts === 1 ? 'item needs' : 'items need'} approval`, 'AI and the migration have filled in the details. Glance over them and publish in bulk.', '/admin/approve', 'Approve drafts')}
         {failed > 0 && card('!', `${failed} processing ${failed === 1 ? 'step needs' : 'steps need'} attention`, 'Usually an unreadable scan or a private Vimeo link.', '/admin/automation', 'See details', 'fail')}
       </div>
       <div className="ae-grid-2">

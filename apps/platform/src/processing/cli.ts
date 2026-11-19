@@ -30,7 +30,8 @@ try {
     let stopping = false
     for (const signal of ['SIGTERM', 'SIGINT'] as const) process.on(signal, () => { stopping = true })
     const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
-    let lastScan = 0, lastThumbs = 0, lastIndex = 0, lastUploads = 0, lastShip = 0, lastSummary = ''
+    let lastScan = 0, lastThumbs = 0, lastIndex = 0, lastUploads = 0, lastShip = 0, lastAutopilot = 0, lastSeed = 0, lastSummary = ''
+    const autopilotSkip = new Set<number>()
     // Payload (for registering large uploads with the same rules as direct uploads) starts on first use.
     let payloadInstance: import('payload').Payload | undefined
     const payloadFor = async () => payloadInstance ??= await (async () => {
@@ -83,6 +84,29 @@ try {
             await registerSource(payload, content as never, object, extension, fileName, bytes)
           }))
           if (results.length) console.log(JSON.stringify({ status: 'large_uploads', results: results.map(r => ({ status: r.status, code: r.code })) }))
+        }
+        if (process.env.PAYLOAD_SECRET && Date.now() - lastSeed > 600000) {
+          // Reference data: the decided audiences and access profiles, plus carriers/tags from the WordPress reference
+          // file when one has been uploaded to processing/reference/. Create-only; never edits what people changed.
+          lastSeed = Date.now()
+          const { seedReference, wordpressReference } = await import('../reference/seed')
+          const { GetObjectCommand } = await import('@aws-sdk/client-s3')
+          let reference: import('zod').infer<typeof wordpressReference> | undefined
+          if (process.env.CONTENT_BUCKET) {
+            try {
+              const object = await s3.send(new GetObjectCommand({ Bucket: process.env.CONTENT_BUCKET, Key: 'processing/reference/wordpress-reference.json' }))
+              reference = wordpressReference.parse(JSON.parse(await object.Body!.transformToString()))
+            } catch (error) { if ((error as { name?: string }).name !== 'NoSuchKey') console.error(JSON.stringify({ status: 'reference_unreadable', code: (error as { name?: string }).name ?? 'invalid' })) }
+          }
+          const created = await seedReference(await payloadFor(), reference)
+          if (Object.values(created).some(Boolean)) console.log(JSON.stringify({ status: 'reference_seeded', ...created }))
+        }
+        if (settings.migrationAutopilot && process.env.PAYLOAD_SECRET && Date.now() - lastAutopilot > 20000) {
+          // Migrated WordPress items: apply AI details by the review rule and the mapped audience; never publishes.
+          lastAutopilot = Date.now()
+          const { runAutopilot } = await import('./autopilot')
+          const applied = await runAutopilot(await payloadFor(), autopilotSkip)
+          if (applied.length) console.log(JSON.stringify({ status: 'autopilot', results: applied }))
         }
         if (Date.now() - lastIndex > 15000) {
           // Search index: rebuild changed items' chunks, then embed new chunks. Bounded per pass; repeats sooner while busy.

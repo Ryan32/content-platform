@@ -4,17 +4,17 @@ import { TAGGING_MODELS } from '../globals/AutomationSettings'
 
 export interface AutomationSettings {
   paused: boolean; documentsEnabled: boolean; vimeoEnabled: boolean; thumbnailsEnabled: boolean; transcriptionEnabled: boolean
-  taggingEnabled: boolean; taggingModel: string; taggingDimensions: string[]; dailyPaidJobLimit: number
+  taggingEnabled: boolean; taggingModel: string; taggingDimensions: string[]; dailyPaidJobLimit: number; migrationAutopilot: boolean
 }
 // Used until an administrator first saves the settings page.
 export const DEFAULT_SETTINGS: AutomationSettings = {
   paused: false, documentsEnabled: true, vimeoEnabled: true, thumbnailsEnabled: true, transcriptionEnabled: true, taggingEnabled: true,
-  taggingModel: TAGGING_MODELS[0].value, taggingDimensions: ['topic', 'business-line', 'audience', 'program', 'entity'], dailyPaidJobLimit: 200,
+  taggingModel: TAGGING_MODELS[0].value, taggingDimensions: ['topic', 'business-line', 'audience', 'program', 'entity'], dailyPaidJobLimit: 200, migrationAutopilot: true,
 }
 
 export async function readSettings(db: Pool | PoolClient): Promise<AutomationSettings> {
   const { rows } = await db.query(`SELECT id, paused, documents_enabled, vimeo_enabled, thumbnails_enabled, transcription_enabled, tagging_enabled,
-    tagging_model, daily_paid_job_limit FROM automation_settings ORDER BY id LIMIT 1`)
+    tagging_model, daily_paid_job_limit, migration_autopilot FROM automation_settings ORDER BY id LIMIT 1`)
   const row = rows[0]
   if (!row) return DEFAULT_SETTINGS
   const dims = await db.query(`SELECT value FROM ${T.automation_settings_tagging_dimensions} WHERE parent_id=$1 ORDER BY "order"`, [row.id])
@@ -22,7 +22,7 @@ export async function readSettings(db: Pool | PoolClient): Promise<AutomationSet
   return {
     paused: bool(row.paused, false), documentsEnabled: bool(row.documents_enabled, true), vimeoEnabled: bool(row.vimeo_enabled, true), thumbnailsEnabled: bool(row.thumbnails_enabled, true),
     transcriptionEnabled: bool(row.transcription_enabled, true), taggingEnabled: bool(row.tagging_enabled, true),
-    taggingModel: row.tagging_model ?? DEFAULT_SETTINGS.taggingModel,
+    taggingModel: row.tagging_model ?? DEFAULT_SETTINGS.taggingModel, migrationAutopilot: bool(row.migration_autopilot, true),
     taggingDimensions: dims.rows.map(r => String(r.value)),
     dailyPaidJobLimit: row.daily_paid_job_limit != null && Number.isFinite(Number(row.daily_paid_job_limit)) ? Number(row.daily_paid_job_limit) : DEFAULT_SETTINGS.dailyPaidJobLimit,
   }

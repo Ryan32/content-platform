@@ -5,8 +5,8 @@ import { default as default_c0faa545acb2d21f3fbb0427c7b026ab } from '../../../co
 import { default as default_afd0d3c250076af2bc13ff5497e541bf } from '../../../components/YesNoCell'
 import { default as default_3fb95960a634c54feab2fff25668f94c } from '../../../components/AudienceSelect'
 import { default as default_5f5630f17449269571d14a7818f263c2 } from '../../../components/AdminUserMenu'
-import { default as default_9ad9eb625239f4fe73572ac8bfa6ec67 } from '../../../components/AdminNavLinks'
 import { default as default_d3392df45e45e44979b0b22325863226 } from '../../../components/AdminSignIn'
+import { default as default_7bb4d8e8c04650469891d301029b44dd } from '../../../components/AdminNav'
 import { default as default_37013ad26ed379f7c8ce37a295133a98 } from '../../../components/manage/ManageHome'
 import { default as default_44886865a5be122c9074d195974ea1c2 } from '../../../components/manage/LibraryList'
 import { default as default_5a5c5f133d8e47e3dcc7408e35506fea } from '../../../components/manage/AddContent'
@@ -15,6 +15,7 @@ import { default as default_f77dc98158034f0df43ee589ca5a1d10 } from '../../../co
 import { default as default_726120f9bd502ed758a233d6ae282eeb } from '../../../components/ReviewView'
 import { default as default_320afdf58b23f17a3457e49bdf0654d3 } from '../../../components/BulkAddView'
 import { default as default_f2cf7c2b1de14ac57ce550500b3c1b17 } from '../../../components/DueForReview'
+import { default as default_b6c4aa5aba521777f6c712d846fd489c } from '../../../components/ApproveDrafts'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 
 /** @type import('payload').ImportMap */
@@ -26,8 +27,8 @@ export const importMap = {
   "/components/YesNoCell#default": default_afd0d3c250076af2bc13ff5497e541bf,
   "/components/AudienceSelect#default": default_3fb95960a634c54feab2fff25668f94c,
   "/components/AdminUserMenu#default": default_5f5630f17449269571d14a7818f263c2,
-  "/components/AdminNavLinks#default": default_9ad9eb625239f4fe73572ac8bfa6ec67,
   "/components/AdminSignIn#default": default_d3392df45e45e44979b0b22325863226,
+  "/components/AdminNav#default": default_7bb4d8e8c04650469891d301029b44dd,
   "/components/manage/ManageHome#default": default_37013ad26ed379f7c8ce37a295133a98,
   "/components/manage/LibraryList#default": default_44886865a5be122c9074d195974ea1c2,
   "/components/manage/AddContent#default": default_5a5c5f133d8e47e3dcc7408e35506fea,
@@ -36,5 +37,6 @@ export const importMap = {
   "/components/ReviewView#default": default_726120f9bd502ed758a233d6ae282eeb,
   "/components/BulkAddView#default": default_320afdf58b23f17a3457e49bdf0654d3,
   "/components/DueForReview#default": default_f2cf7c2b1de14ac57ce550500b3c1b17,
+  "/components/ApproveDrafts#default": default_b6c4aa5aba521777f6c712d846fd489c,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1
 }

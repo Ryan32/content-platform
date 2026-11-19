@@ -31,7 +31,7 @@ export const SCHEMA = {
     'processor_version', 'next_run_at', 'deadline_at', 'lease_token', 'lease_until', 'error_code', 'created_at', 'updated_at'] },
   suggestions: { owner: 'payload', columns: ['id', 'job_key', 'content_id', 'source_version', 'model', 'proposal', 'decision'] },
   automation_settings: { owner: 'payload', columns: ['id', 'paused', 'documents_enabled', 'vimeo_enabled', 'thumbnails_enabled', 'transcription_enabled',
-    'tagging_enabled', 'tagging_model', 'daily_paid_job_limit'] },
+    'tagging_enabled', 'tagging_model', 'daily_paid_job_limit', 'migration_autopilot'] },
   automation_settings_tagging_dimensions: { owner: 'payload', columns: ['parent_id', 'order', 'value'] },
   source_relations: { owner: 'payload', columns: ['content_id', 'artifact_id', 'kind'] },
   import_artifacts: { owner: 'payload', columns: ['id', 'data'] },

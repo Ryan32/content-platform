@@ -23,6 +23,15 @@ html[data-theme=light] .nav__link:hover { color: #ffffff }
 html[data-theme=light] .nav__link-indicator { background: #6f87ff }
 html[data-theme=light] .nav .btn--style-secondary { --bg-color: transparent; --color: #d4dae4; --hover-bg: rgba(255, 255, 255, .08); --hover-color: #ffffff; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .2) }
 
+/* Design tokens (docs/design/ae-tokens.css) on Payload's canvas in dark mode: page, cards, inputs, borders. */
+html[data-theme=dark] { --theme-bg: #151c23; --theme-elevation-0: #1b2129; --theme-elevation-50: #1f252d; --theme-elevation-100: #262c34;
+  --theme-elevation-150: #343a42; --theme-input-bg: #1f252d }
+html[data-theme=dark] .app-header, html[data-theme=dark] .app-header__bg { background: #151c23; border-bottom: 1px solid #262c34 }
+html[data-theme=dark] .btn--style-primary { --bg-color: #7f9eff; --hover-bg: #98b1ff; --color: #151c23; --hover-color: #151c23 }
+html[data-theme=dark] .nav { background: #1b2129; border-right: 1px solid #262c34 }
+/* The Manage menu (components/AdminNav, design mockups) replaces Payload's collection groups; their screens stay
+   reachable from the menu and its "More" list. */
+.nav .nav-group { display: none }
 /* ===== PAYLOAD CHROME OVERRIDES: END ===== */
 
 /* Shared building blocks for AE Library's custom admin pages (dashboard, review, automation, processing panel). */
@@ -35,6 +44,8 @@ html[data-theme=light] .ae-card { background: #ffffff; border-color: #e5e7eb; bo
   font: inherit; font-size: 13px; font-weight: 600; line-height: 1; cursor: pointer; text-decoration: none; white-space: nowrap }
 .ae-btn--primary { background: #3d5af1; color: #ffffff }
 .ae-btn--primary:hover:not(:disabled) { background: #2e4ad8; color: #ffffff; text-decoration: none }
+html[data-theme=dark] .ae-btn--primary { background: #7f9eff; color: #151c23 }
+html[data-theme=dark] .ae-btn--primary:hover:not(:disabled) { background: #98b1ff; color: #151c23 }
 .ae-btn--secondary { background: var(--theme-elevation-0); color: var(--theme-text); border-color: var(--theme-elevation-200) }
 .ae-btn--secondary:hover:not(:disabled) { background: var(--theme-elevation-50); text-decoration: none }
 .ae-btn--small { height: 28px; padding: 0 10px; font-size: 12px }
@@ -151,3 +162,28 @@ html[data-theme=dark] .ae-notice--ok { background: rgba(45, 180, 150, .1); color
 .ae-due .small { font-size: 12px }
 .ae-row-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end }
 @media (max-width: 900px) { .ae-grid-2, .ae-grid-2.aside-left { grid-template-columns: 1fr } .ae-due li { flex-wrap: wrap } }
+
+/* Manage menu (AdminNav). The menu is dark in both themes, like AE Portal. */
+.ae-nav { display: flex; flex-direction: column; gap: 4px; padding: 4px 0 12px; color: #d4dae4 }
+.ae-nav a { color: inherit; text-decoration: none }
+.ae-nav-brand { display: flex; gap: 10px; align-items: center; padding: 4px 4px 14px }
+.ae-nav-mark { width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; background: #252e40; color: #7f9eff; font-size: 13px; font-weight: 700 }
+.ae-nav-brand strong { display: block; color: #ffffff; font-size: 15px; line-height: 1.2 }
+.ae-nav-brand span span { display: block; color: #868c94; font-size: 12px }
+.ae-nav-add { display: flex; align-items: center; justify-content: center; gap: 8px; height: 38px; border-radius: 8px; background: #7f9eff; color: #151c23 !important; font-weight: 600; font-size: 14px; margin-bottom: 10px }
+.ae-nav-add:hover { background: #98b1ff }
+.ae-nav-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px }
+.ae-nav-link { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 8px; font-size: 14px; color: #c5ccd6 }
+.ae-nav-link svg { color: #868c94; flex: none }
+.ae-nav-link:hover { background: rgba(255, 255, 255, .06); color: #ffffff }
+.ae-nav-link[aria-current=page] { background: rgba(255, 255, 255, .08); color: #ffffff; font-weight: 600 }
+.ae-nav-link[aria-current=page] svg { color: #ffffff }
+.ae-nav-text { flex: 1; min-width: 0 }
+.ae-nav-badge { min-width: 22px; padding: 1px 6px; border-radius: 6px; background: #7f9eff; color: #151c23; font-size: 11px; font-weight: 700; text-align: center }
+.ae-nav-more { margin-top: 10px; border-top: 1px solid rgba(255, 255, 255, .08); padding-top: 8px }
+.ae-nav-more summary { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: #868c94; cursor: pointer; list-style: none }
+.ae-nav-more summary::-webkit-details-marker { display: none }
+.ae-nav-more[open] summary svg { transform: rotate(180deg) }
+.ae-nav-sub { padding-left: 38px; font-size: 13px }
+.ae-nav-reader { margin-top: 14px; padding: 10px; border-top: 1px solid rgba(255, 255, 255, .08); font-size: 13px; color: #a3a9b1 !important }
+.ae-nav-reader:hover { color: #ffffff !important }

@@ -4,9 +4,42 @@ This document captures work completed in the originating Portal conversation. Ve
 
 ## Active priority — core platform and general MCP
 
+### Migration autopilot, bulk approval, reference seed and admin skin — 2026-11-19
+
+- **Implemented and tested locally; not deployed.** Owner decisions: migrated items become **Draft** with AI-filled details and the access profile mapped from their WordPress roles, then are published in bulk after a quick glance (no per-item review). Tags come from WordPress category families, built from the full backup.
+- **Access seed (worker, create-only, at startup and every 10 min):** the decided audiences and access profiles from [ACCESS-MODEL.md](ACCESS-MODEL.md) (`src/domain/access-seed.ts`), so the Audience dropdown is no longer empty. If `processing/reference/wordpress-reference.json` exists in the content bucket, the seed also creates its carriers and tags (`src/reference/seed.ts`). Existing records are never changed.
+- **Reference list:** on the backup laptop, `python scripts/build_reference_seed.py --scan data/wordpress-inventory/scan-2026-11-17-v2` writes `data/reference/wordpress-reference.json` with `categories-review.csv` and `roles-report.csv` beside it. Glance at the CSVs, then `aws s3 cp data\reference\wordpress-reference.json s3://aecp-dev-381003255014-us-east-1/processing/reference/wordpress-reference.json --sse AES256 --profile ae-dev-mfa`. Upload it before re-running analyses or importing batches 002–008, so the AI picks from real tags and carriers.
+- **WordPress role → profile** (`profileForWordPressRoles`):
+
+  | WordPress roles | Profile |
+  | --- | --- |
+  | `__wpdm__`, io, life, medicare, aefs, guest | ignored |
+  | full-only | Full-Active members |
+  | includes subscriber | All members |
+  | aewm | AEWM-restricted |
+  | signature tiers | the lowest tier listed (Premier / Elite and above / Legends) |
+  | rob-russell combinations | program profiles |
+  | commission-schedules | All members |
+  | aewm + full-only, mixed, unknown, or no roles | none: held under "Needs an audience" |
+
+  In the pilot about 37 of 200 are held, 33 of them because they have no roles. **Open:** were packages with no roles open to all members?
+- **Migration autopilot** (worker, every 20 s; setting *Migration autopilot* on Processing, default on). It acts only on pending combined AI analyses for `wordpress:` items imported by the migration:
+  - it accepts the analysis with the defaults: keep team values, backfill empty fields, keep current tags (AI tags only if none), never create tags;
+  - it sets the mapped profile if none is set and moves Intake to Draft;
+  - **it never publishes.** The review screen and the autopilot share one accept function (`src/server/analysis-decision.ts`).
+- **Approve drafts** (`/admin/approve`, administrators): tabs Ready to publish / Needs an audience / Still processing, 100 per page, all ticked by default, **Publish selected**. Publishing runs as the signed-in user with access rules enforced and skips anything not a draft or without a profile.
+- **Admin skin:** the Manage menu from the mockups replaces Payload's grouped nav (badges for drafts and AI suggestions, More, View library as an advisor). Payload's dark theme now uses the design tokens.
+- **Account menu fix:** the reader account menu opened inside the scrolling sidebar, so it showed a sideways scrollbar and no menu. It now opens beside the button (below it on narrow screens).
+- Migration `20261119_051724_migration_autopilot` (one ADD COLUMN). The infra scripts expect it.
+- Validation:
+  - typecheck; 190 tests in 31 files (new `migration-autopilot`: role mapping, decision, seed idempotence); 30 Python tests; production build (11 indexed migrations);
+  - images `aecp-dev-platform:autopilot` and `aecp-dev-platform-operations:autopilot` built;
+  - local preview on PostgreSQL 16 + pgvector: Manage menu, Approve drafts with a real bulk publish, the account menu (fixed position, no sideways scroll).
+  - Not tested: the autopilot against live Bedrock output on RDS; the seed with the real reference file.
+
 ### Access model decided — 2026-11-18
 
-- **Documented, not implemented.** [ACCESS-MODEL.md](ACCESS-MODEL.md): WordPress's 29 roles (90.5% of 3,686 active packages fall under four rules) mapped to 3 audiences (Employees / All members / Full-Active), 4 restriction types (AEWM-restricted incl. AE/AEWM staff, minimum signature tier inheriting upward, firm group, program), firm-shared library roles managed in Office Manager (full / by section / none, plus manage), and a new Access Steward role. Access Management is the single identity source (Basic/Full-Active from the AM role; other fields to confirm in the AM payload); Azure AD groups identify employees. Licensing does not gate access; baseline commission schedules are open to all members; events are not migrated.
+- **Decided; audiences, profiles and the WordPress role mapping are implemented (see above). Claims from Access Management are not yet wired.** [ACCESS-MODEL.md](ACCESS-MODEL.md): WordPress's 29 roles (90.5% of 3,686 active packages fall under four rules) mapped to 3 audiences (Employees / All members / Full-Active), 4 restriction types (AEWM-restricted incl. AE/AEWM staff, minimum signature tier inheriting upward, firm group, program), firm-shared library roles managed in Office Manager (full / by section / none, plus manage), and a new Access Steward role. Access Management is the single identity source (Basic/Full-Active from the AM role; other fields to confirm in the AM payload); Azure AD groups identify employees. Licensing does not gate access; baseline commission schedules are open to all members; events are not migrated.
 - Open: confirm AM payload fields; decide the 86 "AEWM or Full-Active" items; Sub-Advisor and guest roles.
 
 ### Upgrade safety for Payload — 2026-11-18

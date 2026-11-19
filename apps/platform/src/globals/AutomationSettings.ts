@@ -35,6 +35,8 @@ export const AutomationSettings: GlobalConfig = {
     { type: 'collapsible', label: 'AI tagging and summaries (paid — Amazon Bedrock)', fields: [
       { name: 'taggingEnabled', type: 'checkbox', defaultValue: true, label: 'Suggest a summary and tags after text is extracted',
         admin: { description: 'The AI reads the extracted text and proposes a summary, key takeaways, and tags chosen only from Tags & topics. Editors accept, edit, or reject each suggestion in Review.' } },
+      { name: 'migrationAutopilot', type: 'checkbox', defaultValue: true, label: 'Apply AI details to migrated WordPress items automatically',
+        admin: { description: 'For items imported from the old site only: keeps every value your team set, fills in what is missing, sets the audience from the WordPress access mapping and moves the item to Draft. Nothing is published; approve drafts in bulk under Approve drafts. New tags the AI proposes are never created automatically. Turn off to review each suggestion in Review instead.' } },
       { name: 'taggingModel', type: 'select', defaultValue: TAGGING_MODELS[0].value, options: TAGGING_MODELS, label: 'AI model', required: true },
       { name: 'taggingDimensions', type: 'select', hasMany: true, options: DIMENSIONS, label: 'Tag categories the AI may suggest',
         defaultValue: ['topic', 'business-line', 'audience', 'program', 'entity'],

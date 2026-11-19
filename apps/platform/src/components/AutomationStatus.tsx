@@ -48,6 +48,7 @@ export default async function AutomationStatus({ initPageResult, params, searchP
   const steps: [string, boolean | null | undefined, string][] = [
     ['Text extraction from files', settings.documentsEnabled, 'free'], ['Vimeo captions', settings.vimeoEnabled, 'free'],
     ['Transcription', settings.transcriptionEnabled, 'paid'], [`AI tagging (${modelLabel})`, settings.taggingEnabled, 'paid'],
+    ['Migration autopilot (old-site items to Draft)', settings.migrationAutopilot, 'free'],
   ]
 
   return template(<div style={{ paddingBottom: 48 }}>

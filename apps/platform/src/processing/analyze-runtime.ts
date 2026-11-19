@@ -5,7 +5,8 @@ import { EvidenceBuilder } from './extract'
 import { ProcessingError, type Job } from './jobs'
 import { extractionSchema } from './review'
 
-const SOURCE_LABEL: Record<string, string> = { pdf: 'PDF', docx: 'Word document', pptx: 'Slides', xlsx: 'Spreadsheet', vtt: 'Captions', txt: 'Text file' }
+const SOURCE_LABEL: Record<string, string> = { pdf: 'PDF', docx: 'Word document', doc: 'Word document (old format)', pptx: 'Slides', ppt: 'Slides (old format)',
+  xlsx: 'Spreadsheet', xlsm: 'Spreadsheet', xls: 'Spreadsheet (old format)', zip: 'Zip packet', vtt: 'Captions', txt: 'Text file' }
 
 /** Current editorial record as the model and the review screen see it. */
 export async function currentRecord(db: Pool, contentId: number): Promise<CurrentRecord & { evidenceVersion: string }> {
@@ -60,6 +61,7 @@ export async function analyzeItem(db: Pool, job: Job, run = analyze): Promise<An
   let files = 0
   for (const row of rows) {
     const label = row.input?.kind === 'vimeo' ? 'Vimeo video' : row.stage === 'transcribe' ? `Audio/video file ${++files}`
+      : row.input?.kind === 'image' ? `Picture ${++files}`
       : `${SOURCE_LABEL[row.input?.format] ?? 'File'} ${++files}`
     if (row.state !== 'succeeded') { sources.push({ label, passages: 0, status: 'failed' }); continue }
     add(label, extractionSchema.parse(row.result).passages, ++n)

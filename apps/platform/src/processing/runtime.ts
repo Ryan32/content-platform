@@ -5,16 +5,25 @@ import { getVimeoCaptions, classify, transcribeMedia } from './providers'
 import { readOriginal, contentKey, storedObject, verifyOriginal, MAX_DOCUMENT_BYTES } from './storage'
 import { MAX_OCR_BYTES, ocrPdf } from './ocr'
 import { MAX_MEDIA_BYTES } from './vimeo-media'
-import type { PdfStats } from './extract'
+import { emptyStats, EvidenceBuilder, svgText, type Extraction } from './extract'
+import { MAX_BYTES } from './formats'
 import { ProcessingError, type Job } from './jobs'
 import { extractionSchema } from './review'
 import type { Processors } from './engine'
 import { stageVimeoMedia } from './vimeo-media'
-import { approvedModels, paidBlock, type PaidStep } from './settings'
+import { approvedModels, paidBlock, readSettings, type PaidStep } from './settings'
 
 async function paid(db: Pool, step: PaidStep) {
   const blocked = await paidBlock(db, step, undefined, true)
   if (blocked) throw new ProcessingError(blocked)
+}
+const PAID_OFF = ['paid_processing_disabled', 'transcription_turned_off', 'tagging_turned_off', 'daily_paid_limit_reached', 'model_not_approved']
+/** The AI model for pictures: the approved tagging model chosen in Automation settings. */
+async function visionModel(db: Pool) {
+  await paid(db, 'tagging')
+  const model = (await readSettings(db)).taggingModel
+  if (!approvedModels().includes(model)) throw new ProcessingError('model_not_approved')
+  return model
 }
 function bucket() {
   if (!process.env.CONTENT_BUCKET) throw new ProcessingError('content_bucket_required')
@@ -70,7 +79,7 @@ export function runtimeProcessors(db: Pool): Processors {
         // Large PDFs skip the in-memory text layer and go straight to OCR (which also reads typed text).
         const { size } = await storedObject(s3, bucket(), file.object_key)
         if (size > MAX_DOCUMENT_BYTES) { await verifyOriginal(s3, bucket(), file.object_key, file.sha256, MAX_OCR_BYTES); return ocr() }
-        const stats: PdfStats = { pages: 0, emptyPages: 0 }
+        const stats = emptyStats()
         let native
         try { native = await extractDocument(await readOriginal(s3, bucket(), file.object_key, file.sha256), 'pdf', stats) } catch (error) {
           if (error instanceof ProcessingError && error.code === 'pdf_requires_ocr') return ocr()
@@ -83,7 +92,26 @@ export function runtimeProcessors(db: Pool): Processors {
           throw error
         }
       }
-      if (input.kind === 'document') return extractDocument(await readOriginal(s3, bucket(), file.object_key, file.sha256), input.format)
+      if (input.kind === 'image') {
+        const bytes = await readOriginal(s3, bucket(), file.object_key, file.sha256, MAX_BYTES[input.format])
+        if (input.format === 'svg') { const out = new EvidenceBuilder('ae-svg/1'); svgText(bytes, out, 'Picture'); return out.finish() }
+        const { pictureExtraction } = await import('./vision')
+        return pictureExtraction(bytes, await visionModel(db))
+      }
+      if (input.kind === 'document') {
+        const stats = emptyStats()
+        const extraction = await extractDocument(await readOriginal(s3, bucket(), file.object_key, file.sha256, MAX_BYTES[input.format]), input.format, stats)
+        if (!stats.images.length) return extraction
+        // Picture-only slides and pictures in zip packets: AI vision when allowed; otherwise keep the text with a note.
+        let model: string
+        try { model = await visionModel(db) } catch (error) {
+          if (!(error instanceof ProcessingError) || !PAID_OFF.includes(error.code)) throw error
+          if (!extraction.passages.length) throw error
+          return { ...extraction, warnings: [...extraction.warnings, `${stats.images.length} picture(s) were not read because AI processing is off or at its daily limit.`] } satisfies Extraction
+        }
+        const { appendPictures } = await import('./vision')
+        return appendPictures(extraction, stats.images, model)
+      }
       await paid(db, 'transcription')
       // Stage originals under immutable hashed keys. Reverify before paid processing (up to Transcribe's 2 GB).
       await verifyOriginal(s3, bucket(), file.object_key, file.sha256, MAX_MEDIA_BYTES)

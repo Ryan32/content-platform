@@ -3,17 +3,12 @@ import { createHash, randomUUID } from 'node:crypto'
 import type { Payload } from 'payload'
 import { MAX_DOCUMENT_BYTES, stageOriginal } from '../processing/storage'
 import { explain, jobLabel, STATE_LABEL } from '../processing/messages'
+import { ITEM_FORMAT, MIME_TYPES, SUPPORTED_LABEL, extensionOf } from '../processing/formats'
 
-export const UPLOAD_TYPES: Record<string, string> = {
-  pdf: 'application/pdf', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  vtt: 'text/vtt', txt: 'text/plain', mp3: 'audio/mpeg', mp4: 'video/mp4', wav: 'audio/wav', flac: 'audio/flac', m4a: 'audio/mp4', ogg: 'audio/ogg', webm: 'video/webm',
-}
+export const UPLOAD_TYPES: Record<string, string> = MIME_TYPES
 export class UploadError extends Error { constructor(public status: number, message: string) { super(message) } }
 
-const FORMAT_BY_EXTENSION: Record<string, string> = { pdf: 'pdf', docx: 'document', xlsx: 'document', txt: 'document', vtt: 'document', pptx: 'slides',
-  mp3: 'audio', wav: 'audio', m4a: 'audio', flac: 'audio', ogg: 'audio', mp4: 'video', webm: 'video' }
-export const formatFor = (fileName: string) => FORMAT_BY_EXTENSION[fileName.split('.').pop()?.toLowerCase() ?? '']
+export const formatFor = (fileName: string) => ITEM_FORMAT[extensionOf(fileName)]
 /** "2026_tax-planning playbook.pdf" → "2026 tax planning playbook" */
 export const titleFromFileName = (fileName: string) =>
   fileName.replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ').replace(/\s*-\s*/g, ' - ').replace(/\s+/g, ' ').trim().slice(0, 200) || 'Untitled'
@@ -22,7 +17,7 @@ export const titleFromFileName = (fileName: string) =>
 export async function createItemFromFile(payload: Payload, user: { id: unknown; collection: 'users' }, file: File, title?: string) {
   const format = formatFor(file.name)
   if (!process.env.CONTENT_BUCKET) throw new UploadError(503, 'File storage is not configured.')
-  if (!format) throw new UploadError(415, 'Unsupported file type. Use PDF, Word, PowerPoint, Excel, VTT, text, MP3, MP4, WAV, M4A, FLAC, OGG, or WEBM.')
+  if (!format) throw new UploadError(415, `Unsupported file type. Use ${SUPPORTED_LABEL}.`)
   if (!file.size || file.size > MAX_DOCUMENT_BYTES) throw new UploadError(413, 'Files must be between 1 byte and 50 MB.')
   const item = await payload.create({ collection: 'content', overrideAccess: false, user: user as never, depth: 0, draft: false,
     data: { title: (title?.trim() || titleFromFileName(file.name)).slice(0, 200), format: format as never, evidenceVersion: 'unprocessed' } } as never) as { id: number }
@@ -47,7 +42,7 @@ export async function uploadSource(payload: Payload, contentId: number, file: Fi
   if (!content) throw new UploadError(404, 'Library item not found.')
   if (!['intake', 'draft'].includes(content.state)) throw new UploadError(409, 'Files can only be added while the item is in Intake or Draft. Ask an administrator to move it back to Draft.')
   const extension = file.name.split('.').pop()?.toLowerCase() ?? ''
-  if (!UPLOAD_TYPES[extension]) throw new UploadError(415, 'Unsupported file type. Use PDF, Word, PowerPoint, Excel, VTT, text, MP3, MP4, WAV, M4A, FLAC, OGG, or WEBM.')
+  if (!UPLOAD_TYPES[extension]) throw new UploadError(415, `Unsupported file type. Use ${SUPPORTED_LABEL}.`)
   if (!file.size || file.size > MAX_DOCUMENT_BYTES) throw new UploadError(413, 'Files must be between 1 byte and 50 MB.')
   const bytes = new Uint8Array(await file.arrayBuffer())
   const object = await stageOriginal(client, process.env.CONTENT_BUCKET, contentId, bytes, extension)

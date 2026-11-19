@@ -65,7 +65,8 @@ try {
 Start-Sleep 10
 
 $definition = @{
-    family = $service; networkMode = 'awsvpc'; requiresCompatibilities = @('FARGATE'); cpu = '512'; memory = '1024'
+    # Office files and zip packets up to 200 MB are read in memory (plus pictures for AI vision): 3 GB headroom.
+    family = $service; networkMode = 'awsvpc'; requiresCompatibilities = @('FARGATE'); cpu = '1024'; memory = '3072'
     runtimePlatform = @{ cpuArchitecture = 'X86_64'; operatingSystemFamily = 'LINUX' }
     executionRoleArn = "arn:aws:iam::${account}:role/aecp-dev-library-worker-execution"
     taskRoleArn = "arn:aws:iam::${account}:role/aecp-dev-library-worker-task"

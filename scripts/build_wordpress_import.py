@@ -498,12 +498,37 @@ def blob_file_name(blob):
     return blob['sha256'] + (suffix if re.fullmatch(r'\.[a-z0-9]{1,8}', suffix) else '.bin')
 
 
-def export_blobs(package, source, files_dir, exported):
-    """Copy each verified blob once into files_dir, re-hashing while copying. Never modifies the backup."""
+MiB = 1024 * 1024
+# Must match apps/platform/src/processing/formats.ts MAX_BYTES and import/attach.ts MIN_IMAGE_BYTES.
+EXPORT_LIMITS = {'pdf': 500 * MiB, 'docx': 200 * MiB, 'pptx': 200 * MiB, 'xlsx': 200 * MiB, 'xlsm': 200 * MiB, 'zip': 200 * MiB,
+                 'doc': 50 * MiB, 'xls': 50 * MiB, 'ppt': 50 * MiB, 'vtt': 4 * MiB, 'txt': 4 * MiB, 'svg': 2 * MiB,
+                 **{e: 2048 * MiB for e in ('mp3', 'mp4', 'wav', 'flac', 'm4a', 'ogg', 'webm')},
+                 **{e: 20 * MiB for e in ('jpg', 'jpeg', 'png', 'webp', 'gif')}}
+MIN_IMAGE_BYTES = 8 * 1024
+
+
+def export_skip_reason(blob):
+    ext = blob_file_name(blob).rsplit('.', 1)[-1]
+    if ext not in EXPORT_LIMITS:
+        return 'unsupported_' + ext
+    if blob['bytes'] > EXPORT_LIMITS[ext]:
+        return 'too_large_' + ext
+    if ext in ('jpg', 'jpeg', 'png', 'webp', 'gif') and blob['bytes'] < MIN_IMAGE_BYTES:
+        return 'icon'
+    return None
+
+
+def export_blobs(package, source, files_dir, exported, skipped=None):
+    """Copy each verified, processable blob once into files_dir, re-hashing while copying. Never modifies the backup."""
     files_dir.mkdir(exist_ok=True)
     for blob in package['blobs']:
         name = blob_file_name(blob)
         if name in exported:
+            continue
+        reason = export_skip_reason(blob)
+        if reason:
+            if skipped is not None:
+                skipped[reason] = skipped.get(reason, 0) + 1
             continue
         target = files_dir / name
         if not target.exists():
@@ -539,7 +564,7 @@ def batch(scan, source, output, size, max_batches=None, with_files=True):
     if not chunks:
         raise ValueError('no_eligible_pilot_records')
     output.mkdir(parents=True)
-    batches, exported = [], {}
+    batches, exported, skipped_files = [], {}, {}
     for n, chunk in enumerate(chunks, 1):
         name = f'batch-{n:03d}'
         summary = build(scan, source, output / name, size, ids=chunk)
@@ -547,12 +572,12 @@ def batch(scan, source, output, size, max_batches=None, with_files=True):
         if summary['records'] > BATCH_SIZE_MAX or edges > EDGE_MAX:
             raise ValueError('batch_exceeds_adapter_limits')
         if with_files:
-            export_blobs(load_complete(output / name), source.resolve(), output / 'files', exported)
+            export_blobs(load_complete(output / name), source.resolve(), output / 'files', exported, skipped_files)
         batches.append({'batch': name, 'packageId': summary['packageId'], 'records': summary['records'], 'relationships': edges})
         print(json.dumps({'built': name, 'records': summary['records'], 'relationships': edges}), flush=True)
     manifest = {'schema': 'ae-wordpress-batches/1', 'batches': batches,
                 'records': sum(b['records'] for b in batches), 'eligibleRecords': len(ids),
-                'files': sorted(exported.values(), key=lambda f: f['file'])}
+                'files': sorted(exported.values(), key=lambda f: f['file']), 'filesSkipped': skipped_files}
     (output / 'batches.json').write_text(json.dumps(manifest, indent=2, sort_keys=True) + '\n', encoding='utf-8')
     return manifest
 

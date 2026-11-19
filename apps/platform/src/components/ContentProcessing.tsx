@@ -1,7 +1,7 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDocumentInfo, useFormFields } from '@payloadcms/ui'
-import { sendFile, UPLOAD_HINT } from './upload-client'
+import { ACCEPT_ATTRIBUTE, SUPPORTED_LABEL, sendFile, UPLOAD_HINT } from './upload-client'
 
 type Status = {
   state: string; vimeoId: string | null; pendingUploads?: number
@@ -63,12 +63,12 @@ export default function ContentProcessing() {
   const pill = (state: string) => `ae-pill${state === 'failed' ? ' ae-pill--fail' : state === 'succeeded' ? ' ae-pill--ok' : state === 'running' ? ' ae-pill--info' : ''}`
   return <div className="ae-card" style={{ margin: '8px 0 24px' }}>
     <div className="ae-card-title">Processing</div>
-    <p className="ae-muted" style={{ margin: 0 }}>Upload the original file (PDF, Word, PowerPoint, Excel, captions, text, audio or video. {UPLOAD_HINT}){vimeoField ? ', or rely on the Vimeo ID above' : ''}. The system extracts the text, transcribes audio if needed, and suggests a summary and tags. Suggestions wait in Review; nothing is published automatically.</p>
+    <p className="ae-muted" style={{ margin: 0 }}>Upload the original file ({SUPPORTED_LABEL}. {UPLOAD_HINT}){vimeoField ? ', or rely on the Vimeo ID above' : ''}. The system reads the text (OCR for scans), transcribes audio and video, describes pictures, and suggests a summary, placement and tags. Suggestions wait in Review; nothing is published automatically.</p>
     {off && off.length > 0 && <p className="ae-notice ae-notice--warn">Note: {off.join(', ')} (Automation settings).</p>}
     {status && !['intake', 'draft'].includes(status.state)
       ? <p className="ae-muted">Files can be added while the item is in Intake or Draft.</p>
       : <label className="ae-file" style={{ marginTop: 12 }}>
-        <input ref={input} type="file" aria-label="Choose the source file" accept=".pdf,.docx,.pptx,.xlsx,.vtt,.txt,.mp3,.mp4,.wav,.m4a,.flac,.ogg,.webm" disabled={busy}
+        <input ref={input} type="file" aria-label="Choose the source file" accept={ACCEPT_ATTRIBUTE} disabled={busy}
           onChange={event => setChosen(event.target.files?.[0]?.name ?? '')} />
         <span className="ae-btn ae-btn--secondary ae-btn--small">Choose file</span>
         <span className="ae-file-name">{chosen || 'No file chosen'}</span>

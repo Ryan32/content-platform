@@ -1,12 +1,21 @@
 'use client'
+import { MAX_BYTES, MIME_TYPES, SIZE_HINT, extensionOf } from '../processing/formats'
 /**
  * One upload path for every screen. Files up to 50 MB post to the app as before. Larger audio/video (up to 2 GB) and
  * PDFs (up to 500 MB) go straight from the browser to private S3 storage with a short-lived signed URL; the background
  * worker then fingerprints the file and attaches it, and processing starts automatically.
  */
 export const DIRECT_LIMIT = 50 * 1024 * 1024
-const LARGE = /\.(mp3|mp4|wav|flac|m4a|ogg|webm|pdf)$/i
-export const UPLOAD_HINT = 'Up to 50 MB; audio and video up to 2 GB; PDFs up to 500 MB.'
+export const UPLOAD_HINT = SIZE_HINT
+export { ACCEPT_ATTRIBUTE, SUPPORTED_LABEL } from '../processing/formats'
+/** Problem with a file before upload, or null. */
+export function fileProblem(file: File) {
+  const ext = extensionOf(file.name)
+  if (!MIME_TYPES[ext]) return 'Unsupported file type.'
+  if (!file.size) return 'Empty file.'
+  const limit = MAX_BYTES[ext]
+  return file.size > limit ? `Larger than ${limit >= 1024 ** 3 ? `${limit / 1024 ** 3} GB` : `${limit / 1024 ** 2} MB`}.` : null
+}
 
 export class UploadFailure extends Error { constructor(message: string, public contentId?: number) { super(message) } }
 
@@ -14,7 +23,8 @@ export async function sendFile(file: File, options: { contentId?: number; title?
   Promise<{ contentId: number; large: boolean }> {
   const { contentId, title, onProgress } = options
   if (file.size > DIRECT_LIMIT) {
-    if (!LARGE.test(file.name)) throw new UploadFailure('Files over 50 MB must be audio, video or PDF.')
+    const problem = fileProblem(file)
+    if (problem) throw new UploadFailure(problem)
     const response = await fetch('/library-api/uploads', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: file.name, size: file.size, ...(contentId ? { contentId } : {}), ...(title ? { title } : {}) }) })
     const signed = await response.json().catch(() => ({}))

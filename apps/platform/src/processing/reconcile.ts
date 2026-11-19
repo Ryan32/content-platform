@@ -3,9 +3,8 @@ import type { JobStore } from './jobs'
 import { PROCESSOR } from './jobs'
 import { approvedModels, paidBlock, type AutomationSettings } from './settings'
 
-const DOCUMENT_FORMATS = ['pdf', 'docx', 'pptx', 'xlsx', 'vtt', 'txt'] as const
-const MEDIA = /\.(mp3|mp4|wav|flac|m4a|ogg|webm)$/
-const ANALYZABLE = [...DOCUMENT_FORMATS, 'mp3', 'mp4', 'wav', 'flac', 'm4a', 'ogg', 'webm']
+import { DOCUMENT_FORMATS, IMAGE_FORMATS, MEDIA_FORMATS, isDocument, isImage, isMedia } from './formats'
+const ANALYZABLE = [...DOCUMENT_FORMATS, ...MEDIA_FORMATS, ...IMAGE_FORMATS]
 
 export interface ReconcileResult { queued: number; waiting: Record<string, number> }
 
@@ -25,10 +24,16 @@ export async function reconcile(db: Pool, store: JobStore, settings: AutomationS
     ORDER BY a.id LIMIT $1`, [batch])
   for (const file of files.rows) {
     const extension = String(file.object_key).split('.').pop()?.toLowerCase() ?? ''
-    if ((DOCUMENT_FORMATS as readonly string[]).includes(extension)) {
+    if (isDocument(extension)) {
       if (!settings.documentsEnabled) { wait('documents_turned_off'); continue }
       await store.enqueue(file.content_id, file.source_hash, { kind: 'document', assetId: file.id, format: extension })
-    } else if (MEDIA.test(`.${extension}`)) {
+    } else if (isImage(extension)) {
+      if (!settings.documentsEnabled) { wait('documents_turned_off'); continue }
+      // SVG text is read for free; raster pictures need AI vision (counted like AI tagging).
+      const blocked = extension === 'svg' ? null : await paidBlock(db, 'tagging', settings)
+      if (blocked) { wait(blocked); continue }
+      await store.enqueue(file.content_id, file.source_hash, { kind: 'image', assetId: file.id, format: extension })
+    } else if (isMedia(extension)) {
       const blocked = await paidBlock(db, 'transcription', settings)
       if (blocked) { wait(blocked); continue }
       await store.enqueue(file.content_id, file.source_hash, { kind: 'transcribe', assetId: file.id })

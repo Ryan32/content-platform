@@ -1,8 +1,8 @@
 'use client'
-import { sendFile, UploadFailure, UPLOAD_HINT } from './upload-client'
+import { ACCEPT_ATTRIBUTE, fileProblem, sendFile, UploadFailure, UPLOAD_HINT } from './upload-client'
 import { useRef, useState } from 'react'
 
-const TYPES = '.pdf,.docx,.pptx,.xlsx,.vtt,.txt,.mp3,.mp4,.wav,.m4a,.flac,.ogg,.webm'
+const TYPES = ACCEPT_ATTRIBUTE
 const MAX_FILES = 50
 const MAX_BYTES = 50 * 1024 * 1024
 type Row = { key: string; file: File; title: string; status: 'ready' | 'uploading' | 'done' | 'error'; message?: string; contentId?: number }
@@ -24,8 +24,7 @@ export default function BulkAdd() {
     const accepted = TYPES.split(',')
     const next = [...list].slice(0, Math.max(0, MAX_FILES - rows.length)).map(file => {
       const ext = '.' + (file.name.split('.').pop() ?? '').toLowerCase()
-      const limit = /^\.(mp3|mp4|wav|flac|m4a|ogg|webm)$/.test(ext) ? 2 * 1024 ** 3 : ext === '.pdf' ? 500 * 1024 ** 2 : MAX_BYTES
-      const problem = !accepted.includes(ext) ? 'Unsupported file type.' : file.size > limit ? `Larger than ${limit === MAX_BYTES ? '50 MB' : limit > MAX_BYTES * 20 ? '2 GB' : '500 MB'}.` : !file.size ? 'Empty file.' : undefined
+      const problem = !accepted.includes(ext) ? 'Unsupported file type.' : fileProblem(file) ?? undefined
       return { key: `${file.name}-${file.size}-${file.lastModified}-${Math.random()}`, file, title: titleFrom(file.name),
         status: problem ? 'error' : 'ready', message: problem } as Row
     })
@@ -55,7 +54,7 @@ export default function BulkAdd() {
       <p style={{ margin: '0 0 12px' }}>Drag files here, or</p>
       <button type="button" className="btn btn--style-secondary btn--size-small" style={{ margin: 0 }} onClick={() => picker.current?.click()} disabled={running}>Choose files</button>
       <input ref={picker} type="file" multiple accept={TYPES} hidden onChange={e => { add(e.target.files); e.target.value = '' }} />
-      <p style={{ color: 'var(--theme-elevation-500)', fontSize: 13, margin: '12px 0 0' }}>Up to {MAX_FILES} files. {UPLOAD_HINT} PDF, Word, PowerPoint, Excel, captions, text, audio, or video.</p>
+      <p style={{ color: 'var(--theme-elevation-500)', fontSize: 13, margin: '12px 0 0' }}>Up to {MAX_FILES} files. {UPLOAD_HINT} PDF, Word, PowerPoint, Excel, zip packets, captions, text, images, audio, or video.</p>
     </div>
     {rows.length > 0 && <>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>

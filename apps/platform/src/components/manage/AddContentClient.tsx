@@ -1,8 +1,8 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { sendFile, UploadFailure, UPLOAD_HINT } from '../upload-client'
+import { ACCEPT_ATTRIBUTE, SUPPORTED_LABEL, sendFile, UploadFailure, UPLOAD_HINT } from '../upload-client'
 
-const TYPES = '.pdf,.docx,.pptx,.xlsx,.vtt,.txt,.mp3,.mp4,.wav,.m4a,.flac,.ogg,.webm'
+const TYPES = ACCEPT_ATTRIBUTE
 const titleFrom = (name: string) => name.replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200) || 'Untitled'
 
 /** Step 1 of Add content: one file, a Vimeo link, or a how-to article written here. Creates the item and moves to step 2. */
@@ -53,7 +53,7 @@ export function UploadStep() {
     {mode === 'file' && <div className={`ae-drop${dragging ? ' on' : ''}`} onDragOver={e => { e.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)}
       onDrop={e => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) { setFile(f); if (!title) setTitle(titleFrom(f.name)) } }}>
       <strong>{file ? file.name : 'Drop a file here'}</strong>
-      <span className="ae-muted">{file ? `${(file.size / 1048576).toFixed(1)} MB` : `PDF, Word, PowerPoint, Excel, captions, text, audio or video. ${UPLOAD_HINT}`}</span>
+      <span className="ae-muted">{file ? `${(file.size / 1048576).toFixed(1)} MB` : `${SUPPORTED_LABEL}. ${UPLOAD_HINT}`}</span>
       <button type="button" className="ae-btn ae-btn--secondary ae-btn--small" onClick={() => picker.current?.click()}>{file ? 'Replace' : 'Choose a file'}</button>
       <input ref={picker} type="file" accept={TYPES} hidden onChange={e => { const f = e.target.files?.[0]; if (f) { setFile(f); if (!title) setTitle(titleFrom(f.name)) } }} />
     </div>}

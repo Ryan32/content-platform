@@ -1,8 +1,8 @@
 import { XMLParser, XMLValidator } from 'fast-xml-parser'
 import { crc32, inflateRawSync } from 'node:zlib'
 import { ProcessingError } from './jobs'
-
-export type DocumentFormat = 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'vtt' | 'txt'
+import { MAX_BYTES, extensionOf, isDocument, isImage, type DocumentFormat } from './formats'
+export type { DocumentFormat } from './formats'
 export interface Extraction {
   passages: { id: string; text: string; locator: string }[]
   warnings: string[]
@@ -35,7 +35,9 @@ export class EvidenceBuilder {
 }
 
 // Read only bounded, named OOXML parts. Cap actual inflate output independently of ZIP metadata.
-function readParts(input: Uint8Array, selected: RegExp) {
+type PartLimits = { part: number; total: number }
+const OFFICE_PART_LIMITS: PartLimits = { part: 4 * MiB, total: 16 * MiB }
+export function readParts(input: Uint8Array, selected: RegExp, limits: PartLimits = OFFICE_PART_LIMITS) {
   const data = Buffer.from(input.buffer, input.byteOffset, input.byteLength)
   const invalid = () => new ProcessingError('invalid_office_archive')
   let end = data.length - 22
@@ -58,7 +60,7 @@ function readParts(input: Uint8Array, selected: RegExp) {
     if (offset > end) throw invalid()
     if (!selected.test(name)) continue
     total += expanded
-    if (expanded > 4 * MiB || total > 16 * MiB || expanded > Math.max(compressed * 250, 64 * 1024)) throw new ProcessingError('office_expansion_limit')
+    if (expanded > limits.part || total > limits.total || expanded > Math.max(compressed * 250, 64 * 1024)) throw new ProcessingError('office_expansion_limit')
     if (parts.has(name) || encrypted || (method !== 0 && method !== 8) || local + 30 > end || data.readUInt32LE(local) !== 0x04034b50) throw invalid()
     const start = local + 30 + data.readUInt16LE(local + 26) + data.readUInt16LE(local + 28)
     if (start + compressed > end || (method === 0 && expanded !== compressed)) throw invalid()
@@ -103,9 +105,12 @@ const selectedParts = {
   pptx: /^ppt\/(?:presentation\.xml|_rels\/presentation\.xml\.rels|slides\/slide[1-9]\d{0,5}\.xml)$/,
   xlsx: /^xl\/(?:workbook\.xml|_rels\/workbook\.xml\.rels|sharedStrings\.xml|worksheets\/sheet[1-9]\d{0,5}\.xml)$/,
 }
+const SLIDE_RELS = /^ppt\/slides\/_rels\/slide[1-9]\d{0,5}\.xml\.rels$/
+const RASTER = /\.(jpe?g|png|gif|webp)$/i
 
-function office(input: Uint8Array, format: keyof typeof selectedParts, output: EvidenceBuilder) {
-  const parts = readParts(input, selectedParts[format])
+function office(input: Uint8Array, format: keyof typeof selectedParts, output: EvidenceBuilder, stats?: ExtractStats) {
+  const parts = readParts(input, format === 'pptx' ? new RegExp(`${selectedParts.pptx.source}|${SLIDE_RELS.source}`) : selectedParts[format])
+  const pictureSlides: { slide: number; media: string }[] = []
   if (format === 'docx') {
     const document = parts.get('word/document.xml')
     if (!document) throw new ProcessingError('missing_document_part')
@@ -135,7 +140,18 @@ function office(input: Uint8Array, format: keyof typeof selectedParts, output: E
     seen.add(key)
     const part = xml(bytes)
     if (slides) {
-      output.add(nodes(part, 'p').map(p => textOf(children(p, 'p'), 't')).join(' '), 'Slide ' + (i + 1))
+      const text = nodes(part, 'p').map(p => textOf(children(p, 'p'), 't')).join(' ')
+      output.add(text, 'Slide ' + (i + 1))
+      // Slides that are essentially a picture (scanned page, infographic, screenshot): remember their images for AI vision.
+      const slideRels = parts.get(key.replace(/slides\/(slide\d+\.xml)$/, 'slides/_rels/$1.rels'))
+      if (stats && slideRels && text.replace(/\s+/g, '').length < 25) {
+        for (const rel of nodes(xml(slideRels), 'Relationship')) {
+          const target = attribute(rel, 'Target') ?? ''
+          if (!String(attribute(rel, 'Type') ?? '').endsWith('/image') || attribute(rel, 'TargetMode') === 'External' || !RASTER.test(target)) continue
+          const media = target.startsWith('/') ? target.slice(1) : 'ppt/' + target.replace(/^\.\.\//, '')
+          if (/^ppt\/media\/[\w.-]+$/.test(media)) pictureSlides.push({ slide: i + 1, media })
+        }
+      }
     } else {
       const sheet = (attribute(item, 'name') ?? String(i + 1)).slice(0, 60)
       for (const c of nodes(part, 'c')) {
@@ -150,6 +166,86 @@ function office(input: Uint8Array, format: keyof typeof selectedParts, output: E
       }
     }
   }
+  if (stats && pictureSlides.length) {
+    const wanted = pictureSlides.slice(0, 25)
+    const names = new Set(wanted.map(w => w.media))
+    const escape = (n: string) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const media = readParts(input, new RegExp(`^(?:${[...names].map(escape).join('|')})$`), { part: 8 * MiB, total: 120 * MiB })
+    for (const w of wanted) {
+      const bytes = media.get(w.media)
+      if (bytes) stats.images.push({ label: `Slide ${w.slide} (picture)`, bytes, format: extensionOf(w.media) })
+    }
+    if (pictureSlides.length > wanted.length) output.result.warnings.push(`${pictureSlides.length - wanted.length} more picture-only slide image(s) were not read.`)
+  }
+}
+
+/**
+ * Older binary Office files (.doc/.xls/.ppt, OLE2). No parser: recover readable text runs (UTF-16 and 8-bit) from the
+ * file. Approximate by design and labelled as such; formatting and table structure are lost.
+ */
+function legacy(bytes: Uint8Array, output: EvidenceBuilder) {
+  const ole = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]
+  if (bytes.length < 512 || ole.some((b, i) => bytes[i] !== b)) throw new ProcessingError('invalid_document')
+  const runs: string[] = [], seen = new Set<string>()
+  const keep = (run: string) => {
+    const text = run.replace(/[\t ]+/g, ' ').trim()
+    const letters = (text.match(/[A-Za-z]/g) ?? []).length
+    if (text.length >= 6 && letters >= 4 && letters / text.length > 0.5 && !seen.has(text)) { seen.add(text); runs.push(text) }
+  }
+  const printable = (c: number) => (c >= 32 && c < 127) || (c >= 160 && c < 0x2000) || [0x2018, 0x2019, 0x201c, 0x201d, 0x2013, 0x2014, 9].includes(c)
+  for (const start of [0, 1]) {
+    let run = ''
+    for (let i = start; i + 1 < bytes.length; i += 2) {
+      const c = bytes[i] | (bytes[i + 1] << 8)
+      if (printable(c)) run += String.fromCharCode(c)
+      else if (c === 13 || c === 10) run += '\n'
+      else { run.split('\n').forEach(keep); run = '' }
+    }
+    run.split('\n').forEach(keep)
+  }
+  let run = ''
+  for (const b of bytes) {
+    if ((b >= 32 && b < 127) || b === 9) run += String.fromCharCode(b)
+    else if (b === 13 || b === 10) run += '\n'
+    else { run.split('\n').forEach(keep); run = '' }
+  }
+  run.split('\n').forEach(keep)
+  runs.forEach((text, i) => output.add(text, 'Text block ' + (i + 1)))
+  output.result.warnings.push('Older Office format: text was recovered approximately; formatting and tables are not preserved. Check against the original.')
+}
+
+const ZIP_ENTRY = /^(?!__MACOSX\/)(?!(?:.*\/)?\.)[^\\]+\.(?:pdf|docx|pptx|xlsx|xlsm|txt|vtt|doc|xls|ppt|jpe?g|png|gif|webp|svg)$/i
+/** Zip packets: read every supported file inside (no nested zips). Pictures are handed to AI vision by the caller. */
+async function zipPacket(bytes: Uint8Array, output: EvidenceBuilder, stats?: ExtractStats) {
+  const entries = [...readParts(bytes, ZIP_ENTRY, { part: 60 * MiB, total: 400 * MiB }).entries()].sort(([a], [b]) => a.localeCompare(b))
+  if (!entries.length) throw new ProcessingError('no_extractable_text')
+  if (entries.length > 300) throw new ProcessingError('office_part_limit')
+  for (const [name, entry] of entries) {
+    const ext = extensionOf(name), label = name.split('/').pop()!.slice(0, 120)
+    if (isImage(ext)) {
+      if (ext === 'svg') { try { svgText(entry, output, label) } catch { output.result.warnings.push(`${label} could not be read.`) } }
+      else if (stats) stats.images.push({ label: `${label} (picture)`, bytes: entry, format: ext })
+      continue
+    }
+    if (!isDocument(ext) || ext === 'zip') continue
+    try {
+      const inner = await extractDocument(entry, ext)
+      for (const p of inner.passages) output.add(p.text, `${label} · ${p.locator}`)
+      for (const w of inner.warnings) output.result.warnings.push(`${label}: ${w}`)
+    } catch (error) {
+      output.result.warnings.push(`${label} inside the zip could not be read (${error instanceof ProcessingError ? error.code : 'invalid_document'}).`)
+    }
+  }
+}
+
+/** SVG titles, descriptions and visible text only. Parsed as inert XML; scripts, styles and links are ignored. */
+export function svgText(bytes: Uint8Array, output: EvidenceBuilder, label = 'Image') {
+  const doc = xml(bytes)
+  const text = ['title', 'desc', 'text'].flatMap(tag => nodes(doc, tag).flatMap(n => collectText(children(n, tag))))
+  output.add(text.join(' '), `${label} · text`)
+}
+function collectText(items: XmlNode[]): string[] {
+  return items.flatMap(item => Object.entries(item).flatMap(([k, v]) => k === '#text' ? [String(v)] : k === 'script' || k === 'style' ? [] : Array.isArray(v) ? collectText(v as XmlNode[]) : []))
 }
 
 function captions(raw: string, output: EvidenceBuilder) {
@@ -171,9 +267,14 @@ function captions(raw: string, output: EvidenceBuilder) {
   }
 }
 
-/** Filled for PDFs: how many pages have no native text layer (OCR candidates). */
-export interface PdfStats { pages: number; emptyPages: number }
-async function pdf(bytes: Uint8Array, output: EvidenceBuilder, stats?: PdfStats) {
+/**
+ * Side information for the caller: PDF pages without a text layer (OCR candidates) and pictures (picture-only slides,
+ * images inside zips) for AI vision, which is a paid step the caller decides on.
+ */
+export interface ExtractStats { pages: number; emptyPages: number; images: { label: string; bytes: Uint8Array; format: string }[] }
+export type PdfStats = ExtractStats
+export const emptyStats = (): ExtractStats => ({ pages: 0, emptyPages: 0, images: [] })
+async function pdf(bytes: Uint8Array, output: EvidenceBuilder, stats?: ExtractStats) {
   if (!Buffer.from(bytes.subarray(0, 1024)).includes('%PDF-')) throw new ProcessingError('invalid_pdf')
   const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs')
   const task = getDocument({ data: Uint8Array.from(bytes), stopAtErrors: true, useWorkerFetch: false,
@@ -207,8 +308,9 @@ async function pdf(bytes: Uint8Array, output: EvidenceBuilder, stats?: PdfStats)
   } finally { await task.destroy() }
 }
 
-export async function extractDocument(bytes: Uint8Array, format: DocumentFormat, stats?: PdfStats): Promise<Extraction> {
-  if (!bytes.length || bytes.length > 50 * MiB) throw new ProcessingError('input_size_limit')
+export async function extractDocument(bytes: Uint8Array, format: DocumentFormat, stats?: ExtractStats): Promise<Extraction> {
+  // PDFs over 50 MB are read by OCR instead (see runtime); everything else up to its type's limit.
+  if (!bytes.length || bytes.length > (format === 'pdf' ? 50 * MiB : MAX_BYTES[format])) throw new ProcessingError('input_size_limit')
   const output = new EvidenceBuilder('ae-' + format + '/1')
   try {
     if (format === 'pdf') await pdf(bytes, output, stats)
@@ -218,7 +320,11 @@ export async function extractDocument(bytes: Uint8Array, format: DocumentFormat,
       if (raw.includes('\0')) throw new ProcessingError('invalid_text')
       if (format === 'vtt') captions(raw, output)
       else raw.split(/\r?\n\s*\r?\n/).forEach((p, i) => output.add(p, 'Paragraph ' + (i + 1)))
-    } else office(bytes, format, output)
+    } else if (format === 'doc' || format === 'xls' || format === 'ppt') legacy(bytes, output)
+    else if (format === 'zip') await zipPacket(bytes, output, stats)
+    else office(bytes, format === 'xlsm' ? 'xlsx' : format, output, stats)
+    // Picture-only decks and picture-only zips have no text yet; the caller adds AI vision passages.
+    if (!output.result.passages.length && stats?.images.length) return output.result
     return output.finish()
   } catch (error) {
     if (error instanceof ProcessingError) throw error

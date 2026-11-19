@@ -1,4 +1,5 @@
 import { assertImport, validatePackage } from './package'
+import { MAX_BYTES, MIME_TYPES, isImage } from '../processing/formats'
 
 /**
  * Attaches an imported package's verified file bytes to their library items so the normal processing pipeline
@@ -9,11 +10,9 @@ import { assertImport, validatePackage } from './package'
  * existing object or asset row is reused. Items whose current source version differs from the package (a staged
  * change awaiting review) are skipped, never overwritten. Only processable types are attached.
  */
-export const ATTACH_TYPES: Record<string, string> = {
-  pdf: 'application/pdf', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  vtt: 'text/vtt', txt: 'text/plain', mp3: 'audio/mpeg', mp4: 'video/mp4', wav: 'audio/wav', flac: 'audio/flac', m4a: 'audio/mp4', ogg: 'audio/ogg', webm: 'video/webm',
-}
+export const ATTACH_TYPES: Record<string, string> = MIME_TYPES
+/** Raster images under this size are icons, bullets and spacers: not worth AI vision. */
+export const MIN_IMAGE_BYTES = 8 * 1024
 
 export interface AttachDeps {
   content(sourceKey: string): Promise<{ id: number; sourceHash: string | null } | null>
@@ -46,6 +45,8 @@ export async function attachFiles(input: unknown, deps: AttachDeps) {
       const { ext, file } = blobFile(blob)
       const mimeType = ATTACH_TYPES[ext]
       if (!mimeType) { count(`skipped_unsupported_${ext}`); continue }
+      if (blob.bytes > MAX_BYTES[ext]) { count(`skipped_too_large_${ext}`); continue }
+      if (isImage(ext) && ext !== 'svg' && blob.bytes < MIN_IMAGE_BYTES) { count('skipped_icon'); continue }
       if (await deps.asset(target.id, blob.sha256, item.sourceHash)) { count('asset_existing'); continue }
       const key = `content/${target.id}/${file}`
       count(`object_${await deps.copy(file, key, blob.bytes)}`)

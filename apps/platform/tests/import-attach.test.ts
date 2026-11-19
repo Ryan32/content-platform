@@ -40,7 +40,7 @@ describe('import file attach', () => {
     const p = fixture()
     const m = memory({ [p.content[0].sourceKey]: p.content[0].sourceHash, [p.content[1].sourceKey]: p.content[1].sourceHash })
     const first = await attachFiles(p, m.deps)
-    expect(first.counts).toMatchObject({ asset_created: 2, object_copied: 2, skipped_unsupported_jpg: 2 })
+    expect(first.counts).toMatchObject({ asset_created: 2, object_copied: 2, skipped_icon: 2 })  // 9-byte "photo" is an icon
     // Same bytes on two articles stay two separate item files.
     expect(m.assets.map(a => a.objectKey)).toEqual([`content/11/${p.blobs[0].sha256}.pdf`, `content/12/${p.blobs[0].sha256}.pdf`])
     expect(m.assets.every(a => a.mimeType === 'application/pdf')).toBe(true)

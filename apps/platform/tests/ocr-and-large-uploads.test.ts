@@ -43,7 +43,9 @@ describe('REQ-ASSET-03: uploads over 50 MB go straight to private S3 staging', (
   it('accepts large audio/video up to 2 GB and PDFs up to 500 MB, nothing else', () => {
     expect(checkLargeFile('webinar.MP4', 900 * 1024 ** 2)).toBe('mp4')
     expect(checkLargeFile('scan.pdf', 400 * 1024 ** 2)).toBe('pdf')
-    expect(() => checkLargeFile('deck.pptx', 80 * 1024 ** 2)).toThrow(UploadError)
+    expect(checkLargeFile('deck.pptx', 80 * 1024 ** 2)).toBe('pptx')
+    expect(() => checkLargeFile('deck.pptx', 742 * 1024 ** 2)).toThrow('200 MB')   // the oversized deck is refused
+    expect(() => checkLargeFile('notes.txt', 80 * 1024 ** 2)).toThrow(UploadError)
     expect(() => checkLargeFile('webinar.mp4', 3 * 1024 ** 3)).toThrow('2 GB')
     expect(() => checkLargeFile('scan.pdf', 600 * 1024 ** 2)).toThrow('500 MB')
     expect(() => checkLargeFile('small.mp4', 10 * 1024 ** 2)).toThrow()

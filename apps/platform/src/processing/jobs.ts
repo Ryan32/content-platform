@@ -1,10 +1,13 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
+import { DOCUMENT_FORMATS, IMAGE_FORMATS } from './formats'
 
 export const PROCESSOR = 'ae-processing/1'
 export const inputSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('document'), assetId: z.number().int().positive(), format: z.enum(['pdf', 'docx', 'pptx', 'xlsx', 'vtt', 'txt']) }).strict(),
+  z.object({ kind: z.literal('document'), assetId: z.number().int().positive(), format: z.enum(DOCUMENT_FORMATS) }).strict(),
+  // Pictures: SVG text is free; raster images are read by AI vision (a paid step).
+  z.object({ kind: z.literal('image'), assetId: z.number().int().positive(), format: z.enum(IMAGE_FORMATS) }).strict(),
   z.object({ kind: z.literal('vimeo'), videoId: z.string().regex(/^\d+$/).optional() }).strict(),
   z.object({ kind: z.literal('transcribe'), assetId: z.number().int().positive() }).strict(),
   z.object({ kind: z.literal('classify'), extractionJobId: z.number().int().positive(), modelId: z.string().min(1).max(250),
